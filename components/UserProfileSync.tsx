@@ -1,6 +1,6 @@
-// Revidera components/UserProfileSync.tsx
+// components/UserProfileSync.tsx - Uppdaterad för att undvika skärmblinkning
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { styled } from 'nativewind';
 import { supabase } from '@/lib/supabase';
@@ -15,8 +15,13 @@ export const UserProfileSync: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const avatarId = useStore(state => state.avatar.id);
   const veganStatus = useStore(state => state.veganStatus.status);
+  const syncAttemptedRef = useRef(false);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
+    // Endast synkronisera om vi inte har försökt redan
+    if (syncAttemptedRef.current) return;
+    
     const syncUserProfile = async () => {
       try {
         // Hämta användardata direkt från Supabase
@@ -36,7 +41,12 @@ export const UserProfileSync: React.FC = () => {
           (metadata.vegan_status && metadata.vegan_status !== veganStatus)
         )) {
           console.log('Syncing user profile from Supabase metadata');
-          setSyncing(true);
+          
+          // Sätt en kort fördröjning innan vi visar laddningsskärmen
+          // för att undvika snabba blinkningar vid korta operationer
+          syncTimeoutRef.current = setTimeout(() => {
+            setSyncing(true);
+          }, 300);
           
           // Uppdatera avatar-information
           if (metadata.avatar_style && metadata.avatar_id) {
@@ -67,11 +77,20 @@ export const UserProfileSync: React.FC = () => {
             });
           }
           
-          // Tillåt lite tid för animationen att visas
+          // Avbryt timeout om vi hann bli färdiga innan den triggats
+          if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+            syncTimeoutRef.current = null;
+          }
+          
+          // Stäng laddningsindikatorn efter en kort fördröjning för att undvika ryckig UI
           setTimeout(() => {
             setSyncing(false);
-          }, 1000);
+          }, 500);
         }
+        
+        // Markera att vi har försökt synkronisera
+        syncAttemptedRef.current = true;
       } catch (error) {
         console.error('Error syncing user profile:', error);
         setSyncing(false);
@@ -79,6 +98,13 @@ export const UserProfileSync: React.FC = () => {
     };
     
     syncUserProfile();
+    
+    return () => {
+      // Rensa timeout om komponenten unmountas
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
   }, [avatarId, veganStatus]);
   
   if (!syncing) return null;

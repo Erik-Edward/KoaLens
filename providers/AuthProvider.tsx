@@ -126,7 +126,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('AuthProvider: Initial session check', { 
         hasSession: !!session,
-        emailConfirmed: session?.user?.email_confirmed_at
+        emailConfirmed: session?.user?.email_confirmed_at,
+        hasAvatar: !!session?.user?.user_metadata?.avatar_id
       })
 
       setSession(session)
@@ -141,6 +142,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         // Sätt onboarding som slutförd om användaren har verifierad e-post
         await markOnboardingAsCompleted();
+
+        // Synkronisera avatardata från Supabase (om den finns)
+        const userData = session.user;
+        const store = useStore.getState();
+        const metadata = userData.user_metadata;
+        
+        if (metadata) {
+          // Om det finns avatar-information i metadata, uppdatera Zustand store
+          if (metadata.avatar_id && metadata.avatar_style) {
+            console.log('AuthProvider: Synkroniserar avatar vid session check:', {
+              style: metadata.avatar_style,
+              id: metadata.avatar_id
+            });
+            
+            await store.setAvatar(
+              metadata.avatar_style as AvatarStyle, 
+              metadata.avatar_id as string
+            );
+            
+            if (typeof metadata.vegan_years === 'number') {
+              await store.setVeganYears(metadata.vegan_years);
+            }
+          }
+          
+          // Synkronisera vegan-status
+          if (metadata.vegan_status) {
+            await store.setVeganStatus(metadata.vegan_status as VeganStatus);
+          }
+        }
         
         // Om detta är första inloggningen efter verifiering
         if (!session.user.last_sign_in_at) {
@@ -209,16 +239,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         if (userData.user_metadata) {
           const metadata = userData.user_metadata
+          
           // Uppdatera avatar-information om den finns
           if (metadata.avatar_style && metadata.avatar_id) {
+            console.log('AuthProvider: Synkroniserar avatar från user_metadata vid auth change:', {
+              style: metadata.avatar_style,
+              id: metadata.avatar_id
+            });
+            
             await store.setAvatar(
               metadata.avatar_style as AvatarStyle, 
               metadata.avatar_id as string
             )
+            
             if (typeof metadata.vegan_years === 'number') {
               await store.setVeganYears(metadata.vegan_years)
             }
           }
+          
           // Uppdatera vegan-status om den finns
           if (metadata.vegan_status) {
             await store.setVeganStatus(metadata.vegan_status as VeganStatus)
@@ -236,30 +274,79 @@ export function AuthProvider({ children }: AuthProviderProps) {
             router.replace('/(auth)/login')
           }
           break
-        case 'USER_UPDATED':
-          console.log('AuthProvider: Användare uppdaterad', {
-            emailConfirmed: session?.user.email_confirmed_at
-          })
-          
-          // Om användaren just har verifierat sin e-post
-          if (session?.user.email_confirmed_at) {
-            // Sätt onboarding som slutförd
-            await markOnboardingAsCompleted();
-            
-            // Avgör om det är första gången användaren loggar in efter verifiering
-            if (!session.user.last_sign_in_at) {
-              console.log('AuthProvider: First verification via auth state, redirecting to login')
-              router.replace('/(auth)/login?verified=true')
-            } else {
-              console.log('AuthProvider: User updated with verified email, redirecting to scan')
-              router.replace('/(tabs)/(scan)')
-            }
-          }
-          break
+          case 'USER_UPDATED':
+  console.log('AuthProvider: Användare uppdaterad', {
+    emailConfirmed: session?.user.email_confirmed_at,
+    hasAvatar: !!session?.user.user_metadata?.avatar_id,
+    isAvatarUpdate: session?.user.user_metadata?.avatar_update === true,
+    isNavigationBlocked: global.isBlockingNavigation === true
+  })
+  
+  // Om navigationsspärren är aktiv, utför inte någon navigering
+  // Detta förhindrar oavsiktlig navigering vid avatarbyten
+  if (global.isBlockingNavigation === true) {
+    console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
+    break;
+  }
+  
+  // Om användaren just har uppdaterats, synkronisera data från Supabase
+  if (session?.user) {
+    const userData = session.user;
+    const store = useStore.getState();
+    const metadata = userData.user_metadata;
+    
+    if (metadata) {
+      // Synkronisera avatar om den finns i metadata
+      if (metadata.avatar_id && metadata.avatar_style) {
+        console.log('AuthProvider: Synkroniserar avatar efter USER_UPDATED:', {
+          style: metadata.avatar_style,
+          id: metadata.avatar_id
+        });
+        
+        // Använd await för att säkerställa att denna operation slutförs
+        await store.setAvatar(
+          metadata.avatar_style as AvatarStyle, 
+          metadata.avatar_id as string
+        );
+      }
+      
+      // Synkronisera vegan-status och år
+      if (metadata.vegan_status) {
+        await store.setVeganStatus(metadata.vegan_status as VeganStatus);
+        
+        if (typeof metadata.vegan_years === 'number') {
+          await store.setVeganYears(metadata.vegan_years);
+        }
+      }
+    }
+  }
+  
+  // Om avatarflaggan är true, avbryt ytterligare hantering
+  if (session?.user.user_metadata?.avatar_update === true) {
+    console.log('AuthProvider: Avatar update detected, staying on current screen');
+    break;
+  }
+  
+  // Fortsätt med normal navigering för e-postverifiering
+  if (session?.user.email_confirmed_at) {
+    // Sätt onboarding som slutförd
+    await markOnboardingAsCompleted();
+    
+    // Avgör om det är första gången användaren loggar in efter verifiering
+    if (!session.user.last_sign_in_at) {
+      console.log('AuthProvider: First verification via auth state, redirecting to login')
+      router.replace('/(auth)/login?verified=true')
+    } else {
+      console.log('AuthProvider: User updated with verified email, redirecting to scan')
+      router.replace('/(tabs)/(scan)')
+    }
+  }
+  break
         case 'SIGNED_IN':
           console.log('AuthProvider: Användare inloggad', {
             emailConfirmed: session?.user.email_confirmed_at,
-            email: session?.user.email
+            email: session?.user.email,
+            hasAvatar: !!session?.user.user_metadata?.avatar_id
           })
           if (session?.user.email_confirmed_at) {
             router.replace('/(tabs)/(scan)')
@@ -328,6 +415,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
               
               // Om vi har en verifierad session, sätt onboarding som slutförd
               markOnboardingAsCompleted();
+
+              // Synkronisera avatar och användardata om det finns tillgängligt
+              if (session.user.user_metadata) {
+                const store = useStore.getState();
+                const metadata = session.user.user_metadata;
+                
+                // Uppdatera avatar om info finns
+                if (metadata.avatar_style && metadata.avatar_id) {
+                  console.log('AuthProvider: Synkroniserar avatar från polling:', {
+                    style: metadata.avatar_style,
+                    id: metadata.avatar_id
+                  });
+                  
+                  store.setAvatar(
+                    metadata.avatar_style as AvatarStyle, 
+                    metadata.avatar_id as string
+                  );
+                }
+              }
             }
           })
           remainingTime -= 5000
@@ -378,20 +484,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (userData.user_metadata) {
           const store = useStore.getState()
           const metadata = userData.user_metadata
+          
           // Uppdatera avatar-information om den finns
           if (metadata.avatar_style && metadata.avatar_id) {
+            console.log('AuthProvider: Synkroniserar avatar från inloggning:', {
+              style: metadata.avatar_style,
+              id: metadata.avatar_id
+            });
+            
             await store.setAvatar(
               metadata.avatar_style as AvatarStyle, 
               metadata.avatar_id as string
             )
+            
             if (typeof metadata.vegan_years === 'number') {
               await store.setVeganYears(metadata.vegan_years)
             }
           }
+          
           // Uppdatera vegan-status om den finns
           if (metadata.vegan_status) {
             await store.setVeganStatus(metadata.vegan_status as VeganStatus)
           }
+          
           console.log('AuthProvider: Användarprofil synkroniserad med store')
         }
       }
@@ -401,6 +516,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('AuthProvider: Refreshed session efter inloggning:', refreshed.data.session)
       setSession(refreshed.data.session)
       setUser(refreshed.data.session?.user ?? null)
+      
       if (!refreshed.data.session || !refreshed.data.session.user.email_confirmed_at) {
         console.log('AuthProvider: Inloggad session saknar verifierad e-post', { email })
         Alert.alert(
@@ -432,6 +548,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await supabase.auth.signOut()
         return
       }
+      
       console.log('AuthProvider: Inloggning lyckades, omdirigerar')
       router.replace('/(tabs)/(scan)')
     } catch (error) {
@@ -454,7 +571,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Hämta avatar och vegan-status från store
       const store = useStore.getState()
       
-      console.log('AuthProvider: Förbereder användarmetadata')
+      console.log('AuthProvider: Förbereder användarmetadata', {
+        avatarStyle: store.avatar.style,
+        avatarId: store.avatar.id,
+        veganYears: store.avatar.veganYears,
+        veganStatus: store.veganStatus.status
+      })
       
       const { data, error } = await supabase.auth.signUp({
         email,

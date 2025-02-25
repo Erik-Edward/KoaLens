@@ -1,4 +1,4 @@
-// components/Avatar.tsx
+// components/Avatar.tsx - Uppdaterad för att hantera ekorre-avataren
 import React from 'react';
 import { View, Image, Platform, StyleSheet } from 'react-native';
 import { styled } from 'nativewind';
@@ -35,6 +35,10 @@ const SCALE_ADJUSTMENTS: Record<string, { [key in 'cute' | 'cool']: number }> = 
   'koala': {
     cute: 0.83,
     cool: 0.88
+  },
+  'squirrel': {  // Lägg till skalningsjusteringar för ekorre
+    cute: 0.85,
+    cool: 0.85
   }
 };
 
@@ -79,19 +83,22 @@ const SUPPORTER_IMAGES = {
 const VEGAN_IMAGES = {
   cute: {
     small: {
-      sprout: require('@/assets/images/avatars/cute/64/sprout.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cute/64/squirrel.png'),
       rabbit: require('@/assets/images/avatars/cute/64/rabbit.png'),
       koala: require('@/assets/images/avatars/cute/64/koala.png'),
       turtle: require('@/assets/images/avatars/cute/64/turtle.png'),
     },
     medium: {
-      sprout: require('@/assets/images/avatars/cute/128/sprout_1.5x.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cute/128/squirrel_1.5x.png'),
       rabbit: require('@/assets/images/avatars/cute/128/rabbit_1.5x.png'),
       koala: require('@/assets/images/avatars/cute/128/koala_1.5x.png'),
       turtle: require('@/assets/images/avatars/cute/128/turtle_1.5x.png'),
     },
     large: {
-      sprout: require('@/assets/images/avatars/cute/256/sprout_3x.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cute/256/squirrel_3x.png'),
       rabbit: require('@/assets/images/avatars/cute/256/rabbit_3x.png'),
       koala: require('@/assets/images/avatars/cute/256/koala_3x.png'),
       turtle: require('@/assets/images/avatars/cute/256/turtle_3x.png'),
@@ -99,19 +106,22 @@ const VEGAN_IMAGES = {
   },
   cool: {
     small: {
-      sprout: require('@/assets/images/avatars/cool/64/sprout_cool.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cool/64/squirrel_cool.png'),
       rabbit: require('@/assets/images/avatars/cool/64/rabbit_cool.png'),
       koala: require('@/assets/images/avatars/cool/64/koala_cool.png'),
       turtle: require('@/assets/images/avatars/cool/64/turtle_cool.png'),
     },
     medium: {
-      sprout: require('@/assets/images/avatars/cool/128/sprout_cool_1.5x.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cool/128/squirrel_cool_1.5x.png'),
       rabbit: require('@/assets/images/avatars/cool/128/rabbit_cool_1.5x.png'),
       koala: require('@/assets/images/avatars/cool/128/koala_cool_1.5x.png'),
       turtle: require('@/assets/images/avatars/cool/128/turtle_cool_1.5x.png'),
     },
     large: {
-      sprout: require('@/assets/images/avatars/cool/256/sprout_cool_3x.png'),
+      // Byt från sprout till squirrel
+      squirrel: require('@/assets/images/avatars/cool/256/squirrel_cool_3x.png'),
       rabbit: require('@/assets/images/avatars/cool/256/rabbit_cool_3x.png'),
       koala: require('@/assets/images/avatars/cool/256/koala_cool_3x.png'),
       turtle: require('@/assets/images/avatars/cool/256/turtle_cool_3x.png'),
@@ -152,12 +162,40 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   const getImageSource = () => {
+    // Rensa bort eventuella filändelser och "_cool" suffix från sourcenamnet
     const baseName = source.replace(/(_cool)?\.png$/, '');
     
-    if (style === 'supporter') {
-      return SUPPORTER_IMAGES[size][baseName as keyof typeof SUPPORTER_IMAGES[typeof size]];
-    } else {
-      return VEGAN_IMAGES[style][size][baseName as keyof typeof VEGAN_IMAGES[typeof style][typeof size]];
+    try {
+      // Kontrollera om detta är en supporteravatar
+      if (style === 'supporter') {
+        // För supporter-stil, hämta från SUPPORTER_IMAGES
+        if (SUPPORTER_IMAGES[size] && SUPPORTER_IMAGES[size][baseName as keyof typeof SUPPORTER_IMAGES[typeof size]]) {
+          return SUPPORTER_IMAGES[size][baseName as keyof typeof SUPPORTER_IMAGES[typeof size]];
+        } else {
+          console.warn(`Kunde inte hitta supporter-avatar för ${baseName} med storlek ${size}`);
+          // Returnera en fallback-bild (första supporter-avataren)
+          const fallbackKey = Object.keys(SUPPORTER_IMAGES[size])[0] as keyof typeof SUPPORTER_IMAGES[typeof size];
+          return SUPPORTER_IMAGES[size][fallbackKey];
+        }
+      } else {
+        // För veganska avatarer (cute eller cool), hämta från VEGAN_IMAGES
+        // Kontrollera att stilen är antingen 'cute' eller 'cool'
+        const avatarStyle = (style === 'cute' || style === 'cool') ? style : 'cute';
+        
+        // Säkerställ att baseName är en giltig nyckel för den valda stilen och storleken
+        if (VEGAN_IMAGES[avatarStyle][size] && 
+            baseName in VEGAN_IMAGES[avatarStyle][size]) {
+          return VEGAN_IMAGES[avatarStyle][size][baseName as keyof typeof VEGAN_IMAGES[typeof avatarStyle][typeof size]];
+        } else {
+          console.warn(`Kunde inte hitta avatar för ${baseName} med stil ${avatarStyle} och storlek ${size}`);
+          // Returnera en fallback-bild om den begärda bilden inte finns
+          return VEGAN_IMAGES.cute[size].squirrel; // Ändrat från sprout till squirrel
+        }
+      }
+    } catch (error) {
+      console.error(`Fel vid hämtning av avatar: ${error}`);
+      // Returnera en säker fallback vid fel
+      return VEGAN_IMAGES.cute[size].squirrel; // Ändrat från sprout till squirrel
     }
   };
 

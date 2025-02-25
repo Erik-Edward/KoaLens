@@ -1,5 +1,5 @@
-// app/(tabs)/(profile)/index.tsx
-import { FC, useState } from 'react';
+// app/(tabs)/(profile)/index.tsx - med global navigationsspärr
+import { FC, useState, useEffect } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
@@ -7,6 +7,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
 import { Avatar } from '@/components/Avatar';
+import { AvatarSelectorModal } from '@/components/AvatarSelectorModal';
+import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
+import * as Haptics from 'expo-haptics';
+import { supabase } from '@/lib/supabase';
+
+// Skapa en global variabel för att blockera navigering tillfälligt
+// Denna kan nås från AuthProvider för att kontrollera om navigering bör blockeras
+if (typeof global.isBlockingNavigation === 'undefined') {
+  global.isBlockingNavigation = false;
+}
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -16,27 +26,19 @@ const ProfileScreen: FC = () => {
   const { user, signOut } = useAuth();
   const avatar = useStore(state => state.avatar);
   const veganStatus = useStore(state => state.veganStatus.status);
-  const [syncing, setSyncing] = useState(false);
+  const setAvatar = useStore(state => state.setAvatar);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [updating, setUpdating] = useState(false);
   
-  const handleSyncProfile = async () => {
-    try {
-      setSyncing(true);
-      
-      // Om du skulle implementera en faktisk synkroniseringsfunktion:
-      // await updateUserProfile();
-      
-      // Simulera laddningstid
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      Alert.alert('Profil uppdaterad', 'Din profil har synkroniserats.');
-    } catch (error) {
-      console.error('Sync error:', error);
-      Alert.alert('Fel', 'Ett oväntat fel inträffade. Försök igen senare.');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
+  // Återställ navigationsspärren när komponenten monteras och demonteras
+  useEffect(() => {
+    global.isBlockingNavigation = false;
+    
+    return () => {
+      global.isBlockingNavigation = false;
+    };
+  }, []);
+  
   const handleSettingsPress = () => {
     router.push('./settings');
   };
@@ -70,6 +72,63 @@ const ProfileScreen: FC = () => {
     );
   };
 
+  // Uppdaterad funktion för att synkronisera avatar med Supabase
+  const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
+    try {
+      setUpdating(true);
+      
+      // Aktivera navigationsspärren innan vi gör några ändringar
+      global.isBlockingNavigation = true;
+      console.log('Navigationsspärr aktiverad för avatarbyte');
+      
+      // 1. Uppdatera lokalt i Zustand-store
+      await setAvatar(style, filename);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // 2. Synkronisera med Supabase
+      if (user) {
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            avatar_style: style,
+            avatar_id: filename,
+            avatar_update: true,
+            vegan_years: avatar.veganYears,
+            vegan_status: veganStatus
+          }
+        });
+        
+        if (error) {
+          console.error('Fel vid uppdatering av avatar i Supabase:', error);
+          Alert.alert('Varning', 'Avataren uppdaterades lokalt men synkroniseringen med servern misslyckades.');
+        } else {
+          console.log('Avatar uppdaterad i Supabase');
+        }
+      }
+      
+      // Behåll navigationsspärren aktiv i 3 sekunder för att förhindra att
+      // någon annan navigation sker medan vi uppdaterar avataren
+      setTimeout(() => {
+        global.isBlockingNavigation = false;
+        console.log('Navigationsspärr inaktiverad efter avatarbyte');
+        
+        // Återställ avatar_update-flaggan
+        if (user) {
+          supabase.auth.updateUser({
+            data: {
+              avatar_update: false
+            }
+          }).catch(err => console.error('Fel vid återställning av avatar_update:', err));
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+      Alert.alert('Fel', 'Kunde inte uppdatera avataren. Försök igen senare.');
+      global.isBlockingNavigation = false;
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <StyledView 
       className="flex-1 bg-background-main"
@@ -78,18 +137,38 @@ const ProfileScreen: FC = () => {
       {/* Profile Info */}
       <StyledView className="px-4 pt-12 pb-6">
         <StyledView className="items-center">
-          {/* Visa avatar från lagrat val */}
-          {avatar.id ? (
-            <Avatar 
-              source={avatar.id}
-              size="large"
-              style={avatar.style}
-            />
-          ) : (
-            <StyledView className="w-24 h-24 bg-background-light rounded-full justify-center items-center mb-4">
-              <Ionicons name="person" size={48} color="#ffffff" />
+          {/* Visa avatar från lagrat val med klickbar funktion */}
+          <StyledPressable
+            onPress={() => setShowAvatarModal(true)}
+            className="relative"
+            accessibilityLabel="Ändra avatar"
+            accessibilityHint="Tryck för att välja en ny avatar"
+            disabled={updating}
+          >
+            {avatar.id ? (
+              <Avatar 
+                source={avatar.id}
+                size="large"
+                style={avatar.style}
+              />
+            ) : (
+              <StyledView className="w-24 h-24 bg-background-light rounded-full justify-center items-center mb-4">
+                <Ionicons name="person" size={48} color="#ffffff" />
+              </StyledView>
+            )}
+            
+            {/* Liten redigeringsikon */}
+            <StyledView className="absolute bottom-0 right-0 bg-primary rounded-full p-2">
+              <Ionicons name="pencil" size={16} color="#000000" />
             </StyledView>
-          )}
+            
+            {/* Liten indikator när uppdatering pågår */}
+            {updating && (
+              <StyledView className="absolute inset-0 bg-black/20 rounded-full items-center justify-center">
+                <Ionicons name="sync" size={32} color="#ffd33d" />
+              </StyledView>
+            )}
+          </StyledPressable>
           
           {/* Visa e-post */}
           {user?.email && (
@@ -113,30 +192,6 @@ const ProfileScreen: FC = () => {
 
       {/* Menu Items */}
       <StyledView className="px-4 space-y-4">
-        {/* Uppdatera profil */}
-        <StyledPressable 
-          onPress={handleSyncProfile}
-          disabled={syncing}
-          className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Uppdatera profil"
-        >
-          <Ionicons 
-            name={syncing ? "sync" : "sync-outline"} 
-            size={24} 
-            color="#ffffff" 
-          />
-          <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-            {syncing ? 'Uppdaterar...' : 'Uppdatera profil'}
-          </StyledText>
-          <Ionicons 
-            name="chevron-forward" 
-            size={24} 
-            color="#ffffff" 
-            style={{ marginLeft: 'auto' }}
-          />
-        </StyledPressable>
-
         {/* Settings */}
         <StyledPressable 
           onPress={handleSettingsPress}
@@ -188,6 +243,15 @@ const ProfileScreen: FC = () => {
           </StyledText>
         </StyledPressable>
       </StyledView>
+
+      {/* Avatar Selector Modal */}
+      <AvatarSelectorModal
+        visible={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onSelectAvatar={handleSelectAvatar}
+        currentAvatarId={avatar.id}
+        currentAvatarStyle={avatar.style}
+      />
     </StyledView>
   );
 };

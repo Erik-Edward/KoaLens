@@ -1,3 +1,4 @@
+// hooks/useUpdateUserProfile.ts - uppdaterad för att stödja avatar-uppdateringar
 import { useCallback } from 'react';
 import { useStore } from '@/stores/useStore';
 import { useAuth } from '@/providers/AuthProvider';
@@ -36,5 +37,30 @@ export const useUpdateUserProfile = () => {
     }
   }, [user, avatarData, veganStatus]);
   
-  return { updateUserProfile };
+  // Funktion för att bara uppdatera avataren
+  const updateAvatar = useCallback(async (style: AvatarStyle, avatarId: string) => {
+    if (!user) return false;
+    
+    try {
+      // Uppdatera endast avatar-relaterad metadata
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          avatar_style: style,
+          avatar_id: avatarId
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating avatar:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Exception updating avatar:', error);
+      return false;
+    }
+  }, [user]);
+  
+  return { updateUserProfile, updateAvatar };
 };

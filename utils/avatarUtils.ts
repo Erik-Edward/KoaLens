@@ -1,166 +1,140 @@
-// utils/avatarUtils.ts
+// utils/avatarUtils.ts - Uppdaterad med ekorre istället för grodd
+import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
+import { VeganStatus } from '@/stores/slices/createVeganStatusSlice';
+import { useStore } from '@/stores/useStore';
+
 export interface AvatarOption {
-    id: string;
-    name: string;
-    description: string;
-    filename: string;
-    minYears?: number;
+  id: string;
+  name: string;
+  description: string;
+  filename: string;
+  style: AvatarStyle;
+  minYears?: number;
+}
+
+// Supporter (icke-veganska) avatarer med intressanta fakta
+const SUPPORTER_AVATARS: AvatarOption[] = [
+  {
+    id: 'gorilla',
+    name: 'Gorilla',
+    description: 'Visste du att gorillor kan lära sig teckenspråk och kommunicera med människor? De använder också verktyg i naturen.',
+    filename: 'gorilla',
+    style: 'supporter'
+  },
+  {
+    id: 'cow',
+    name: 'Ko',
+    description: 'Kor är extremt sociala och bygger livslånga vänskaper. De kan känna igen över 100 andra kor och blir stressade när de separeras från sina vänner.',
+    filename: 'cow',
+    style: 'supporter'
+  },
+  {
+    id: 'ostrich',
+    name: 'Struts',
+    description: 'Strutsar är världens snabbaste tvåbenta djur och kan springa i 70 km/h. Deras ögon är större än deras hjärnor!',
+    filename: 'ostrich',
+    style: 'supporter'
+  },
+  {
+    id: 'giraffe',
+    name: 'Giraff',
+    description: 'Giraffer har samma antal halskotor som människor - bara sju! Deras tungor kan vara upp till 50 cm långa och är blå-svarta för att skydda mot solbränna.',
+    filename: 'giraffe',
+    style: 'supporter'
+  },
+  {
+    id: 'deer',
+    name: 'Rådjur',
+    description: 'Rådjur kan höra frekvenser långt bortom mänsklig hörsel. De kan också rotera öronen 180 grader utan att flytta på huvudet!',
+    filename: 'deer',
+    style: 'supporter'
+  },
+  {
+    id: 'alpaca',
+    name: 'Alpacka',
+    description: 'Alpackor nynnar för att kommunicera. De använder 20 olika ljud tillsammans med kroppsspråk för att uttrycka sina känslor.',
+    filename: 'alpaca',
+    style: 'supporter'
+  },
+  {
+    id: 'panda',
+    name: 'Panda',
+    description: 'Pandor har en "extra tumme" som hjälper dem att greppa bambu. Trots att de är klassade som rovdjur består 99% av deras diet av växter!',
+    filename: 'panda',
+    style: 'supporter'
+  },
+  {
+    id: 'hippo',
+    name: 'Flodhäst',
+    description: 'Flodhästar "svettas" en röd olja som fungerar som naturlig solkräm. Trots sin storlek kan de springa fortare än en människa på land!',
+    filename: 'hippo',
+    style: 'supporter'
+  },
+  {
+    id: 'moose',
+    name: 'Älg',
+    description: 'Älgar kan dyka ner till 6 meters djup för att äta vattenväxter. En älgtjurs horn kan väga upp till 35 kg - lika mycket som en 10-åring!',
+    filename: 'moose',
+    style: 'supporter'
   }
-  
-  export interface SupporterAvatarOption {
-    id: string;
-    name: string;
-    description: string;
-    filename: string;
-    bgColor: string; // Ny property för bakgrundsfärg
+];
+
+// Veganska avatarer med intressanta fakta
+const VEGAN_AVATARS: AvatarOption[] = [
+  {
+    id: 'squirrel',
+    name: 'Ekorre',
+    description: 'Ekorrar kan komma ihåg tusentals gömställen för nötter! De planterar omedvetet nya träd när de glömmer var de gömt vissa nötter.',
+    filename: 'squirrel',
+    style: 'cute',
+    minYears: 0
+  },
+  {
+    id: 'rabbit',
+    name: 'Kanin',
+    description: 'När kaniner är extra glada gör de "binkies" - de hoppar upp i luften och vrider kroppen! De har också 360-graders synfält utan att behöva vända på huvudet.',
+    filename: 'rabbit',
+    style: 'cute',
+    minYears: 1
+  },
+  {
+    id: 'koala',
+    name: 'Koala',
+    description: 'Koalor har fingeravtryck som är nästan identiska med människors. De sover upp till 20 timmar per dag för att spara energi från sin näringsfattiga diet.',
+    filename: 'koala',
+    style: 'cute',
+    minYears: 2
+  },
+  {
+    id: 'turtle',
+    name: 'Sköldpadda',
+    description: 'Vissa sköldpaddor kan andas genom sin bakdel! Havssköldpaddor kan också känna jordens magnetfält och navigerar efter det under långa resor.',
+    filename: 'turtle',
+    style: 'cute',
+    minYears: 3
   }
+];
+
+// Hämta tillgängliga avatarer baserat på antalet veganska år och vald stil
+export function getAvailableAvatars(veganYears: number, style: AvatarStyle): AvatarOption[] {
+  // Hämta veganStatus från store
+  const veganStatus = useStore.getState().veganStatus.status;
   
-  // Ursprungliga avatarer för veganer
-  export const AVATARS: Record<'cute' | 'cool', AvatarOption[]> = {
-    cute: [
-      {
-        id: 'sprout',
-        name: 'Grodden',
-        description: 'Ditt veganska frö har just börjat gro. Varje steg räknas!',
-        filename: 'sprout',
-        minYears: 0
-      },
-      {
-        id: 'rabbit',
-        name: 'Hoppy',
-        description: 'Visste du att kaninens öron kan höra nästan 360 grader, vilket gör dem extremt alerta?',
-        filename: 'rabbit',
-        minYears: 1
-      },
-      {
-        id: 'koala',
-        name: 'Kola',
-        description: 'Koalor sover upp till 20 timmar per dag – de vet verkligen hur man slappar!',
-        filename: 'koala',
-        minYears: 3
-      },
-      {
-        id: 'turtle',
-        name: 'Sköldy',
-        description: 'Sköldpaddor har unika mönster på sina skal, precis som våra fingeravtryck!',
-        filename: 'turtle',
-        minYears: 5
-      }
-    ],
-    cool: [
-      {
-        id: 'sprout_cool',
-        name: 'Grodden',
-        description: 'Med styrka och beslutsamhet börjar din veganska resa!',
-        filename: 'sprout',
-        minYears: 0
-      },
-      {
-        id: 'rabbit_cool',
-        name: 'Hoppy',
-        description: 'Visste du att kaninens öron kan höra nästan 360 grader, vilket gör dem extremt alerta?',
-        filename: 'rabbit',
-        minYears: 1
-      },
-      {
-        id: 'koala_cool',
-        name: 'Kola',
-        description: 'Koalor sover upp till 20 timmar per dag – de vet verkligen hur man slappar!',
-        filename: 'koala',
-        minYears: 3
-      },
-      {
-        id: 'turtle_cool',
-        name: 'Sköldy',
-        description: 'Sköldpaddor har unika mönster på sina skal, precis som våra fingeravtryck!',
-        filename: 'turtle',
-        minYears: 5
-      }
-    ]
-  };
-  
-  // Supporter avatarer
-  export const SUPPORTER_AVATARS: SupporterAvatarOption[] = [
-    {
-      id: 'gorilla',
-      name: 'Groove Gorilla',
-      description: 'Gorillor har unika fingeravtryck precis som människor och älskar att dansa till musik!',
-      filename: 'gorilla',
-      bgColor: '#2D3748'
-    },
-    {
-      id: 'cow',
-      name: 'Cool Ko',
-      description: 'Kor har bästa kompisar och blir stressade när de separeras från sina vänner',
-      filename: 'cow',
-      bgColor: '#44337A'
-    },
-    {
-      id: 'ostrich',
-      name: 'Optimist Ostrich',
-      description: 'Strutsar kan springa snabbare än en häst och ta steg på över 4 meter!',
-      filename: 'ostrich',
-      bgColor: '#234E52'
-    },
-    {
-      id: 'giraffe',
-      name: 'Gentle Giraffe',
-      description: 'Giraffer använder sin långa tunga på 50 cm för att rengöra sina öron',
-      filename: 'giraffe',
-      bgColor: '#744210'
-    },
-    {
-      id: 'deer',
-      name: 'Drömmande Hjort',
-      description: 'Hjortar kan simma i upp till 15 km/h och korsa stora sjöar när de vandrar',
-      filename: 'deer',
-      bgColor: '#553C9A'
-    },
-    {
-      id: 'alpaca',
-      name: 'Alvin Alpaca',
-      description: 'Alpackor nynnar mjuka melodier till varandra för att kommunicera och visa kärlek',
-      filename: 'alpaca',
-      bgColor: '#2C5282'
-    },
-    {
-      id: 'panda',
-      name: 'Peace Panda',
-      description: 'En panda kan äta upp till 12 timmar om dagen och konsumera 12-15 kg bambu!',
-      filename: 'panda',
-      bgColor: '#276749'
-    },
-    {
-      id: 'hippo',
-      name: 'Happy Hippo',
-      description: 'Flodhästar svettas en naturlig röd vätska som fungerar som solskydd och antibiotika',
-      filename: 'hippo',
-      bgColor: '#4C51BF'
-    },
-    {
-      id: 'moose',
-      name: 'Mighty Moose',
-      description: 'Älgar kan hålla andan i upp till en minut under vatten medan de söker efter vattenväxter',
-      filename: 'moose',
-      bgColor: '#2F855A'
-    }
-  ];
-  
-  // Hjälpfunktioner för veganska avatarer
-  export const getAvailableAvatars = (years: number, style: 'cute' | 'cool' = 'cute'): AvatarOption[] => {
-    return AVATARS[style].filter(avatar => years >= (avatar.minYears || 0));
-  };
-  
-  // Hjälpfunktioner för supporter avatarer
-  export const getSupporterAvatars = (): SupporterAvatarOption[] => {
+  // Om användaren är supporter (icke-vegan), returnera supporter avatarer
+  if (veganStatus === 'supporter') {
     return SUPPORTER_AVATARS;
-  };
+  }
   
-  export const getDefaultAvatar = (years: number, style: 'cute' | 'cool' = 'cute'): AvatarOption => {
-    const available = getAvailableAvatars(years, style);
-    return available[available.length - 1];
-  };
-  
-  export const getDefaultSupporterAvatar = (): SupporterAvatarOption => {
-    return SUPPORTER_AVATARS[0];
-  };
+  // För veganska användare, filtrera baserat på antal veganska år
+  return VEGAN_AVATARS
+    .filter(avatar => (avatar.minYears === undefined || avatar.minYears <= veganYears))
+    .map(avatar => ({
+      ...avatar,
+      style: style // Använd den valda stilen för veganska avatarer
+    }));
+}
+
+// Hämta supporter-avatarer (oberoende av stil)
+export function getSupporterAvatars(): AvatarOption[] {
+  return SUPPORTER_AVATARS;
+}

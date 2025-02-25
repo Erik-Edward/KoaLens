@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Huvudpil mot hörnet -->
+  <path 
+    d="M52 12L12 52" 
+    stroke="#FFD33D" 
+    stroke-width="4" 
+    stroke-linecap="round"
+  />
+  <!-- Pilhuvud -->
+  <path 
+    d="M52 32V12H32" 
+    stroke="#FFD33D" 
+    stroke-width="4" 
+    fill="none" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  <!-- Pulserande cirkel för fokuspunkt -->
+  <circle 
+    cx="52" 
+    cy="12" 
+    r="6" 
+    fill="#FFD33D" 
+    opacity="0.5"
+  />
+</svg>

@@ -4,38 +4,128 @@
     "slug": "KoaLens",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splashscreen_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#25292e"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
+      },
+      "bundleIdentifier": "com.erikedward.KoaLens",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.880878962670-drs8ta7556lgkd4bkbi2nkbh79jl0tn5"
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "foregroundImage": "./assets/images/splashscreen_logo.png",
+        "backgroundColor": "#25292e"
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.erikedward.KoaLens",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splashscreen_logo.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#25292e"
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
         }
       ]
     ],
+    "scheme": "koalens",
     "experiments": {
-      "typedRoutes": true
-    }
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "nativewind": {
+        "tailwindcss": {
+          "cssPath": "global.css"
+        }
+      }
+    },
+    "fonts": [
+      {
+        "asset": "assets/fonts/PlusJakartaSans-Bold.ttf",
+        "family": "PlusJakartaSans-Bold"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-BoldItalic.ttf",
+        "family": "PlusJakartaSans-BoldItalic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-ExtraBold.ttf",
+        "family": "PlusJakartaSans-ExtraBold"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-ExtraBoldItalic.ttf",
+        "family": "PlusJakartaSans-ExtraBoldItalic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-ExtraLight.ttf",
+        "family": "PlusJakartaSans-ExtraLight"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-ExtraLightItalic.ttf",
+        "family": "PlusJakartaSans-ExtraLightItalic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-Italic.ttf",
+        "family": "PlusJakartaSans-Italic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-Light.ttf",
+        "family": "PlusJakartaSans-Light"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-LightItalic.ttf",
+        "family": "PlusJakartaSans-LightItalic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-Medium.ttf",
+        "family": "PlusJakartaSans-Medium"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-MediumItalic.ttf",
+        "family": "PlusJakartaSans-MediumItalic"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-Regular.ttf",
+        "family": "PlusJakartaSans-Regular"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-SemiBold.ttf",
+        "family": "PlusJakartaSans-SemiBold"
+      },
+      {
+        "asset": "assets/fonts/PlusJakartaSans-SemiBoldItalic.ttf",
+        "family": "PlusJakartaSans-SemiBoldItalic"
+      }
+    ]
   }
 }

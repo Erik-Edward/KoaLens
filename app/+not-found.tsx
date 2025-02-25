@@ -1,32 +1,51 @@
+import React, { FC } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { ViewStyle, TextStyle } from 'react-native';
+import theme from '@/constants/theme';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-
-export default function NotFoundScreen() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <ThemedView style={styles.container}>
-        <ThemedText type="title">This screen doesn't exist.</ThemedText>
-        <Link href="/" style={styles.link}>
-          <ThemedText type="link">Go to home screen!</ThemedText>
-        </Link>
-      </ThemedView>
-    </>
-  );
+// Interface för styles
+interface Styles {
+  container: ViewStyle;
+  button: TextStyle;
 }
 
-const styles = StyleSheet.create({
+const NotFoundScreen: FC = () => {
+  return (
+    <>
+      <Stack.Screen options={{ 
+        title: 'Oops! Not Found',
+        headerStyle: {
+          backgroundColor: theme.colors.background.main,
+        },
+        headerTintColor: theme.colors.text.primary,
+      }} />
+      <View style={styles.container}>
+        <Link 
+          href="/" 
+          style={styles.button}
+          accessibilityRole="link"
+          accessibilityLabel="Go back to home screen"
+        >
+          Go back to Home screen!
+        </Link>
+      </View>
+    </>
+  );
+};
+
+const styles = StyleSheet.create<Styles>({
   container: {
     flex: 1,
-    alignItems: 'center',
+    backgroundColor: theme.colors.background.main,
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+  button: {
+    fontSize: theme.typography.sizes.lg,
+    textDecorationLine: 'underline',
+    color: theme.colors.text.primary,
   },
 });
+
+export default NotFoundScreen;

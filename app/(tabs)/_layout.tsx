@@ -1,43 +1,74 @@
+// app/(tabs)/_layout.tsx
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
+import theme from '@/constants/theme';
 
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+interface TabBarIconProps {
+  color: string;
+  size: number;
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const setupNavigationBar = async () => {
+        try {
+          await NavigationBar.setBackgroundColorAsync(theme.colors.background.dark);
+          await NavigationBar.setBorderColorAsync(theme.colors.background.dark); // Matcha bakgrundsfärgen
+          await NavigationBar.setButtonStyleAsync('light');
+        } catch (error) {
+          console.log('Error setting navigation bar:', error);
+        }
+      };
+      
+      setupNavigationBar();
+    }
+  }, []);
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: theme.colors.primary.DEFAULT,
+        tabBarInactiveTintColor: theme.colors.text.secondary,
+        tabBarStyle: {
+          backgroundColor: theme.colors.background.dark,
+          borderTopWidth: 0, // Ta bort top border helt
+          elevation: 0,
+          shadowOpacity: 0,
+          height: 60, // Ge lite mer höjd för bättre touch targets
+          paddingBottom: 8, // Lägg till padding i botten för bättre placering av innehåll
+        },
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="(scan)"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Skanna',
+          tabBarIcon: ({ color, size }: TabBarIconProps) => (
+            <Ionicons name="camera-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="(history)"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Historik',
+          tabBarIcon: ({ color, size }: TabBarIconProps) => (
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="(profile)"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ color, size }: TabBarIconProps) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

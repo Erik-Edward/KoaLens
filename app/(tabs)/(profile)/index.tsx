@@ -73,61 +73,56 @@ const ProfileScreen: FC = () => {
   };
 
   // Uppdaterad funktion för att synkronisera avatar med Supabase
-  const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
-    try {
-      setUpdating(true);
-      
-      // Aktivera navigationsspärren innan vi gör några ändringar
-      global.isBlockingNavigation = true;
-      console.log('Navigationsspärr aktiverad för avatarbyte');
-      
-      // 1. Uppdatera lokalt i Zustand-store
-      await setAvatar(style, filename);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // 2. Synkronisera med Supabase
-      if (user) {
-        const { error } = await supabase.auth.updateUser({
-          data: {
-            avatar_style: style,
-            avatar_id: filename,
-            avatar_update: true,
-            vegan_years: avatar.veganYears,
-            vegan_status: veganStatus
-          }
-        });
-        
-        if (error) {
-          console.error('Fel vid uppdatering av avatar i Supabase:', error);
-          Alert.alert('Varning', 'Avataren uppdaterades lokalt men synkroniseringen med servern misslyckades.');
-        } else {
-          console.log('Avatar uppdaterad i Supabase');
+const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
+  try {
+    setUpdating(true);
+    
+    // Aktivera navigationsspärren innan vi gör några ändringar
+    global.isBlockingNavigation = true;
+    console.log('Navigationsspärr aktiverad för avatarbyte');
+    
+    // 1. Uppdatera lokalt i Zustand-store
+    await setAvatar(style, filename);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // 2. Synkronisera med Supabase - VIKTIGT: Sätt avatar_update till true
+    if (user) {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          avatar_style: style,
+          avatar_id: filename,
+          avatar_update: true, // Markera tydligt att detta är en avataruppdatering
+          vegan_years: avatar.veganYears,
+          vegan_status: veganStatus
         }
+      });
+      
+      if (error) {
+        console.error('Fel vid uppdatering av avatar i Supabase:', error);
+        Alert.alert('Varning', 'Avataren uppdaterades lokalt men synkroniseringen med servern misslyckades.');
+      } else {
+        console.log('Avatar uppdaterad i Supabase');
       }
-      
-      // Behåll navigationsspärren aktiv i 3 sekunder för att förhindra att
-      // någon annan navigation sker medan vi uppdaterar avataren
-      setTimeout(() => {
-        global.isBlockingNavigation = false;
-        console.log('Navigationsspärr inaktiverad efter avatarbyte');
-        
-        // Återställ avatar_update-flaggan
-        if (user) {
-          supabase.auth.updateUser({
-            data: {
-              avatar_update: false
-            }
-          }).catch(err => console.error('Fel vid återställning av avatar_update:', err));
-        }
-      }, 3000);
-    } catch (error) {
-      console.error('Error updating avatar:', error);
-      Alert.alert('Fel', 'Kunde inte uppdatera avataren. Försök igen senare.');
-      global.isBlockingNavigation = false;
-    } finally {
-      setUpdating(false);
     }
-  };
+    
+    // VIKTIGT: Ta bort återställningen av avatar_update-flaggan
+    // och förläng tiden för navigationsspärren till 5 sekunder
+    setTimeout(() => {
+      // Inaktivera navigationsspärren efter 5 sekunder
+      global.isBlockingNavigation = false;
+      console.log('Navigationsspärr inaktiverad efter avatarbyte');
+      
+      // Vi återställer INTE avatar_update-flaggan här längre
+      // Det gör att vi inte får en andra USER_UPDATED-händelse
+    }, 5000);
+  } catch (error) {
+    console.error('Error updating avatar:', error);
+    Alert.alert('Fel', 'Kunde inte uppdatera avataren. Försök igen senare.');
+    global.isBlockingNavigation = false;
+  } finally {
+    setUpdating(false);
+  }
+};
 
   return (
     <StyledView 

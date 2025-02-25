@@ -1,4 +1,4 @@
-// components/UserProfileSync.tsx - Uppdaterad för att undvika skärmblinkning
+// components/UserProfileSync.tsx - Uppdaterad för att respektera avatar_update
 
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
@@ -48,8 +48,19 @@ export const UserProfileSync: React.FC = () => {
             setSyncing(true);
           }, 300);
           
+          // Kontrollera om detta är en avataruppdatering och undvik att navigera
+          const isAvatarUpdate = metadata.avatar_update === true;
+          console.log('UserProfileSync: Är detta en avataruppdatering?', isAvatarUpdate);
+          
           // Uppdatera avatar-information
           if (metadata.avatar_style && metadata.avatar_id) {
+            console.log('UserProfileSync: Synkroniserar avatar från Supabase metadata:', {
+              style: metadata.avatar_style,
+              id: metadata.avatar_id,
+              isAvatarUpdate
+            });
+            
+            // Uppdatera lokalt utan att utlösa en ny uppdatering till Supabase
             await store.setAvatar(
               metadata.avatar_style as AvatarStyle, 
               metadata.avatar_id as string
@@ -66,7 +77,8 @@ export const UserProfileSync: React.FC = () => {
           }
           
           // Synkronisera tillbaka till Supabase om lokal data är annorlunda
-          if (!metadata.avatar_id && avatarId) {
+          // Viktigt: Vi bör endast göra detta om det INTE är en avataruppdatering
+          if (!metadata.avatar_id && avatarId && !isAvatarUpdate) {
             await supabase.auth.updateUser({
               data: {
                 avatar_style: store.avatar.style,
@@ -75,6 +87,18 @@ export const UserProfileSync: React.FC = () => {
                 vegan_status: veganStatus
               }
             });
+          }
+          
+          // Om det är en avataruppdatering, aktivera navigationsspärren för säkerhets skull
+          if (isAvatarUpdate) {
+            console.log('UserProfileSync: Aktiverar navigationsspärr p.g.a. avataruppdatering');
+            global.isBlockingNavigation = true;
+            
+            // Inaktivera navigationsspärren efter en kort stund
+            setTimeout(() => {
+              console.log('UserProfileSync: Inaktiverar navigationsspärr efter timeout');
+              global.isBlockingNavigation = false;
+            }, 3000);
           }
           
           // Avbryt timeout om vi hann bli färdiga innan den triggats

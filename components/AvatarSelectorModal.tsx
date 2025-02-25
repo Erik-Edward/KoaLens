@@ -1,146 +1,188 @@
-// components/AvatarSelectorModal.tsx - med swipe-baserad layout
-import React, { useState, useRef } from 'react';
-import { View, Text, Modal, Pressable, FlatList, Dimensions } from 'react-native';
+// components/AvatarSelectorModal.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { styled } from 'nativewind';
-import { Avatar } from '@/components/Avatar';
+import { Ionicons } from '@expo/vector-icons';
+import { Avatar } from './Avatar';
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
-
-// Gruppera avatarerna efter kategori för bättre organisation
-const AVATAR_GROUPS = [
-  {
-    title: "Cute stil",
-    data: [
-      { id: 'squirrel-cute', filename: 'squirrel', style: 'cute' as AvatarStyle },
-      { id: 'rabbit-cute', filename: 'rabbit', style: 'cute' as AvatarStyle },
-      { id: 'koala-cute', filename: 'koala', style: 'cute' as AvatarStyle },
-      { id: 'turtle-cute', filename: 'turtle', style: 'cute' as AvatarStyle },
-    ]
-  },
-  {
-    title: "Cool stil",
-    data: [
-      { id: 'squirrel-cool', filename: 'squirrel', style: 'cool' as AvatarStyle },
-      { id: 'rabbit-cool', filename: 'rabbit', style: 'cool' as AvatarStyle },
-      { id: 'koala-cool', filename: 'koala', style: 'cool' as AvatarStyle },
-      { id: 'turtle-cool', filename: 'turtle', style: 'cool' as AvatarStyle },
-    ]
-  },
-  {
-    title: "Djur",
-    data: [
-      { id: 'gorilla', filename: 'gorilla', style: 'supporter' as AvatarStyle },
-      { id: 'cow', filename: 'cow', style: 'supporter' as AvatarStyle },
-      { id: 'ostrich', filename: 'ostrich', style: 'supporter' as AvatarStyle },
-      { id: 'giraffe', filename: 'giraffe', style: 'supporter' as AvatarStyle },
-      { id: 'deer', filename: 'deer', style: 'supporter' as AvatarStyle },
-      { id: 'alpaca', filename: 'alpaca', style: 'supporter' as AvatarStyle },
-      { id: 'panda', filename: 'panda', style: 'supporter' as AvatarStyle },
-      { id: 'hippo', filename: 'hippo', style: 'supporter' as AvatarStyle },
-      { id: 'moose', filename: 'moose', style: 'supporter' as AvatarStyle },
-    ]
-  }
-];
+const StyledScrollView = styled(ScrollView);
 
 interface AvatarSelectorModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectAvatar: (filename: string, style: AvatarStyle) => void;
-  currentAvatarId?: string | null;
-  currentAvatarStyle?: AvatarStyle;
+  currentAvatarId: string | null;
+  currentAvatarStyle: AvatarStyle;
 }
+
+// Avatarer för de olika stilarna - VIKTIGT: id används för att identifiera valet, filename används för bildvisning
+const CUTE_AVATARS = [
+  { id: 'squirrel', filename: 'squirrel' },
+  { id: 'rabbit', filename: 'rabbit' },
+  { id: 'koala', filename: 'koala' },
+  { id: 'turtle', filename: 'turtle' },
+];
+
+const COOL_AVATARS = [
+  { id: 'squirrel', filename: 'squirrel' },
+  { id: 'rabbit', filename: 'rabbit' },
+  { id: 'koala', filename: 'koala' },
+  { id: 'turtle', filename: 'turtle' },
+];
+
+const SUPPORTER_AVATARS = [
+  { id: 'gorilla', filename: 'gorilla' },
+  { id: 'cow', filename: 'cow' },
+  { id: 'ostrich', filename: 'ostrich' },
+  { id: 'giraffe', filename: 'giraffe' },
+  { id: 'deer', filename: 'deer' },
+  { id: 'alpaca', filename: 'alpaca' },
+  { id: 'panda', filename: 'panda' },
+  { id: 'hippo', filename: 'hippo' },
+];
+
+// Array med alla tillgängliga stilar för att enkelt kunna navigera mellan dem
+const AVAILABLE_STYLES: AvatarStyle[] = ['cute', 'cool', 'supporter'];
+
+// Svensk visningstext för de olika stilarna
+const STYLE_DISPLAY_NAMES: Record<AvatarStyle, string> = {
+  'cute': 'Söta djur',
+  'cool': 'Coola djur',
+  'supporter': 'Fler djur'
+};
 
 export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   visible,
   onClose,
   onSelectAvatar,
   currentAvatarId,
-  currentAvatarStyle = 'cute',
+  currentAvatarStyle,
 }) => {
-  const { width } = Dimensions.get('window');
-  const itemSize = width / 3 - 20; // 3 avatarer per rad med mellanrum
+  const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>(currentAvatarStyle);
   
-  const handleAvatarSelect = (avatar: { filename: string; style: AvatarStyle }) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelectAvatar(avatar.filename, avatar.style);
+  // Återställ vald stil när modalen öppnas
+  useEffect(() => {
+    if (visible) {
+      setSelectedStyle(currentAvatarStyle);
+    }
+  }, [visible, currentAvatarStyle]);
+
+  const handleSelectAvatar = async (avatarId: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelectAvatar(avatarId, selectedStyle);
     onClose();
   };
 
-  // Avgör om en avatar är den nuvarande valda
-  const isCurrentAvatar = (avatar: { filename: string; style: AvatarStyle }) => {
-    return avatar.filename === currentAvatarId && avatar.style === currentAvatarStyle;
+  // Navigera till nästa stil
+  const handleNextStyle = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const currentIndex = AVAILABLE_STYLES.indexOf(selectedStyle);
+    const nextIndex = (currentIndex + 1) % AVAILABLE_STYLES.length;
+    setSelectedStyle(AVAILABLE_STYLES[nextIndex]);
   };
 
-  // Rendera en enskild avatar
-  const renderAvatar = ({ item }: { item: { id: string; filename: string; style: AvatarStyle } }) => (
-    <StyledPressable
-      onPress={() => handleAvatarSelect(item)}
-      className="items-center justify-center my-2"
-      style={{ width: itemSize }}
-    >
-      <Avatar
-        source={item.filename}
-        size="medium"
-        style={item.style}
-        variant={isCurrentAvatar(item) ? 'selected' : 'default'}
-      />
-    </StyledPressable>
-  );
+  // Navigera till föregående stil
+  const handlePrevStyle = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const currentIndex = AVAILABLE_STYLES.indexOf(selectedStyle);
+    const prevIndex = (currentIndex - 1 + AVAILABLE_STYLES.length) % AVAILABLE_STYLES.length;
+    setSelectedStyle(AVAILABLE_STYLES[prevIndex]);
+  };
 
-  // Rendera en grupp med avatarer
-  const renderGroup = ({ item }: { item: typeof AVATAR_GROUPS[0] }) => (
-    <StyledView className="mb-6">
-      <StyledText className="text-text-primary font-sans-medium text-lg px-4 mb-2">
-        {item.title}
-      </StyledText>
-      <FlatList
-        data={item.data}
-        renderItem={renderAvatar}
-        keyExtractor={(avatar) => avatar.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 10 }}
-        snapToInterval={itemSize}
-        decelerationRate="fast"
-      />
-    </StyledView>
-  );
+  // Bestäm vilka avatarer som ska visas baserat på vald stil
+  let displayedAvatars = CUTE_AVATARS;
+  if (selectedStyle === 'cool') {
+    displayedAvatars = COOL_AVATARS;
+  } else if (selectedStyle === 'supporter') {
+    displayedAvatars = SUPPORTER_AVATARS;
+  }
+
+  // Hjälpfunktion för att kontrollera om en avatar är vald
+  const isAvatarSelected = (avatarId: string): boolean => {
+    // Om vi är i cool-läge, jämför bara basnamnet utan att ta hänsyn till "_cool"
+    if (currentAvatarStyle === 'cool' && selectedStyle === 'cool') {
+      return currentAvatarId === avatarId;
+    }
+    
+    // För andra stilar, direkt jämförelse
+    return currentAvatarId === avatarId;
+  };
 
   return (
     <Modal
-      visible={visible}
-      transparent={true}
       animationType="slide"
+      transparent={true}
+      visible={visible}
       onRequestClose={onClose}
     >
       <StyledView className="flex-1 justify-end bg-black/70">
-        <StyledView className="bg-background-main rounded-t-3xl pt-4 pb-10">
-          {/* Header */}
-          <StyledView className="flex-row justify-between items-center px-6 mb-4">
+        <StyledView className="bg-background-main rounded-t-3xl h-4/5">
+          {/* Header med stängknapp */}
+          <StyledView className="flex-row justify-between items-center p-6 border-b border-background-light">
             <StyledText className="text-text-primary font-sans-bold text-xl">
               Välj avatar
             </StyledText>
             <StyledPressable
               onPress={onClose}
-              className="p-2 rounded-full bg-background-light/50"
+              className="w-10 h-10 rounded-full bg-background-light/50 items-center justify-center"
             >
-              <Ionicons name="close" size={24} color="#ffffff" />
+              <Ionicons name="close" size={24} color="#fff" />
             </StyledPressable>
           </StyledView>
 
-          {/* Grouped avatar lists with horizontal scroll */}
-          <FlatList
-            data={AVATAR_GROUPS}
-            renderItem={renderGroup}
-            keyExtractor={(group) => group.title}
-            showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 450 }}
-          />
+          {/* Navigationsfält med pilar */}
+          <StyledView className="flex-row justify-between items-center px-6 py-3">
+            <StyledPressable
+              onPress={handlePrevStyle}
+              className="p-2 rounded-full bg-background-light/50 active:opacity-70"
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <Ionicons name="chevron-back" size={24} color="#fff" />
+            </StyledPressable>
+            
+            <StyledText className="text-text-primary font-sans-medium text-lg">
+              {STYLE_DISPLAY_NAMES[selectedStyle]}
+            </StyledText>
+            
+            <StyledPressable
+              onPress={handleNextStyle}
+              className="p-2 rounded-full bg-background-light/50 active:opacity-70"
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#fff" />
+            </StyledPressable>
+          </StyledView>
+
+          {/* Avatarlista med större mellanrum */}
+          <StyledScrollView className="flex-1 px-4">
+            <StyledView className="flex-row flex-wrap justify-center">
+              {displayedAvatars.map((avatar) => {
+                const isSelected = isAvatarSelected(avatar.id);
+                const avatarStyle = selectedStyle === 'supporter' ? 'supporter' : selectedStyle;
+                
+                return (
+                  <StyledPressable
+                    key={avatar.id}
+                    onPress={() => handleSelectAvatar(avatar.id)}
+                    className="p-4" // Ökat mellanrum mellan avatarerna
+                  >
+                    <Avatar
+                      source={avatar.filename}
+                      size="medium"
+                      style={avatarStyle}
+                      variant={isSelected ? 'selected' : 'default'}
+                    />
+                  </StyledPressable>
+                );
+              })}
+            </StyledView>
+            <StyledView className="h-8" />
+          </StyledScrollView>
         </StyledView>
       </StyledView>
     </Modal>

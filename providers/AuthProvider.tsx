@@ -282,8 +282,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isNavigationBlocked: global.isBlockingNavigation === true
   })
   
-  // Om navigationsspärren är aktiv, utför inte någon navigering
-  // Detta förhindrar oavsiktlig navigering vid avatarbyten
+  // VIKTIG FÖRBÄTTRING: Kontrollera avatarflaggan FÖRST, innan navigationsspärren
+  // Detta gör att även om navigationsspärren har inaktiverats, så avbryts
+  // ändå navigeringen om det är en avataruppdatering
+  if (session?.user.user_metadata?.avatar_update === true) {
+    console.log('AuthProvider: Avatar update detected, staying on current screen');
+    break;
+  }
+  
+  // Sekundär kontroll: Om navigationsspärren är aktiv, utför inte någon navigering
   if (global.isBlockingNavigation === true) {
     console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
     break;
@@ -319,12 +326,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     }
-  }
-  
-  // Om avatarflaggan är true, avbryt ytterligare hantering
-  if (session?.user.user_metadata?.avatar_update === true) {
-    console.log('AuthProvider: Avatar update detected, staying on current screen');
-    break;
   }
   
   // Fortsätt med normal navigering för e-postverifiering

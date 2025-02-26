@@ -718,14 +718,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const value = {
-    session,
-    user,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    signInWithGoogle
-  }
+    session: session,
+    user: user,
+    loading: loading,
+    signIn: signIn,  // Explicit property-value syntax
+    signUp: signUp,
+    signOut: signOut,
+    signInWithGoogle: signInWithGoogle
+  };
 
   return (
     <AuthContext.Provider value={value}>

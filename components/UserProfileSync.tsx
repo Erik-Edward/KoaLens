@@ -1,5 +1,4 @@
-// components/UserProfileSync.tsx - Uppdaterad för att respektera avatar_update
-
+// components/UserProfileSync.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { styled } from 'nativewind';
@@ -7,32 +6,86 @@ import { supabase } from '@/lib/supabase';
 import { useStore } from '@/stores/useStore';
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import { VeganStatus } from '@/stores/slices/createVeganStatusSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/providers/AuthProvider';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
 
+// Nyckel för att spåra om det är användarens första inloggning
+const FIRST_LOGIN_KEY = 'KOALENS_FIRST_LOGIN_COMPLETE';
+
 export const UserProfileSync: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
   const avatarId = useStore(state => state.avatar.id);
   const veganStatus = useStore(state => state.veganStatus.status);
   const syncAttemptedRef = useRef(false);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Hämta användarinformation från AuthProvider
+  const { user, session } = useAuth();
+  
+  // Viktigt: Kontrollera om användaren är inloggad och om det är första inloggningen
+  // Men endast när sessionen faktiskt finns och har ändrats
   useEffect(() => {
-    // Endast synkronisera om vi inte har försökt redan
-    if (syncAttemptedRef.current) return;
+    // Endast fortsätt om vi har en aktiv session
+    if (!session || !user) {
+      // Ingen session, ingen synkronisering behövs
+      syncAttemptedRef.current = false; // Återställ för att tillåta synkronisering när session finns
+      setSyncing(false); // Se till att laddningsskärmen är dold
+      return;
+    }
+    
+    const checkFirstLogin = async () => {
+      try {
+        // Kontrollera om användaren har en last_sign_in_at (vilket indikerar tidigare inloggning)
+        // och om vi redan har markerat denna användare som "inte första inloggning"
+        const userKey = `${FIRST_LOGIN_KEY}_${user.id}`;
+        const firstLoginComplete = await AsyncStorage.getItem(userKey);
+        
+        // Om det är användarens första inloggning (ingen previous sign-in timestamp)
+        // eller om vi inte har markerat denna användare som klar med första inloggningen
+        if (!firstLoginComplete) {
+          console.log('UserProfileSync: Första inloggning detekterad för användare', user.id);
+          setIsFirstLogin(true);
+          
+          // Visa en kort laddningsskärm för att förhindra blinkningar
+          setSyncing(true);
+          
+          // Markera första inloggningen som slutförd för denna användare
+          await AsyncStorage.setItem(userKey, 'true');
+          
+          // Efter en kort stund, återställ flaggan och dölj laddningsskärmen
+          setTimeout(() => {
+            setIsFirstLogin(false);
+            setSyncing(false);
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('Error checking first login status:', error);
+        setSyncing(false);
+      }
+    };
+    
+    // Endast kontrollera om det är första inloggningen om
+    // vi inte redan har försökt synkronisera för denna session
+    if (!syncAttemptedRef.current) {
+      console.log('UserProfileSync: Kontrollerar första inloggning för användare', user?.id);
+      checkFirstLogin();
+      syncAttemptedRef.current = true;
+    }
+  }, [session, user]); // Kör endast när session eller user ändras
+  
+  // Separat useEffect för att hantera synkronisering av profildata
+  useEffect(() => {
+    // Endast fortsätt om det finns en användare
+    if (!user) return;
     
     const syncUserProfile = async () => {
       try {
-        // Hämta användardata direkt från Supabase
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
-        if (error || !user) {
-          console.log('No user to sync profile for');
-          return;
-        }
-        
-        const metadata = user.user_metadata;
+        const userData = user;
+        const metadata = userData.user_metadata;
         const store = useStore.getState();
         
         // Kontrollera om det finns metadata att synkronisera
@@ -40,27 +93,10 @@ export const UserProfileSync: React.FC = () => {
           (metadata.avatar_id && metadata.avatar_id !== avatarId) || 
           (metadata.vegan_status && metadata.vegan_status !== veganStatus)
         )) {
-          console.log('Syncing user profile from Supabase metadata');
-          
-          // Sätt en kort fördröjning innan vi visar laddningsskärmen
-          // för att undvika snabba blinkningar vid korta operationer
-          syncTimeoutRef.current = setTimeout(() => {
-            setSyncing(true);
-          }, 300);
-          
-          // Kontrollera om detta är en avataruppdatering och undvik att navigera
-          const isAvatarUpdate = metadata.avatar_update === true;
-          console.log('UserProfileSync: Är detta en avataruppdatering?', isAvatarUpdate);
+          console.log('UserProfileSync: Synkroniserar användarprofil från metadata');
           
           // Uppdatera avatar-information
           if (metadata.avatar_style && metadata.avatar_id) {
-            console.log('UserProfileSync: Synkroniserar avatar från Supabase metadata:', {
-              style: metadata.avatar_style,
-              id: metadata.avatar_id,
-              isAvatarUpdate
-            });
-            
-            // Uppdatera lokalt utan att utlösa en ny uppdatering till Supabase
             await store.setAvatar(
               metadata.avatar_style as AvatarStyle, 
               metadata.avatar_id as string
@@ -76,68 +112,26 @@ export const UserProfileSync: React.FC = () => {
             await store.setVeganStatus(metadata.vegan_status as VeganStatus);
           }
           
-          // Synkronisera tillbaka till Supabase om lokal data är annorlunda
-          // Viktigt: Vi bör endast göra detta om det INTE är en avataruppdatering
-          if (!metadata.avatar_id && avatarId && !isAvatarUpdate) {
-            await supabase.auth.updateUser({
-              data: {
-                avatar_style: store.avatar.style,
-                avatar_id: avatarId,
-                vegan_years: store.avatar.veganYears,
-                vegan_status: veganStatus
-              }
-            });
-          }
-          
-          // Om det är en avataruppdatering, aktivera navigationsspärren för säkerhets skull
-          if (isAvatarUpdate) {
-            console.log('UserProfileSync: Aktiverar navigationsspärr p.g.a. avataruppdatering');
-            global.isBlockingNavigation = true;
-            
-            // Inaktivera navigationsspärren efter en kort stund
-            setTimeout(() => {
-              console.log('UserProfileSync: Inaktiverar navigationsspärr efter timeout');
-              global.isBlockingNavigation = false;
-            }, 3000);
-          }
-          
-          // Avbryt timeout om vi hann bli färdiga innan den triggats
-          if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current);
-            syncTimeoutRef.current = null;
-          }
-          
-          // Stäng laddningsindikatorn efter en kort fördröjning för att undvika ryckig UI
-          setTimeout(() => {
-            setSyncing(false);
-          }, 500);
+          console.log('UserProfileSync: Synkronisering slutförd');
         }
-        
-        // Markera att vi har försökt synkronisera
-        syncAttemptedRef.current = true;
       } catch (error) {
         console.error('Error syncing user profile:', error);
-        setSyncing(false);
       }
     };
     
     syncUserProfile();
-    
-    return () => {
-      // Rensa timeout om komponenten unmountas
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, [avatarId, veganStatus]);
+  }, [user, avatarId, veganStatus]); // Kör när användardata eller lokal profildata ändras
   
+  // Om inte synkroniserar, visa inget
   if (!syncing) return null;
   
   return (
-    <StyledView className="absolute inset-0 bg-background-main/90 z-50 flex items-center justify-center">
+    <StyledView className="absolute inset-0 bg-background-main z-50 flex items-center justify-center">
       <ActivityIndicator size="large" color="#ffd33d" />
       <StyledText className="text-text-primary font-sans text-lg mt-4">
-        Synkroniserar din profil...
+        {isFirstLogin 
+          ? 'Förbereder din profil...' 
+          : 'Synkroniserar din profil...'}
       </StyledText>
     </StyledView>
   );

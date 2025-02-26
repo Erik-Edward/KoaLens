@@ -1,11 +1,13 @@
-// ÄNDRING 1: Uppdatera import-sektion högst upp i filen för att säkerställa att vi har allt vi behöver
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+// providers/AuthProvider.tsx
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { Session, AuthError, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Alert, AppState } from 'react-native'
 import { router } from 'expo-router'
 import { useStore } from '@/stores/useStore'
 import * as Linking from 'expo-linking';
+import { FirstLoginOverlay } from '@/components/FirstLoginOverlay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Imports för avatar och vegan-status
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice'
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showFirstLoginOverlay, setShowFirstLoginOverlay] = useState(false);
 
   // Hjälpfunktion för att markera onboarding som slutförd
   const markOnboardingAsCompleted = async () => {
@@ -158,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     };
-  
+
     // Lyssna på djuplänkar
     const subscription = Linking.addEventListener('url', handleDeepLink);
     
@@ -169,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         handleDeepLink({ url });
       }
     });
-  
+
     return () => {
       subscription.remove();
     };
@@ -349,87 +352,87 @@ export function AuthProvider({ children }: AuthProviderProps) {
             router.replace('/(auth)/login')
           }
           break
-          case 'USER_UPDATED':
-  console.log('AuthProvider: Användare uppdaterad', {
-    emailConfirmed: session?.user.email_confirmed_at,
-    hasAvatar: !!session?.user.user_metadata?.avatar_id,
-    isAvatarUpdate: session?.user.user_metadata?.avatar_update === true,
-    isNavigationBlocked: global.isBlockingNavigation === true
-  })
-  
-  // VIKTIG FÖRBÄTTRING: Kontrollera avatarflaggan FÖRST, innan navigationsspärren
-  // Detta gör att även om navigationsspärren har inaktiverats, så avbryts
-  // ändå navigeringen om det är en avataruppdatering
-  if (session?.user.user_metadata?.avatar_update === true) {
-    console.log('AuthProvider: Avatar update detected, staying on current screen');
-    break;
-  }
-  
-  // Sekundär kontroll: Om navigationsspärren är aktiv, utför inte någon navigering
-  if (global.isBlockingNavigation === true) {
-    console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
-    break;
-  }
-  
-  // Om användaren just har uppdaterats, synkronisera data från Supabase
-  if (session?.user) {
-    const userData = session.user;
-    const store = useStore.getState();
-    const metadata = userData.user_metadata;
-    
-    if (metadata) {
-      // Synkronisera avatar om den finns i metadata
-      if (metadata.avatar_id && metadata.avatar_style) {
-        console.log('AuthProvider: Synkroniserar avatar efter USER_UPDATED:', {
-          style: metadata.avatar_style,
-          id: metadata.avatar_id
-        });
-        
-        // Använd await för att säkerställa att denna operation slutförs
-        await store.setAvatar(
-          metadata.avatar_style as AvatarStyle, 
-          metadata.avatar_id as string
-        );
-      }
-      
-      // Synkronisera vegan-status och år
-      if (metadata.vegan_status) {
-        await store.setVeganStatus(metadata.vegan_status as VeganStatus);
-        
-        if (typeof metadata.vegan_years === 'number') {
-          await store.setVeganYears(metadata.vegan_years);
-        }
-      }
-    }
-  }
-  
-  // Fortsätt med normal navigering för e-postverifiering
-  if (session?.user.email_confirmed_at) {
-    // Sätt onboarding som slutförd
-    await markOnboardingAsCompleted();
-    
-    // Avgör om det är första gången användaren loggar in efter verifiering
-    if (!session.user.last_sign_in_at) {
-      console.log('AuthProvider: First verification via auth state, redirecting to login')
-      // Skicka med användarens e-postadress
-      const userEmail = session.user.email;
-      if (userEmail) {
-        router.replace({
-          pathname: '/(auth)/login',
-          params: { 
-            verified: 'true', 
-            email: encodeURIComponent(userEmail)
+        case 'USER_UPDATED':
+          console.log('AuthProvider: Användare uppdaterad', {
+            emailConfirmed: session?.user.email_confirmed_at,
+            hasAvatar: !!session?.user.user_metadata?.avatar_id,
+            isAvatarUpdate: session?.user.user_metadata?.avatar_update === true,
+            isNavigationBlocked: global.isBlockingNavigation === true
+          })
+          
+          // VIKTIG FÖRBÄTTRING: Kontrollera avatarflaggan FÖRST, innan navigationsspärren
+          // Detta gör att även om navigationsspärren har inaktiverats, så avbryts
+          // ändå navigeringen om det är en avataruppdatering
+          if (session?.user.user_metadata?.avatar_update === true) {
+            console.log('AuthProvider: Avatar update detected, staying on current screen');
+            break;
           }
-        });
-      } else {
-        router.replace('/(auth)/login?verified=true');
-      }
-    } else {
-      console.log('AuthProvider: User updated with verified email, redirecting to scan')
-      router.replace('/(tabs)/(scan)')
-    }
-  }
-  break
+          
+          // Sekundär kontroll: Om navigationsspärren är aktiv, utför inte någon navigering
+          if (global.isBlockingNavigation === true) {
+            console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
+            break;
+          }
+          
+          // Om användaren just har uppdaterats, synkronisera data från Supabase
+          if (session?.user) {
+            const userData = session.user;
+            const store = useStore.getState();
+            const metadata = userData.user_metadata;
+            
+            if (metadata) {
+              // Synkronisera avatar om den finns i metadata
+              if (metadata.avatar_id && metadata.avatar_style) {
+                console.log('AuthProvider: Synkroniserar avatar efter USER_UPDATED:', {
+                  style: metadata.avatar_style,
+                  id: metadata.avatar_id
+                });
+                
+                // Använd await för att säkerställa att denna operation slutförs
+                await store.setAvatar(
+                  metadata.avatar_style as AvatarStyle, 
+                  metadata.avatar_id as string
+                );
+              }
+              
+              // Synkronisera vegan-status och år
+              if (metadata.vegan_status) {
+                await store.setVeganStatus(metadata.vegan_status as VeganStatus);
+                
+                if (typeof metadata.vegan_years === 'number') {
+                  await store.setVeganYears(metadata.vegan_years);
+                }
+              }
+            }
+          }
+          
+          // Fortsätt med normal navigering för e-postverifiering
+          if (session?.user.email_confirmed_at) {
+            // Sätt onboarding som slutförd
+            await markOnboardingAsCompleted();
+            
+            // Avgör om det är första gången användaren loggar in efter verifiering
+            if (!session.user.last_sign_in_at) {
+              console.log('AuthProvider: First verification via auth state, redirecting to login')
+              // Skicka med användarens e-postadress
+              const userEmail = session.user.email;
+              if (userEmail) {
+                router.replace({
+                  pathname: '/(auth)/login',
+                  params: { 
+                    verified: 'true', 
+                    email: encodeURIComponent(userEmail)
+                  }
+                });
+              } else {
+                router.replace('/(auth)/login?verified=true');
+              }
+            } else {
+              console.log('AuthProvider: User updated with verified email, redirecting to scan')
+              router.replace('/(tabs)/(scan)')
+            }
+          }
+          break
         case 'SIGNED_IN':
           console.log('AuthProvider: Användare inloggad', {
             emailConfirmed: session?.user.email_confirmed_at,
@@ -550,107 +553,97 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [loading, session])
 
-  const signIn = async (email: string, password: string) => {
-    console.log('AuthProvider: Försöker logga in med email', { email })
-    try {
-      setLoading(true)
-      const { error, data } = await supabase.auth.signInWithPassword({ email, password })
-      
-      console.log('AuthProvider: Svar för inloggning', {
-        error: error?.message,
-        hasData: !!data,
-        emailConfirmed: data?.user?.email_confirmed_at
-      })
-      if (data) {
-        console.log('AuthProvider: Fullt svar från inloggning:', data)
-      }
-      if (error) throw error
-      
-      // Synkronisera Zustand store med användardata om metadata finns
-      if (data?.user) {
-        const userData = data.user
-        if (userData.user_metadata) {
-          const store = useStore.getState()
-          const metadata = userData.user_metadata
+  // Lyssna på route-ändringar indirekt via en timer
+  useEffect(() => {
+    // Kontrollera periodiskt för djuplänkar
+    const checkInterval = setInterval(async () => {
+      try {
+        const url = await Linking.getInitialURL();
+        if (url && url.includes('access_token') && url.includes('type=signup')) {
+          console.log('AuthProvider: Verification link detected in periodic check');
+          await markOnboardingAsCompleted();
           
-          // Uppdatera avatar-information om den finns
-          if (metadata.avatar_style && metadata.avatar_id) {
-            console.log('AuthProvider: Synkroniserar avatar från inloggning:', {
-              style: metadata.avatar_style,
-              id: metadata.avatar_id
-            });
-            
-            await store.setAvatar(
-              metadata.avatar_style as AvatarStyle, 
-              metadata.avatar_id as string
-            )
-            
-            if (typeof metadata.vegan_years === 'number') {
-              await store.setVeganYears(metadata.vegan_years)
-            }
+          // Tvinga session-refresh
+          try {
+            await supabase.auth.refreshSession();
+          } catch (error) {
+            console.error('Error refreshing session:', error);
           }
           
-          // Uppdatera vegan-status om den finns
-          if (metadata.vegan_status) {
-            await store.setVeganStatus(metadata.vegan_status as VeganStatus)
-          }
-          
-          console.log('AuthProvider: Användarprofil synkroniserad med store')
+          router.replace('/(auth)/login?verified=true');
+          clearInterval(checkInterval); // Slutar kontrollera när vi hittat en länk
         }
+      } catch (error) {
+        console.error('Error checking URL:', error);
       }
-      
-      // Tvinga en session-refresh efter inloggning
-      const refreshed = await supabase.auth.getSession()
-      console.log('AuthProvider: Refreshed session efter inloggning:', refreshed.data.session)
-      setSession(refreshed.data.session)
-      setUser(refreshed.data.session?.user ?? null)
-      
-      if (!refreshed.data.session || !refreshed.data.session.user.email_confirmed_at) {
-        console.log('AuthProvider: Inloggad session saknar verifierad e-post', { email })
-        Alert.alert(
-          'E-post ej verifierad',
-          'Ett verifieringsmail har skickats till din e-postadress. Vänligen verifiera din e-postadress innan inloggning. Om du vill kunna skicka ett nytt verifieringsmail, använd knappen nedan.',
-          [
-            {
-              text: 'Skicka nytt verifieringsmail',
-              onPress: async () => {
-                console.log('AuthProvider: Försöker skicka nytt verifieringsmail')
-const { error: resendError } = await supabase.auth.resend({
-  type: 'signup',
-  email,
-  options: {
-    // Inkludera email i redirectlänken så att den kan återanvändas i login-formuläret
-    emailRedirectTo: `koalens://login?verified=true&email=${encodeURIComponent(email)}`
-  }
-})
-console.log('AuthProvider: Svar från nytt verifieringsmail', { error: resendError?.message })
-                if (resendError) {
-                  Alert.alert('Fel', 'Kunde inte skicka nytt verifieringsmail')
-                } else {
-                  Alert.alert('', 'Nytt verifieringsmail har skickats')
+    }, 1000);
+    
+    return () => clearInterval(checkInterval);
+  }, []);
+
+  // Polling av sessionen när appen blir aktiv
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('AuthProvider: AppState "active" – startar polling för sessionuppdatering')
+        let remainingTime = 30000 // 30 sekunder
+        const interval = setInterval(() => {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            console.log('AuthProvider: Polling session', session)
+            if (session && session.user.email_confirmed_at) {
+              console.log('AuthProvider: Session uppdaterad med verifierad e-post')
+              setSession(session)
+              setUser(session.user)
+              clearInterval(interval)
+              
+              // Om vi har en verifierad session, sätt onboarding som slutförd
+              markOnboardingAsCompleted();
+
+              // Synkronisera avatar och användardata om det finns tillgängligt
+              if (session.user.user_metadata) {
+                const store = useStore.getState();
+                const metadata = session.user.user_metadata;
+                
+                // Uppdatera avatar om info finns
+                if (metadata.avatar_style && metadata.avatar_id) {
+                  console.log('AuthProvider: Synkroniserar avatar från polling:', {
+                    style: metadata.avatar_style,
+                    id: metadata.avatar_id
+                  });
+                  
+                  store.setAvatar(
+                    metadata.avatar_style as AvatarStyle, 
+                    metadata.avatar_id as string
+                  );
                 }
               }
-            },
-            { text: 'OK', style: 'cancel' }
-          ]
-        )
-        await supabase.auth.signOut()
+            }
+          })
+          remainingTime -= 5000
+          if (remainingTime <= 0) {
+            clearInterval(interval)
+          }
+        }, 5000)
+      }
+    })
+    return () => {
+      appStateSubscription.remove()
+    }
+  }, [])
+
+  // Extra useEffect: Om inloggningen är klar men ingen session finns, tvinga användaren till login
+  useEffect(() => {
+    if (!loading && !session) {
+      // Kontrollera onboarding-status innan omdirigering
+      const store = useStore.getState()
+      if (!store.onboarding.hasCompletedOnboarding) {
+        console.log('AuthProvider: No session but onboarding not completed, staying in onboarding')
         return
       }
-      
-      console.log('AuthProvider: Inloggning lyckades, omdirigerar')
-      router.replace('/(tabs)/(scan)')
-    } catch (error) {
-      console.error('AuthProvider: Fel vid inloggning', error)
-      if (error instanceof AuthError) {
-        Alert.alert('Inloggningsfel', error.message)
-      } else {
-        Alert.alert('Fel', 'Ett oväntat fel inträffade vid inloggning')
-      }
-    } finally {
-      setLoading(false)
+      console.log('AuthProvider: Ingen giltig session, tvingar omdirigering till login')
+      router.replace('/(auth)/login')
     }
-  }
+  }, [loading, session])
 
   const signUp = async (email: string, password: string): Promise<SignUpResult> => {
     console.log('AuthProvider: Startar registreringsprocess med email', { email })
@@ -736,6 +729,7 @@ console.log('AuthProvider: Svar från nytt verifieringsmail', { error: resendErr
 
   return (
     <AuthContext.Provider value={value}>
+      <FirstLoginOverlay visible={showFirstLoginOverlay} />
       {children}
     </AuthContext.Provider>
   )

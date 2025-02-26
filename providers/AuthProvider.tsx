@@ -1,5 +1,5 @@
-// providers/AuthProvider.tsx
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+// ÄNDRING 1: Uppdatera import-sektion högst upp i filen för att säkerställa att vi har allt vi behöver
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { Session, AuthError, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Alert, AppState } from 'react-native'
@@ -57,33 +57,108 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const handleDeepLink = async (event: { url: string }) => {
       console.log('AuthProvider: Deep link detected:', event.url);
       
-      // Identifiera verifieringslänk baserat på innehåll snarare än specifik parameter
+      // Autentiseringslänk från Supabase innehåller access_token
       if (event.url.includes('access_token') && event.url.includes('type=signup')) {
         console.log('AuthProvider: Verification deep link detected with token');
         
-        // Tvinga session-refresh för att få den nya sessionen
         try {
-          const { data } = await supabase.auth.refreshSession();
-          const { session } = data;
+          // NYTT: Försök extrahera e-postadressen direkt från token
+          // JWT-token är i formatet: xxxxx.PAYLOAD.xxxxx
+          // Vi behöver extrahera och dekodera PAYLOAD-delen
+          
+          let email = null;
+          
+          // Extrahera access_token från URL
+          const tokenMatch = event.url.match(/access_token=([^&]+)/);
+          if (tokenMatch && tokenMatch[1]) {
+            const accessToken = tokenMatch[1];
+            console.log('AuthProvider: Found access token in URL');
+            
+            // Dela upp JWT i delar
+            const tokenParts = accessToken.split('.');
+            if (tokenParts.length === 3) {
+              // Base64-dekodera payload-delen (del 2)
+              try {
+                // Konvertera base64url till standard base64
+                const base64 = tokenParts[1]
+                  .replace(/-/g, '+')
+                  .replace(/_/g, '/');
+                  
+                // Dekodera base64 till en sträng och parsa som JSON
+                const decodedPayload = JSON.parse(
+                  decodeURIComponent(
+                    atob(base64)
+                      .split('')
+                      .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                      .join('')
+                  )
+                );
+                
+                // Extrahera e-postadressen från payload
+                if (decodedPayload.email) {
+                  email = decodedPayload.email;
+                  console.log('AuthProvider: Successfully extracted email from token:', email);
+                }
+              } catch (error) {
+                console.error('AuthProvider: Error decoding JWT payload:', error);
+              }
+            }
+          }
+          
+          // Försök refresha sessionen som tidigare
+          const { data: sessionData } = await supabase.auth.refreshSession();
+          const { session } = sessionData;
           
           if (session) {
             console.log('AuthProvider: Session refreshed after verification');
             setSession(session);
             setUser(session.user);
+            
+            // Om vi fick en e-postadress från token, använd den
+            // Annars fall tillbaka på session.user.email om det finns
+            const emailToUse = email || session.user?.email;
+            
+            // Navigera till login med e-postadressen
+            if (emailToUse) {
+              console.log('AuthProvider: Redirecting to login with email:', emailToUse);
+              router.replace({
+                pathname: '/(auth)/login',
+                params: { 
+                  verified: 'true', 
+                  email: encodeURIComponent(emailToUse)
+                }
+              });
+            } else {
+              console.log('AuthProvider: No email found in session, redirecting to login');
+              router.replace('/(auth)/login?verified=true');
+            }
+          } else {
+            // Om vi inte kunde refresha sessionen men har e-postadressen från token
+            if (email) {
+              console.log('AuthProvider: No valid session but email extracted from token:', email);
+              router.replace({
+                pathname: '/(auth)/login',
+                params: { 
+                  verified: 'true', 
+                  email: encodeURIComponent(email)
+                }
+              });
+            } else {
+              console.log('AuthProvider: No valid session and no email, redirecting to login');
+              router.replace('/(auth)/login?verified=true');
+            }
           }
+          
+          // Sätt onboarding som slutförd
+          await markOnboardingAsCompleted();
+          
         } catch (error) {
-          console.error('AuthProvider: Error refreshing session:', error);
+          console.error('AuthProvider: Error handling deep link:', error);
+          router.replace('/(auth)/login?verified=true');
         }
-        
-        // Sätt onboarding som slutförd
-        await markOnboardingAsCompleted();
-        
-        // VIKTIGT: Vi måste direkt omdirigera användaren innan andra checks körs
-        console.log('AuthProvider: Redirecting to login from deep link handler');
-        router.replace('/(auth)/login?verified=true');
       }
     };
-
+  
     // Lyssna på djuplänkar
     const subscription = Linking.addEventListener('url', handleDeepLink);
     
@@ -94,7 +169,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         handleDeepLink({ url });
       }
     });
-
+  
     return () => {
       subscription.remove();
     };
@@ -336,7 +411,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Avgör om det är första gången användaren loggar in efter verifiering
     if (!session.user.last_sign_in_at) {
       console.log('AuthProvider: First verification via auth state, redirecting to login')
-      router.replace('/(auth)/login?verified=true')
+      // Skicka med användarens e-postadress
+      const userEmail = session.user.email;
+      if (userEmail) {
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { 
+            verified: 'true', 
+            email: encodeURIComponent(userEmail)
+          }
+        });
+      } else {
+        router.replace('/(auth)/login?verified=true');
+      }
     } else {
       console.log('AuthProvider: User updated with verified email, redirecting to scan')
       router.replace('/(tabs)/(scan)')
@@ -528,14 +615,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
               text: 'Skicka nytt verifieringsmail',
               onPress: async () => {
                 console.log('AuthProvider: Försöker skicka nytt verifieringsmail')
-                const { error: resendError } = await supabase.auth.resend({
-                  type: 'signup',
-                  email,
-                  options: {
-                    emailRedirectTo: `koalens://login?verified=true&email=${encodeURIComponent(email)}`
-                  }
-                })
-                console.log('AuthProvider: Svar från nytt verifieringsmail', { error: resendError?.message })
+const { error: resendError } = await supabase.auth.resend({
+  type: 'signup',
+  email,
+  options: {
+    // Inkludera email i redirectlänken så att den kan återanvändas i login-formuläret
+    emailRedirectTo: `koalens://login?verified=true&email=${encodeURIComponent(email)}`
+  }
+})
+console.log('AuthProvider: Svar från nytt verifieringsmail', { error: resendError?.message })
                 if (resendError) {
                   Alert.alert('Fel', 'Kunde inte skicka nytt verifieringsmail')
                 } else {

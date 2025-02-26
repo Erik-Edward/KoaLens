@@ -16,18 +16,30 @@ export default function LoginScreen() {
   // Hämta URL-parametrar för att se om användaren kommer från verifiering
   const params = useLocalSearchParams();
   const verified = params.verified === 'true';
+  // Viktigt: Dekodera e-postadressen om den finns med som parameter
+  const emailFromParams = params.email ? decodeURIComponent(params.email as string) : '';
   const justRegistered = params.registered === 'true';
   
   useEffect(() => {
+    // Automatiskt fyll i e-postadressen från URL-parametrar
+    if (emailFromParams) {
+      console.log('Login: Fyller i e-postadress från URL-parametrar:', emailFromParams);
+      setEmail(emailFromParams);
+    }
+    
     // Visa ett välkomstmeddelande om användaren kommer från e-postverifiering
     if (verified) {
+      const message = emailFromParams
+        ? `Din e-post ${emailFromParams} har verifierats. Ange ditt lösenord för att logga in.`
+        : 'Din e-post har verifierats. Ange ditt lösenord för att logga in.';
+      
       Alert.alert(
         'E-post verifierad',
-        'Din e-post har verifierats. Logga nu in med dina uppgifter för att komma till appen.',
+        message,
         [{ text: 'OK' }]
       );
     }
-  }, [verified]);
+  }, [verified, emailFromParams]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -46,18 +58,22 @@ export default function LoginScreen() {
   };
 
   const resendVerificationEmail = async () => {
-    if (!email) {
+    // Använd e-postadressen från parametrar om e-postfältet är tomt
+    const emailToUse = email || emailFromParams;
+    
+    if (!emailToUse) {
       Alert.alert('E-post saknas', 'Ange din e-postadress för att skicka ett nytt verifieringsmail.');
       return;
     }
 
     setIsLoading(true);
     try {
+      console.log('Login: Skickar nytt verifieringsmail till:', emailToUse);
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email,
+        email: emailToUse,
         options: {
-          emailRedirectTo: `koalens://login?verified=true&email=${encodeURIComponent(email)}`
+          emailRedirectTo: `koalens://login?verified=true&email=${encodeURIComponent(emailToUse)}`
         }
       });
 
@@ -142,7 +158,7 @@ export default function LoginScreen() {
         </View>
         
         {/* Resend verification section - only shown when needed */}
-        {(justRegistered || verified) && (
+        {(justRegistered || verified || emailFromParams) && (
           <View style={styles.resendContainer}>
             <Text style={styles.resendText}>Fick du inget verifieringsmail?</Text>
             <Pressable onPress={resendVerificationEmail} disabled={isLoading}>

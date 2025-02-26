@@ -71,10 +71,13 @@ export default function RegisterScreen() {
             { 
               text: 'OK',
               onPress: () => {
-                // Navigera till login med flaggan registered=true
+                // Navigera till login med flaggan registered=true och e-postadressen
                 router.replace({
                   pathname: '/(auth)/login',
-                  params: { registered: 'true', email: encodeURIComponent(email) }
+                  params: { 
+                    registered: 'true',
+                    email: encodeURIComponent(email)
+                  }
                 });
               }
             }
@@ -134,6 +137,11 @@ export default function RegisterScreen() {
               autoComplete="password-new"
               textContentType="newPassword"
             />
+          </View>
+          {/* Hjälptext för lösenordskrav */}
+          <View style={styles.helpTextContainer}>
+            <Ionicons name="information-circle-outline" size={16} color="#9ca3af" />
+            <Text style={styles.helpText}>Lösenordet måste vara minst 6 tecken långt</Text>
           </View>
         </View>
 
@@ -216,6 +224,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 16,
+  },
+  // Nya stilar för hjälptext
+  helpTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  helpText: {
+    marginLeft: 4,
+    color: '#9ca3af',
+    fontFamily: 'PlusJakartaSans-Regular',
+    fontSize: 12,
   },
   button: {
     backgroundColor: '#3B82F6',

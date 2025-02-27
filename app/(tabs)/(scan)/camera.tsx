@@ -9,6 +9,7 @@ import { styled } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraGuide } from '@/components/CameraGuide';
+import { captureException, addBreadcrumb } from '@/lib/sentry';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -51,13 +52,16 @@ export default function CameraScreen() {
     try {
       if (camera.current && !isCapturing) {
         setIsCapturing(true);
+        addBreadcrumb('Capturing photo', 'camera');
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         const photo = await camera.current.takePhoto({
           flash: 'off',
           enableShutterSound: true
         });
-
+  
+        addBreadcrumb('Photo captured', 'camera', { path: photo.path });
+        
         // Navigera till beskärningsskärmen först
         router.push({
           pathname: './crop',
@@ -66,6 +70,7 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Failed to take photo:', error);
+      captureException(error instanceof Error ? error : new Error('Failed to take photo'));
       Alert.alert(
         "Fel vid bildtagning",
         "Kunde inte ta bilden. Försök igen.",

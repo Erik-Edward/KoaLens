@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
+import { captureException, addBreadcrumb } from '@/lib/sentry';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -41,29 +42,37 @@ export default function ResultScreen() {
       if (!photoPath || hasAnalyzed.current) {
         return;
       }
-
+  
       try {
         hasAnalyzed.current = true;
+        addBreadcrumb('Starting ingredient analysis', 'analysis', { photoPath });
+        
         await analyzeIngredients(photoPath);
+        
+        addBreadcrumb('Analysis completed', 'analysis');
       } catch (err) {
         console.log('Analysis error:', err);
+        
         if (err instanceof Error) {
           if (err.message === 'OFFLINE_MODE') {
             setIsOffline(true);
+            addBreadcrumb('App in offline mode', 'analysis', { status: 'offline' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           } else {
             setError(err.message);
+            captureException(err, { context: 'ingredient_analysis' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           }
         } else {
           setError('Ett oväntat fel uppstod');
+          captureException(new Error('Unexpected analysis error'), { context: 'ingredient_analysis' });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
       } finally {
         setLoading(false);
       }
     }
-
+  
     analyze();
   }, [photoPath]);
 

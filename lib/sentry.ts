@@ -1,0 +1,111 @@
+// lib/sentry.ts
+import * as Sentry from 'sentry-expo';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+// Definiera en egen enum för severity-nivåer
+enum Severity {
+  Fatal = 'fatal',
+  Error = 'error',
+  Warning = 'warning',
+  Info = 'info',
+  Debug = 'debug'
+}
+
+// Viktigt: Ersätt denna DSN med din egen från Sentry-dashboarden
+const SENTRY_DSN = "https://ba5841d4b9c827331ded3dfd43f3e8a1@o4508887214194688.ingest.de.sentry.io/4508887220093008";
+
+export const initSentry = () => {
+  // Initiera Sentry endast i produktionsmiljö eller om explicit aktiverat i utveckling
+  if (!__DEV__ || process.env.ENABLE_SENTRY_IN_DEV) {
+    Sentry.init({
+      dsn: SENTRY_DSN,
+      enableInExpoDevelopment: true,
+      debug: __DEV__, // Aktivera debug-läge i utvecklingsmiljö
+      
+      // Konfigurera miljö baserat på build-typ
+      environment: __DEV__ ? 'development' : 'production',
+      
+      // Release och dist information, för att korrekt mappa sourcemaps
+      release: 'koalens@' + Constants.expoConfig?.version,
+      dist: Platform.OS === 'ios' 
+        ? Constants.expoConfig?.ios?.buildNumber 
+        : Constants.expoConfig?.android?.versionCode?.toString(),
+      
+      // Konfigurera automatisk sessionstracking
+      integrations: [
+        new Sentry.Native.ReactNativeTracing({
+          routingInstrumentation: new Sentry.Native.ReactNavigationInstrumentation(),
+          tracingOrigins: ["koalens.app", /^\//],
+        }),
+      ],
+      
+      // Begränsa antalet rapporter som skickas per session
+      maxBreadcrumbs: 50,
+      
+      // Konfigurera användargränsen (% av användare som rapporterar errors)
+      tracesSampleRate: 0.5, // 50% av användare
+    });
+    
+    // Lägg till grundläggande användarinformation om tillgänglig
+    const userId = getUserId();
+    if (userId) {
+      Sentry.Native.setUser({ id: userId });
+    }
+    
+    console.log('Sentry initialized');
+  } else {
+    console.log('Sentry disabled in development mode');
+  }
+};
+
+// Hjälpfunktion för att sätta användarkontext
+export const setUserContext = (userId: string, email?: string) => {
+  Sentry.Native.setUser({
+    id: userId,
+    email: email,
+  });
+};
+
+// Hjälpfunktion för att rensa användarkontext
+export const clearUserContext = () => {
+  Sentry.Native.setUser(null);
+};
+
+// Hjälpfunktion för att rapportera fel
+export const captureException = (error: Error, context?: Record<string, any>) => {
+  if (context) {
+    Sentry.Native.setContext("additional", context);
+  }
+  Sentry.Native.captureException(error);
+};
+
+// Hjälpfunktion för att rapportera meddelanden
+export const captureMessage = (message: string, level: Severity = Severity.Info) => {
+  Sentry.Native.captureMessage(message, level as any);
+};
+
+// Hjälpfunktion för att logga breadcrumbs (spåra användarflöden)
+export const addBreadcrumb = (message: string, category: string, data?: Record<string, any>) => {
+  Sentry.Native.addBreadcrumb({
+    message,
+    category,
+    data,
+    level: Severity.Info as any,
+  });
+};
+
+// Hjälpfunktion för att hämta användare från lagring om tillgänglig
+const getUserId = (): string | null => {
+  try {
+    // Anpassas baserat på hur du lagrar användarinformation
+    // Exempel: Om du använder Zustand/useStore
+    // @ts-ignore - Ignorera typfel för denna globala variabel
+    const state = global.__ZUSTAND_STATE__?.getState?.();
+    return state?.user?.id || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export { Severity };

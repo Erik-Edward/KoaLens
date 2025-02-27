@@ -1,6 +1,12 @@
-// global.d.ts - Deklarera globala variabler för TypeScript
+// global.d.ts
 declare global {
-    var isBlockingNavigation: boolean;
-  }
+  // Deklarera isBlockingNavigation som redan finns i koden
+  var isBlockingNavigation: boolean;
   
-  export {};
+  // Deklarera __ZUSTAND_STATE__ för Sentry-integrationen
+  var __ZUSTAND_STATE__: {
+    getState?: () => any;
+  } | undefined;
+}
+
+export {};

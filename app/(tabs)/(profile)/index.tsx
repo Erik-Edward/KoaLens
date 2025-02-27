@@ -1,4 +1,4 @@
-// app/(tabs)/(profile)/index.tsx - med global navigationsspärr
+// app/(tabs)/(profile)/index.tsx - med global navigationsspärr och Sentry-test
 import { FC, useState, useEffect } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
@@ -11,6 +11,8 @@ import { AvatarSelectorModal } from '@/components/AvatarSelectorModal';
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
+// Lägg till Sentry-import
+import { captureException, captureMessage, Severity } from '@/lib/sentry';
 
 // Skapa en global variabel för att blockera navigering tillfälligt
 // Denna kan nås från AuthProvider för att kontrollera om navigering bör blockeras
@@ -72,57 +74,77 @@ const ProfileScreen: FC = () => {
     );
   };
 
-  // Uppdaterad funktion för att synkronisera avatar med Supabase
-const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
-  try {
-    setUpdating(true);
-    
-    // Aktivera navigationsspärren innan vi gör några ändringar
-    global.isBlockingNavigation = true;
-    console.log('Navigationsspärr aktiverad för avatarbyte');
-    
-    // 1. Uppdatera lokalt i Zustand-store
-    await setAvatar(style, filename);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    // 2. Synkronisera med Supabase - VIKTIGT: Sätt avatar_update till true
-    if (user) {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          avatar_style: style,
-          avatar_id: filename,
-          avatar_update: true, // Markera tydligt att detta är en avataruppdatering
-          vegan_years: avatar.veganYears,
-          vegan_status: veganStatus
-        }
-      });
+  // Testfunktion för Sentry
+  const testSentry = () => {
+    try {
+      // Simulera ett fel
+      throw new Error('Test error from KoaLens app');
+    } catch (error) {
+      captureException(error instanceof Error ? error : new Error(String(error)));
+      // Även skicka ett meddelande
+      captureMessage('Test message from KoaLens app', Severity.Info);
       
-      if (error) {
-        console.error('Fel vid uppdatering av avatar i Supabase:', error);
-        Alert.alert('Varning', 'Avataren uppdaterades lokalt men synkroniseringen med servern misslyckades.');
-      } else {
-        console.log('Avatar uppdaterad i Supabase');
-      }
+      Alert.alert(
+        'Sentry Test',
+        'Ett testfel har skickats till Sentry. Kontrollera din Sentry-dashboard.',
+        [{ text: 'OK' }]
+      );
     }
-    
-    // VIKTIGT: Ta bort återställningen av avatar_update-flaggan
-    // och förläng tiden för navigationsspärren till 5 sekunder
-    setTimeout(() => {
-      // Inaktivera navigationsspärren efter 5 sekunder
-      global.isBlockingNavigation = false;
-      console.log('Navigationsspärr inaktiverad efter avatarbyte');
+  };
+
+  // Uppdaterad funktion för att synkronisera avatar med Supabase
+  const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
+    try {
+      setUpdating(true);
       
-      // Vi återställer INTE avatar_update-flaggan här längre
-      // Det gör att vi inte får en andra USER_UPDATED-händelse
-    }, 5000);
-  } catch (error) {
-    console.error('Error updating avatar:', error);
-    Alert.alert('Fel', 'Kunde inte uppdatera avataren. Försök igen senare.');
-    global.isBlockingNavigation = false;
-  } finally {
-    setUpdating(false);
-  }
-};
+      // Aktivera navigationsspärren innan vi gör några ändringar
+      global.isBlockingNavigation = true;
+      console.log('Navigationsspärr aktiverad för avatarbyte');
+      
+      // 1. Uppdatera lokalt i Zustand-store
+      await setAvatar(style, filename);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // 2. Synkronisera med Supabase - VIKTIGT: Sätt avatar_update till true
+      if (user) {
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            avatar_style: style,
+            avatar_id: filename,
+            avatar_update: true, // Markera tydligt att detta är en avataruppdatering
+            vegan_years: avatar.veganYears,
+            vegan_status: veganStatus
+          }
+        });
+        
+        if (error) {
+          console.error('Fel vid uppdatering av avatar i Supabase:', error);
+          captureException(error); // Rapportera felet till Sentry
+          Alert.alert('Varning', 'Avataren uppdaterades lokalt men synkroniseringen med servern misslyckades.');
+        } else {
+          console.log('Avatar uppdaterad i Supabase');
+        }
+      }
+      
+      // VIKTIGT: Ta bort återställningen av avatar_update-flaggan
+      // och förläng tiden för navigationsspärren till 5 sekunder
+      setTimeout(() => {
+        // Inaktivera navigationsspärren efter 5 sekunder
+        global.isBlockingNavigation = false;
+        console.log('Navigationsspärr inaktiverad efter avatarbyte');
+        
+        // Vi återställer INTE avatar_update-flaggan här längre
+        // Det gör att vi inte får en andra USER_UPDATED-händelse
+      }, 5000);
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+      captureException(error instanceof Error ? error : new Error(String(error)));
+      Alert.alert('Fel', 'Kunde inte uppdatera avataren. Försök igen senare.');
+      global.isBlockingNavigation = false;
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <StyledView 
@@ -224,6 +246,21 @@ const handleSelectAvatar = async (filename: string, style: AvatarStyle) => {
             style={{ marginLeft: 'auto' }}
           />
         </StyledPressable>
+
+        {/* Sentry Test Button - endast i utvecklingsläge */}
+        {__DEV__ && (
+          <StyledPressable 
+            onPress={testSentry}
+            className="flex-row items-center p-4 bg-red-500/50 rounded-lg active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Testa Sentry felrapportering"
+          >
+            <Ionicons name="bug-outline" size={24} color="#ffffff" />
+            <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+              Testa Sentry
+            </StyledText>
+          </StyledPressable>
+        )}
 
         {/* Sign Out */}
         <StyledPressable 

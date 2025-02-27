@@ -8,6 +8,8 @@ import { useStore } from '@/stores/useStore'
 import * as Linking from 'expo-linking';
 import { FirstLoginOverlay } from '@/components/FirstLoginOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// Lägg till denna import för Sentry
+import { setUserContext, clearUserContext, captureException, addBreadcrumb } from '@/lib/sentry';
 
 // Imports för avatar och vegan-status
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice'
@@ -104,6 +106,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
               } catch (error) {
                 console.error('AuthProvider: Error decoding JWT payload:', error);
+                // Lägg till Sentry-rapportering
+                captureException(error instanceof Error ? error : new Error('Failed to decode JWT'));
               }
             }
           }
@@ -116,6 +120,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
             console.log('AuthProvider: Session refreshed after verification');
             setSession(session);
             setUser(session.user);
+            
+            // Sätt användarkontext i Sentry
+            setUserContext(session.user.id, session.user.email || undefined);
+            addBreadcrumb('User verified email', 'auth');
             
             // Om vi fick en e-postadress från token, använd den
             // Annars fall tillbaka på session.user.email om det finns
@@ -157,6 +165,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           
         } catch (error) {
           console.error('AuthProvider: Error handling deep link:', error);
+          // Lägg till Sentry-rapportering
+          captureException(error instanceof Error ? error : new Error('Deep link error'));
           router.replace('/(auth)/login?verified=true');
         }
       }
@@ -198,6 +208,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }).catch(error => {
       console.error('AuthProvider: Error checking initial URL:', error);
+      // Lägg till Sentry-rapportering
+      captureException(error instanceof Error ? error : new Error('Initial URL check error'));
     });
     
     // Initial session check
@@ -210,6 +222,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setSession(session)
       setUser(session?.user ?? null)
+
+      // Sätt användarkontext i Sentry om vi har en session
+      if (session?.user) {
+        setUserContext(session.user.id, session.user.email || undefined);
+        addBreadcrumb('Initial session check', 'auth', {
+          email_confirmed: !!session.user.email_confirmed_at
+        });
+      }
 
       // Vänta tills Zustand store är redo
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -305,6 +325,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(session)
       setUser(session?.user ?? null)
 
+      // Sätt användarkontext i Sentry när sessionen uppdateras
+      if (session?.user) {
+        setUserContext(session.user.id, session.user.email || undefined);
+        addBreadcrumb('User session updated', 'auth', { 
+          event_type: event,
+          email_confirmed: !!session.user.email_confirmed_at
+        });
+      } else {
+        // Rensa användarkontext om det inte finns en session
+        clearUserContext();
+      }
+
       // Synkronisera användardata med Zustand store när vi har en session
       if (session?.user) {
         const userData = session.user
@@ -346,6 +378,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       switch (event) {
         case 'SIGNED_OUT':
           console.log('AuthProvider: Användare loggad ut')
+          // Rensa användarkontext i Sentry
+          clearUserContext();
+          addBreadcrumb('User signed out', 'auth');
+          
           if (!useStore.getState().onboarding.hasCompletedOnboarding) {
             router.replace('/(onboarding)')
           } else {
@@ -439,6 +475,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             email: session?.user.email,
             hasAvatar: !!session?.user.user_metadata?.avatar_id
           })
+          
+          // Lägg till en breadcrumb i Sentry
+          addBreadcrumb('User signed in', 'auth', {
+            emailConfirmed: !!session?.user.email_confirmed_at
+          });
+          
           if (session?.user.email_confirmed_at) {
             router.replace('/(tabs)/(scan)')
           } else {
@@ -476,6 +518,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await supabase.auth.refreshSession();
           } catch (error) {
             console.error('Error refreshing session:', error);
+            // Lägg till Sentry-rapportering
+            captureException(error instanceof Error ? error : new Error('Session refresh error'));
           }
           
           router.replace('/(auth)/login?verified=true');
@@ -483,6 +527,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (error) {
         console.error('Error checking URL:', error);
+        // Lägg till Sentry-rapportering
+        captureException(error instanceof Error ? error : new Error('URL check error'));
       }
     }, 1000);
     
@@ -503,6 +549,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
               setSession(session)
               setUser(session.user)
               clearInterval(interval)
+              
+              // Sätt användarkontext i Sentry
+              setUserContext(session.user.id, session.user.email || undefined);
               
               // Om vi har en verifierad session, sätt onboarding som slutförd
               markOnboardingAsCompleted();
@@ -553,97 +602,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [loading, session])
 
-  // Lyssna på route-ändringar indirekt via en timer
-  useEffect(() => {
-    // Kontrollera periodiskt för djuplänkar
-    const checkInterval = setInterval(async () => {
-      try {
-        const url = await Linking.getInitialURL();
-        if (url && url.includes('access_token') && url.includes('type=signup')) {
-          console.log('AuthProvider: Verification link detected in periodic check');
-          await markOnboardingAsCompleted();
-          
-          // Tvinga session-refresh
-          try {
-            await supabase.auth.refreshSession();
-          } catch (error) {
-            console.error('Error refreshing session:', error);
-          }
-          
-          router.replace('/(auth)/login?verified=true');
-          clearInterval(checkInterval); // Slutar kontrollera när vi hittat en länk
-        }
-      } catch (error) {
-        console.error('Error checking URL:', error);
-      }
-    }, 1000);
-    
-    return () => clearInterval(checkInterval);
-  }, []);
+  // Funktioner för att hantera användarautentisering
+  
+  const signIn = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-  // Polling av sessionen när appen blir aktiv
-  useEffect(() => {
-    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        console.log('AuthProvider: AppState "active" – startar polling för sessionuppdatering')
-        let remainingTime = 30000 // 30 sekunder
-        const interval = setInterval(() => {
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log('AuthProvider: Polling session', session)
-            if (session && session.user.email_confirmed_at) {
-              console.log('AuthProvider: Session uppdaterad med verifierad e-post')
-              setSession(session)
-              setUser(session.user)
-              clearInterval(interval)
-              
-              // Om vi har en verifierad session, sätt onboarding som slutförd
-              markOnboardingAsCompleted();
-
-              // Synkronisera avatar och användardata om det finns tillgängligt
-              if (session.user.user_metadata) {
-                const store = useStore.getState();
-                const metadata = session.user.user_metadata;
-                
-                // Uppdatera avatar om info finns
-                if (metadata.avatar_style && metadata.avatar_id) {
-                  console.log('AuthProvider: Synkroniserar avatar från polling:', {
-                    style: metadata.avatar_style,
-                    id: metadata.avatar_id
-                  });
-                  
-                  store.setAvatar(
-                    metadata.avatar_style as AvatarStyle, 
-                    metadata.avatar_id as string
-                  );
-                }
-              }
-            }
-          })
-          remainingTime -= 5000
-          if (remainingTime <= 0) {
-            clearInterval(interval)
-          }
-        }, 5000)
+      if (error) throw error;
+      
+      // Sätt användarkontext i Sentry
+      if (data.user) {
+        setUserContext(data.user.id, data.user.email || undefined);
+        addBreadcrumb('User signed in', 'auth');
       }
-    })
-    return () => {
-      appStateSubscription.remove()
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      // Lägg till Sentry-rapportering
+      captureException(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    } finally {
+      setLoading(false);
     }
-  }, [])
-
-  // Extra useEffect: Om inloggningen är klar men ingen session finns, tvinga användaren till login
-  useEffect(() => {
-    if (!loading && !session) {
-      // Kontrollera onboarding-status innan omdirigering
-      const store = useStore.getState()
-      if (!store.onboarding.hasCompletedOnboarding) {
-        console.log('AuthProvider: No session but onboarding not completed, staying in onboarding')
-        return
-      }
-      console.log('AuthProvider: Ingen giltig session, tvingar omdirigering till login')
-      router.replace('/(auth)/login')
-    }
-  }, [loading, session])
+  };
 
   const signUp = async (email: string, password: string): Promise<SignUpResult> => {
     console.log('AuthProvider: Startar registreringsprocess med email', { email })
@@ -678,6 +663,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return { data, error }
     } catch (error) {
       console.error('AuthProvider: Fel vid registrering', error)
+      // Lägg till Sentry-rapportering
+      captureException(error instanceof Error ? error : new Error(String(error)));
       return { data: null, error: error as AuthError }
     } finally {
       setLoading(false)
@@ -688,9 +675,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log('AuthProvider: Försöker logga ut')
     try {
       setLoading(true)
+      // Lägg till breadcrumb i Sentry
+      addBreadcrumb('User signing out', 'auth');
+      
       const { error } = await supabase.auth.signOut()
       console.log('AuthProvider: Svar vid utloggning', { error: error?.message })
+      
       if (error) throw error
+      
+      // Rensa användarkontext i Sentry vid utloggning
+      clearUserContext();
       
       // Kontrollera onboarding-status innan omdirigering vid utloggning
       const store = useStore.getState()
@@ -701,6 +695,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('AuthProvider: Fel vid utloggning', error)
+      // Lägg till Sentry-rapportering
+      captureException(error instanceof Error ? error : new Error(String(error)));
       if (error instanceof AuthError) {
         Alert.alert('Utloggningsfel', error.message)
       } else {
@@ -721,7 +717,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     session: session,
     user: user,
     loading: loading,
-    signIn: signIn,  // Explicit property-value syntax
+    signIn: signIn,
     signUp: signUp,
     signOut: signOut,
     signInWithGoogle: signInWithGoogle

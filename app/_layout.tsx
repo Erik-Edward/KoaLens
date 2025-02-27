@@ -1,5 +1,4 @@
-// app/_layout.tsx - Förbättrad djuplänkhantering för verifiering
-
+// app/_layout.tsx - med Sentry integration
 import 'react-native-reanimated';
 import { FC, useEffect } from 'react';
 import { Stack } from 'expo-router';
@@ -9,10 +8,26 @@ import theme from '@/constants/theme';
 import { UserProfileSync } from '@/components/UserProfileSync';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { initSentry } from '@/lib/sentry';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+// Initiera Sentry så tidigt som möjligt
+initSentry();
+
+// Visa splashscreen tills appen är redo
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ingen åtgärd vid fel */
+});
 
 const RootLayout: FC = () => {
   // Förbättrad djuplänkhantering (detta stör inte AuthProvider:s egen hantering)
   useEffect(() => {
+    // Dölj splash screen när komponenten är monterad
+    SplashScreen.hideAsync().catch(() => {
+      /* ingen åtgärd vid fel */
+    });
+    
     // Hantera initial URL när appen startas via en djuplänk
     const getInitialURL = async () => {
       const url = await Linking.getInitialURL();
@@ -40,42 +55,44 @@ const RootLayout: FC = () => {
   }, []);
 
   return (
-    <AuthProvider>
-      <StatusBar 
-        style="light"
-        backgroundColor={theme.colors.background.main}
-        translucent={true}
-      />
-      <UserProfileSync />
-      <Stack 
-        screenOptions={{ 
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: theme.colors.background.main
-          },
-          animation: 'fade'
-        }}
-      >
-        <Stack.Screen 
-          name="(auth)" 
-          options={{
+    <ErrorBoundary>
+      <AuthProvider>
+        <StatusBar 
+          style="light"
+          backgroundColor={theme.colors.background.main}
+          translucent={true}
+        />
+        <UserProfileSync />
+        <Stack 
+          screenOptions={{ 
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: theme.colors.background.main
+            },
             animation: 'fade'
           }}
-        />
-        <Stack.Screen 
-          name="(tabs)"
-          options={{
-            animation: 'fade'
-          }}
-        />
-        <Stack.Screen 
-          name="(onboarding)"
-          options={{
-            animation: 'fade'
-          }}
-        />
-      </Stack>
-    </AuthProvider>
+        >
+          <Stack.Screen 
+            name="(auth)" 
+            options={{
+              animation: 'fade'
+            }}
+          />
+          <Stack.Screen 
+            name="(tabs)"
+            options={{
+              animation: 'fade'
+            }}
+          />
+          <Stack.Screen 
+            name="(onboarding)"
+            options={{
+              animation: 'fade'
+            }}
+          />
+        </Stack>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

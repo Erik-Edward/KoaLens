@@ -55,8 +55,39 @@
         {
           "cameraPermissionText": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33,
+            "buildToolsVersion": "33.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      [
+        "sentry-expo",
+        {
+          "organization": "o4508887214194688",
+          "project": "4508887220093008"
+        }
       ]
     ],
+    "hooks": {
+      "postPublish": [
+        {
+          "file": "sentry-expo/upload-sourcemaps",
+          "config": {
+            "organization": "o4508887214194688",
+            "project": "4508887220093008"
+          }
+        }
+      ]
+    },
     "scheme": "koalens",
     "experiments": {
       "typedRoutes": true,

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import ImageCropPicker, { Image as CroppedImage } from 'react-native-image-crop-picker';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
+import { captureException, addBreadcrumb } from '@/lib/sentry';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -23,6 +24,8 @@ export default function CropScreen() {
   const handleCrop = async () => {
     setLoading(true);
     try {
+      addBreadcrumb('Starting image crop', 'crop', { photoPath });
+      
       const croppedImage: CroppedImage = await ImageCropPicker.openCropper({
         path: `file://${photoPath}`,
         // Grundläggande dimensioner
@@ -49,7 +52,13 @@ export default function CropScreen() {
         cropperChooseText: 'Klar',
         cropperCancelText: 'Avbryt',
       });
-
+  
+      addBreadcrumb('Image cropped successfully', 'crop', { 
+        width: croppedImage.width,
+        height: croppedImage.height,
+        path: croppedImage.path
+      });
+  
       // Skicka med orientering och dimensioner till result
       router.push({
         pathname: './result',
@@ -63,15 +72,20 @@ export default function CropScreen() {
       });
     } catch (error) {
       const cropError = error as CropError;
+      
+      // Spåra endast riktiga fel, inte användare som avbryter
       if (cropError?.message !== 'User cancelled image selection') {
         console.error('Crop error:', cropError);
+        captureException(cropError instanceof Error ? cropError : new Error(String(cropError)));
         setError('Kunde inte beskära bilden. Försök igen.');
       }
+      
       router.back();
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleBack = () => {
     router.back();

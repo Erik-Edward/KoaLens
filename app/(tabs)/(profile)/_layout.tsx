@@ -46,6 +46,12 @@ const ProfileLayout: FC = () => {
         }}
       />
       <Stack.Screen
+        name="support"
+        options={{
+          title: "Support",
+        }}
+      />
+      <Stack.Screen
         name="offline-test"
         options={{
           title: 'Offline Test',

@@ -16,15 +16,15 @@ enum Severity {
 const SENTRY_DSN = "https://ba5841d4b9c827331ded3dfd43f3e8a1@o4508887214194688.ingest.de.sentry.io/4508887220093008";
 
 export const initSentry = () => {
-  // Initiera Sentry endast i produktionsmiljö eller om explicit aktiverat i utveckling
-  if (!__DEV__ || process.env.ENABLE_SENTRY_IN_DEV) {
+  // Ändra detta för att ALLTID initiera Sentry oavsett utvecklingsläge för att testa
+  if (true) { // Ändrat från: if (!__DEV__ || process.env.ENABLE_SENTRY_IN_DEV) {
     Sentry.init({
       dsn: SENTRY_DSN,
       enableInExpoDevelopment: true,
-      debug: __DEV__, // Aktivera debug-läge i utvecklingsmiljö
+      debug: true, // Sätt till true för att visa debug-meddelanden
       
-      // Konfigurera miljö baserat på build-typ
-      environment: __DEV__ ? 'development' : 'production',
+      // Konfigurera miljö baserat på build-typ, men tvinga till development för test
+      environment: 'development', // Ändrat från: __DEV__ ? 'development' : 'production',
       
       // Release och dist information, för att korrekt mappa sourcemaps
       release: 'koalens@' + Constants.expoConfig?.version,
@@ -40,11 +40,11 @@ export const initSentry = () => {
         }),
       ],
       
-      // Begränsa antalet rapporter som skickas per session
-      maxBreadcrumbs: 50,
+      // För test: öka antalet breadcrumbs för mer detaljerad debugging
+      maxBreadcrumbs: 100,
       
       // Konfigurera användargränsen (% av användare som rapporterar errors)
-      tracesSampleRate: 0.5, // 50% av användare
+      tracesSampleRate: 1.0, // Ändrat från 0.5 till 1.0 för test - 100% av användare
     });
     
     // Lägg till grundläggande användarinformation om tillgänglig
@@ -53,7 +53,7 @@ export const initSentry = () => {
       Sentry.Native.setUser({ id: userId });
     }
     
-    console.log('Sentry initialized');
+    console.log('Sentry initialized with debug mode');
   } else {
     console.log('Sentry disabled in development mode');
   }

@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
+// Lägg till import för Analytics
+import { logEvent, Events, logScreenView } from '@/lib/analytics';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -23,12 +25,27 @@ export default function ResultScreen() {
   const initialProductCount = useRef<number | null>(null);
   const products = useStore((state) => state.products);
 
+  // Logga skärmvisning när komponenten monteras
+  useEffect(() => {
+    logScreenView('AnalysisResult');
+  }, []);
+
   useEffect(() => {
     if (initialProductCount.current === null) {
       initialProductCount.current = products.length;
     } else if (products.length > initialProductCount.current && loading) {
       // Vi har fått en ny produkt och är fortfarande i laddningsläge
       const newProduct = products[0];
+      
+      // Logga att analysen är klar med produktdetaljer
+      logEvent(Events.ANALYSIS_COMPLETED, {
+        is_vegan: newProduct.isVegan,
+        confidence: Math.round(newProduct.confidence * 100),
+        ingredient_count: newProduct.allIngredients.length,
+        non_vegan_ingredient_count: newProduct.nonVeganIngredients.length,
+        watched_ingredients_count: newProduct.watchedIngredientsFound.length
+      });
+      
       router.dismissTo('/(tabs)/(scan)');
       router.push({
         pathname: '/(tabs)/(history)/[id]',
@@ -47,6 +64,9 @@ export default function ResultScreen() {
         hasAnalyzed.current = true;
         addBreadcrumb('Starting ingredient analysis', 'analysis', { photoPath });
         
+        // Logga att analysen har påbörjats
+        logEvent(Events.ANALYSIS_STARTED);
+        
         await analyzeIngredients(photoPath);
         
         addBreadcrumb('Analysis completed', 'analysis');
@@ -58,15 +78,32 @@ export default function ResultScreen() {
             setIsOffline(true);
             addBreadcrumb('App in offline mode', 'analysis', { status: 'offline' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            
+            // Logga offline-händelse
+            logEvent('analysis_offline', {
+              timestamp: new Date().toISOString()
+            });
           } else {
             setError(err.message);
             captureException(err, { context: 'ingredient_analysis' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            
+            // Logga analysfel
+            logEvent(Events.ANALYSIS_ERROR, {
+              error_message: err.message,
+              error_type: 'analysis_error'
+            });
           }
         } else {
           setError('Ett oväntat fel uppstod');
           captureException(new Error('Unexpected analysis error'), { context: 'ingredient_analysis' });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          
+          // Logga oväntat fel
+          logEvent(Events.ANALYSIS_ERROR, {
+            error_message: 'Unexpected error',
+            error_type: 'unknown_error'
+          });
         }
       } finally {
         setLoading(false);
@@ -77,11 +114,22 @@ export default function ResultScreen() {
   }, [photoPath]);
 
   const handleNavigateToHistory = () => {
+    // Logga navigation
+    logEvent('navigation', { 
+      from: 'offline_result', 
+      to: 'history' 
+    });
+    
     router.dismissTo('/(tabs)/(scan)');
     router.replace('/(tabs)/(history)');
   };
 
   const handleTakeNewPhoto = () => {
+    // Logga ny fotoåtgärd
+    logEvent('new_photo_from_result', { 
+      result_state: isOffline ? 'offline' : (error ? 'error' : 'success') 
+    });
+    
     router.dismissTo('/(tabs)/(scan)');
   };
 

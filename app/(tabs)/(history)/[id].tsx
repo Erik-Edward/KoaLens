@@ -1,12 +1,14 @@
 // app/(tabs)/(history)/[id].tsx
-import { View, Text, ScrollView, Image, Share, Pressable } from 'react-native';
+import { View, Text, ScrollView, Image, Share, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useStore } from '@/stores/useStore';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { styled } from 'nativewind';
+// Lägg till import för Analytics
+import { logEvent, Events, logScreenView } from '@/lib/analytics';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -50,6 +52,23 @@ export default function ProductDetailScreen() {
   
   const toggleFavorite = useStore((state) => state.toggleFavorite);
   const removeProduct = useStore((state) => state.removeProduct);
+  
+  // Logga skärmvisning när komponenten monteras
+  useEffect(() => {
+    if (product) {
+      logScreenView('ProductDetail');
+      
+      // Logga produktdetaljer
+      logEvent('view_product_details', {
+        is_vegan: product.isVegan,
+        is_favorite: product.isFavorite,
+        confidence: Math.round(product.confidence * 100),
+        non_vegan_ingredients_count: product.nonVeganIngredients.length,
+        watched_ingredients_count: product.watchedIngredientsFound.length,
+        total_ingredients: product.allIngredients.length
+      });
+    }
+  }, [product]);
 
   if (!product) {
     return (
@@ -77,17 +96,60 @@ Analys:
 ${product.reasoning}`;
 
       await Share.share({ message });
+      
+      // Logga delningshändelse
+      logEvent(Events.SHARE_RESULT, {
+        is_vegan: product.isVegan,
+        confidence: Math.round(product.confidence * 100),
+        content_length: message.length
+      });
+      
     } catch (error) {
       console.error('Error sharing product:', error);
+      
+      // Logga delningsfel
+      logEvent('share_error', {
+        error_message: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   };
 
   const handleRemove = () => {
-    removeProduct(product.id);
-    router.back();
+    Alert.alert(
+      'Ta bort produkt',
+      'Är du säker på att du vill ta bort denna produkt från historiken?',
+      [
+        {
+          text: 'Avbryt',
+          style: 'cancel'
+        },
+        {
+          text: 'Ta bort',
+          style: 'destructive',
+          onPress: () => {
+            // Logga borttagnigshändelse
+            logEvent(Events.DELETE_PRODUCT, {
+              is_vegan: product.isVegan,
+              is_favorite: product.isFavorite
+            });
+            
+            removeProduct(product.id);
+            router.back();
+          }
+        }
+      ]
+    );
   };
 
   const handleToggleFavorite = () => {
+    // Logga favoritändring
+    logEvent(Events.TOGGLE_FAVORITE, {
+      product_id: product.id,
+      is_vegan: product.isVegan,
+      previous_state: product.isFavorite ? 'favorite' : 'not_favorite',
+      new_state: product.isFavorite ? 'not_favorite' : 'favorite'
+    });
+    
     toggleFavorite(product.id);
   };
 

@@ -1,4 +1,4 @@
-// app/_layout.tsx - med Sentry integration
+// app/_layout.tsx
 import 'react-native-reanimated';
 import { FC, useEffect } from 'react';
 import { Stack } from 'expo-router';
@@ -11,6 +11,8 @@ import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { initSentry } from '@/lib/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+// Import Firebase Analytics
+import { initAnalytics } from '@/lib/analytics';
 
 // Initiera Sentry så tidigt som möjligt
 initSentry();
@@ -26,6 +28,15 @@ const RootLayout: FC = () => {
     // Dölj splash screen när komponenten är monterad
     SplashScreen.hideAsync().catch(() => {
       /* ingen åtgärd vid fel */
+    });
+    
+    // Initiera Firebase Analytics
+    initAnalytics().then(success => {
+      if (success) {
+        console.log('Firebase Analytics initialized successfully');
+      } else {
+        console.warn('Failed to initialize Firebase Analytics');
+      }
     });
     
     // Hantera initial URL när appen startas via en djuplänk

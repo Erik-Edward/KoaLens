@@ -1,4 +1,4 @@
-// app/(tabs)/(profile)/index.tsx - med global navigationsspärr och Sentry-test
+// app/(tabs)/(profile)/index.tsx - med global navigationsspärr och uppdaterad Sentry-test
 import { FC, useState, useEffect } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
@@ -12,7 +12,9 @@ import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 // Lägg till Sentry-import
-import { captureException, captureMessage, Severity } from '@/lib/sentry';
+import { captureException, captureMessage, Severity, addBreadcrumb } from '@/lib/sentry';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // Skapa en global variabel för att blockera navigering tillfälligt
 // Denna kan nås från AuthProvider för att kontrollera om navigering bör blockeras
@@ -74,19 +76,49 @@ const ProfileScreen: FC = () => {
     );
   };
 
-  // Testfunktion för Sentry
+  // Uppdaterad testfunktion för Sentry
   const testSentry = () => {
     try {
-      // Simulera ett fel
-      throw new Error('Test error from KoaLens app');
-    } catch (error) {
-      captureException(error instanceof Error ? error : new Error(String(error)));
-      // Även skicka ett meddelande
+      // Explicit logging för testning
+      console.log('Starting Sentry test...');
+      
+      // Lägg till en breadcrumb innan felet
+      addBreadcrumb('About to throw test error', 'test', {
+        important: true,
+        userId: user?.id || 'unknown'
+      });
+      
+      // Skicka ett testmeddelande först
       captureMessage('Test message from KoaLens app', Severity.Info);
+      console.log('Sent test message to Sentry');
+      
+      // Skapa ett unikt fel med tidsstämpel för att göra det lättare att identifiera
+      const timestamp = new Date().toISOString();
+      throw new Error(`Test error from KoaLens app at ${timestamp}`);
+    } catch (error) {
+      // Explicit logging när vi fångar felet
+      console.log('Caught test error, sending to Sentry:', error);
+      
+      // Skicka felet med mer kontext
+      captureException(error instanceof Error ? error : new Error(String(error)), {
+        tags: {
+          test: 'true',
+          timestamp: new Date().toISOString(),
+          version: Constants.expoConfig?.version || 'unknown'
+        },
+        extra: {
+          device: Platform.OS,
+          user: user?.id || 'anonymous'
+        }
+      });
+      
+      // Skicka ett extra meddelande för att bekräfta att allt fungerar
+      captureMessage('Test exception was caught and reported', Severity.Warning);
+      console.log('Sent exception to Sentry');
       
       Alert.alert(
         'Sentry Test',
-        'Ett testfel har skickats till Sentry. Kontrollera din Sentry-dashboard.',
+        'Ett testfel har skickats till Sentry. Kontrollera din Sentry-dashboard.\n\nOm felet inte syns, kontrollera konsolloggen.',
         [{ text: 'OK' }]
       );
     }

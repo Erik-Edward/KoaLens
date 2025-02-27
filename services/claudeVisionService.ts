@@ -4,6 +4,8 @@ import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '@/stores/useStore';
 import { WatchedIngredientFound } from '@/types/settingsTypes';
+// Lägg till import för Analytics
+import { logEvent, Events } from '@/lib/analytics';
 
 interface IngredientAnalysisResult {
   isVegan: boolean;
@@ -41,6 +43,14 @@ async function performAnalysis(base64Data: string): Promise<IngredientAnalysisRe
     if (!analysisResponse.ok) {
       const errorData = await analysisResponse.json();
       console.error('Backend error:', errorData);
+      
+      // Logga API-fel
+      logEvent(Events.ANALYSIS_ERROR, {
+        error_type: 'api_error',
+        error_status: analysisResponse.status,
+        error_message: errorData.message || 'Unknown API error'
+      });
+      
       throw new Error(errorData.message || 'Analysis failed');
     }
 
@@ -53,6 +63,13 @@ async function performAnalysis(base64Data: string): Promise<IngredientAnalysisRe
 
     if (!result || typeof result.isVegan !== 'boolean' || !Array.isArray(result.allIngredients)) {
       console.error('Invalid response format:', result);
+      
+      // Logga formatfel
+      logEvent(Events.ANALYSIS_ERROR, {
+        error_type: 'format_error',
+        error_message: 'Invalid response format from server'
+      });
+      
       throw new Error('Invalid response format from server');
     }
 
@@ -130,6 +147,12 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
     if (!networkState.isConnected) {
       console.log('Device is offline, saving analysis for later');
       
+      // Logga offline-statusen
+      logEvent('analysis_saved_offline', {
+        timestamp: Date.now(),
+        image_size_kb: Math.round((base64Data.length * 0.75) / 1024)
+      });
+      
       // Skapa en pending analys
       const analysisId = Date.now().toString();
       const pendingAnalysis: PendingAnalysis = {
@@ -170,6 +193,13 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
       return result;
     } catch (error) {
       console.error('API analysis failed:', error);
+      
+      // Logga analysfel
+      logEvent(Events.ANALYSIS_ERROR, {
+        error_type: 'api_error',
+        error_message: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       if (error instanceof Error) {
         throw error;
       }

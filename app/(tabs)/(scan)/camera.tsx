@@ -10,6 +10,8 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraGuide } from '@/components/CameraGuide';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
+// Lägg till import för Analytics
+import { logEvent, Events, logScreenView } from '@/lib/analytics';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -23,6 +25,11 @@ export default function CameraScreen() {
   const camera = useRef<Camera>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Logga skärmvisning när komponenten monteras
+  useEffect(() => {
+    logScreenView('Camera');
+  }, []);
 
   useEffect(() => {
     const checkGuide = async () => {
@@ -53,6 +60,10 @@ export default function CameraScreen() {
       if (camera.current && !isCapturing) {
         setIsCapturing(true);
         addBreadcrumb('Capturing photo', 'camera');
+        
+        // Logga att skanningen har påbörjats
+        logEvent(Events.SCAN_STARTED);
+        
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
         const photo = await camera.current.takePhoto({
@@ -71,6 +82,13 @@ export default function CameraScreen() {
     } catch (error) {
       console.error('Failed to take photo:', error);
       captureException(error instanceof Error ? error : new Error('Failed to take photo'));
+      
+      // Logga fel vid skanning
+      logEvent(Events.SCAN_ERROR, { 
+        error_type: "camera_error",
+        error_message: error instanceof Error ? error.message : "Unknown error"
+      });
+      
       Alert.alert(
         "Fel vid bildtagning",
         "Kunde inte ta bilden. Försök igen.",
@@ -78,6 +96,20 @@ export default function CameraScreen() {
       );
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  const handleCloseGuide = async () => {
+    // Spara att användaren har sett guiden
+    try {
+      await AsyncStorage.setItem(GUIDE_KEY, 'true');
+      setShowGuide(false);
+      
+      // Logga guideinteraktion
+      logEvent('guide_completed', { type: 'camera_guide' });
+    } catch (error) {
+      console.error('Error saving guide status:', error);
+      setShowGuide(false);
     }
   };
 
@@ -165,7 +197,7 @@ export default function CameraScreen() {
       </StyledView>
 
       {/* Guide overlay */}
-      {showGuide && <CameraGuide onClose={() => setShowGuide(false)} />}
+      {showGuide && <CameraGuide onClose={handleCloseGuide} />}
     </StyledView>
   );
 }

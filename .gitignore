@@ -9,6 +9,22 @@ dist/
 web-build/
 expo-env.d.ts
 
+# EAS
+.eas/
+eas.json
+
+# EAS Build artifacts
+*.aab
+*.apk
+*.ipa
+
+# EAS credentials and secrets
+credentials.json
+*-keystore.jks
+
+# EAS build cache
+.expo-shared/
+
 # Native
 *.orig.*
 *.jks

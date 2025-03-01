@@ -9,22 +9,6 @@ dist/
 web-build/
 expo-env.d.ts
 
-# EAS
-.eas/
-eas.json
-
-# EAS Build artifacts
-*.aab
-*.apk
-*.ipa
-
-# EAS credentials and secrets
-credentials.json
-*-keystore.jks
-
-# EAS build cache
-.expo-shared/
-
 # Native
 *.orig.*
 *.jks
@@ -65,14 +49,6 @@ supabase.js
 *.sublime-*
 *.swp
 *.swo
-
-# Local build files
-ios/build/
-android/build/
-android/app/build/
-android/gradle/
-android/gradlew
-android/gradlew.bat
 
 # Firebase config
 google-services.json

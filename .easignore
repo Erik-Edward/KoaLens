@@ -1,0 +1,16 @@
+# Ignorera Sentry-relevant mappar för testbyggen
+sentry.properties
+android/sentry.properties
+
+# Följ rekommendationen från expo doctor om projektet använder prebuild
+# /android
+# /ios
+
+# Övriga filer att ignorera
+node_modules
+npm-debug.log
+yarn-error.log
+.git
+.github
+.vscode
+.idea

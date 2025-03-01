@@ -18,12 +18,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
       },
-      "bundleIdentifier": "com.erikedward.KoaLens",
-      "config": {
-        "googleSignIn": {
-          "reservedClientId": "com.googleusercontent.apps.880878962670-drs8ta7556lgkd4bkbi2nkbh79jl0tn5"
-        }
-      }
+      "bundleIdentifier": "com.erikedward.KoaLens"
     },
     "android": {
       "adaptiveIcon": {
@@ -68,26 +63,8 @@
             "deploymentTarget": "15.1"
           }
         }
-      ],
-      [
-        "sentry-expo",
-        {
-          "organization": "o4508887214194688",
-          "project": "4508887220093008"
-        }
       ]
     ],
-    "hooks": {
-      "postPublish": [
-        {
-          "file": "sentry-expo/upload-sourcemaps",
-          "config": {
-            "organization": "o4508887214194688",
-            "project": "4508887220093008"
-          }
-        }
-      ]
-    },
     "scheme": "koalens",
     "experiments": {
       "typedRoutes": true,
@@ -105,64 +82,6 @@
       "eas": {
         "projectId": "92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
       }
-    },
-    "fonts": [
-      {
-        "asset": "assets/fonts/PlusJakartaSans-Bold.ttf",
-        "family": "PlusJakartaSans-Bold"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-BoldItalic.ttf",
-        "family": "PlusJakartaSans-BoldItalic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-ExtraBold.ttf",
-        "family": "PlusJakartaSans-ExtraBold"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-ExtraBoldItalic.ttf",
-        "family": "PlusJakartaSans-ExtraBoldItalic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-ExtraLight.ttf",
-        "family": "PlusJakartaSans-ExtraLight"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-ExtraLightItalic.ttf",
-        "family": "PlusJakartaSans-ExtraLightItalic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-Italic.ttf",
-        "family": "PlusJakartaSans-Italic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-Light.ttf",
-        "family": "PlusJakartaSans-Light"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-LightItalic.ttf",
-        "family": "PlusJakartaSans-LightItalic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-Medium.ttf",
-        "family": "PlusJakartaSans-Medium"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-MediumItalic.ttf",
-        "family": "PlusJakartaSans-MediumItalic"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-Regular.ttf",
-        "family": "PlusJakartaSans-Regular"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-SemiBold.ttf",
-        "family": "PlusJakartaSans-SemiBold"
-      },
-      {
-        "asset": "assets/fonts/PlusJakartaSans-SemiBoldItalic.ttf",
-        "family": "PlusJakartaSans-SemiBoldItalic"
-      }
-    ]
+    }
   }
 }

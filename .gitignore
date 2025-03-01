@@ -52,3 +52,6 @@ supabase.js
 
 # Firebase config
 GoogleService-Info.plist
+
+# app.json backup
+app.json.bak

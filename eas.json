@@ -13,7 +13,8 @@
       },
       "env": {
         "ENVIRONMENT": "development",
-        "API_URL": "https://api-dev.koalens.com"
+        "API_URL": "https://api-dev.koalens.com",
+        "SENTRY_DISABLE": "true"
       }
     },
     "preview": {
@@ -23,7 +24,8 @@
       },
       "env": {
         "ENVIRONMENT": "preview",
-        "API_URL": "https://api-staging.koalens.com"
+        "API_URL": "https://api-staging.koalens.com",
+        "SENTRY_DISABLE": "true"
       }
     },
     "production": {

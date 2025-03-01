@@ -41,39 +41,39 @@
       "output": "static"
     },
     "plugins": [
-  "expo-router",
-  [
-    "expo-splash-screen",
-    {
-      "image": "./assets/images/splashscreen_logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#25292e"
-    }
-  ],
-  [
-    "react-native-vision-camera",
-    {
-      "cameraPermissionText": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
-    }
-  ],
-  [
-    "expo-build-properties",
-    {
-      "android": {
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "buildToolsVersion": "34.0.0"
-    },
-      "ios": {
-        "deploymentTarget": "15.1"
-      }
-    }
-  ],
-  [
-    "sentry-expo",
-    {
-      "organization": "o4508887214194688",
-      "project": "4508887220093008"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splashscreen_logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#25292e"
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      [
+        "sentry-expo",
+        {
+          "organization": "o4508887214194688",
+          "project": "4508887220093008"
         }
       ]
     ],
@@ -98,6 +98,12 @@
         "tailwindcss": {
           "cssPath": "global.css"
         }
+      },
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
       }
     },
     "fonts": [

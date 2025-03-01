@@ -51,5 +51,4 @@ supabase.js
 *.swo
 
 # Firebase config
-google-services.json
 GoogleService-Info.plist

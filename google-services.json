@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "880878962670",
+    "project_id": "koalens-447323",
+    "storage_bucket": "koalens-447323.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:880878962670:android:ee850db76bb8ecd4fd30ff",
+        "android_client_info": {
+          "package_name": "com.erikedward.KoaLens"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "880878962670-lmknf32a0qkvfiad1fe84v02qk2kke43.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.erikedward.KoaLens",
+            "certificate_hash": "cefca9ba49b293081e7f5dc6e7a00e646f00043e"
+          }
+        },
+        {
+          "client_id": "880878962670-21hvu7v8749p2jqmuo0qdv5s23mbo2cq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMjfkPsFoW-8_gaBhvWUjG_EpDrICRpLo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "880878962670-21hvu7v8749p2jqmuo0qdv5s23mbo2cq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "880878962670-drs8ta7556lgkd4bkbi2nkbh79jl0tn5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.erikedward.KoaLens"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

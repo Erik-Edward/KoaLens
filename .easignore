@@ -2,9 +2,9 @@
 sentry.properties
 android/sentry.properties
 
-# Följ rekommendationen från expo doctor om projektet använder prebuild
-# /android
-# /ios
+# Viktigt för att undvika konflikter mellan prebuild och EAS
+/android
+/ios
 
 # Övriga filer att ignorera
 node_modules

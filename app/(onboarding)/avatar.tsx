@@ -1,6 +1,6 @@
-// app/(onboarding)/avatar.tsx - Fixat för att undvika oändlig loop
+// app/(onboarding)/avatar.tsx - Förbättrad för alla enhetsstorlekar
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, StyleSheet } from 'react-native';
 import { styled } from 'nativewind';
 import { router } from 'expo-router';
 import Slider from '@react-native-community/slider';
@@ -14,6 +14,8 @@ import { AvatarCarousel } from '@/components/AvatarCarousel';
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
+const StyledScrollView = styled(ScrollView);
+const StyledSafeAreaView = styled(SafeAreaView);
 
 type StyleType = 'cute' | 'cool';
 
@@ -22,6 +24,7 @@ export default function AvatarScreen() {
   const [selectedStyle, setSelectedStyle] = useState<StyleType>('cute');
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarOption | null>(null);
   const initializedRef = useRef(false);
+  const { height, width } = useWindowDimensions();
   
   const setVeganYears = useStore((state) => state.setVeganYears);
   const setAvatar = useStore((state) => state.setAvatar);
@@ -113,65 +116,59 @@ export default function AvatarScreen() {
       ? "5+ år" 
       : `${years} år`;
 
-  return (
-    <StyledView className="flex-1 bg-background-main">
-      {/* Header - anpassad baserat på veganStatus */}
-      <StyledView className="px-6 pt-14 mb-8">
-        <StyledText className="text-text-primary font-sans-bold text-2xl text-center">
-          {headerText}
-        </StyledText>
+  // Beräkna adaptiva dimensioner
+  const headerTop = Math.max(height * 0.05, 20);
+  const avatarContainerSize = Math.min(width * 0.5, height * 0.2, 200);
+  const avatarSize = avatarContainerSize * 0.9;
+  const spacingVertical = Math.max(height * 0.02, 12);
+
+  // Funktion för att rendera vegansidans UI
+  const renderVeganUI = () => (
+    <>
+      {/* Style val knappar */}
+      <StyledView className="flex-row justify-center space-x-3 px-6 mb-6">
+        <StyledPressable
+          onPress={() => handleStyleChange('cute')}
+          className={`px-6 py-3 rounded-xl ${
+            selectedStyle === 'cute' ? 'bg-primary' : 'bg-background-light/30'
+          }`}
+        >
+          <StyledText 
+            className={`font-sans-medium ${
+              selectedStyle === 'cute' ? 'text-text-inverse' : 'text-text-primary'
+            }`}
+          >
+            Lekfull
+          </StyledText>
+        </StyledPressable>
+
+        <StyledPressable
+          onPress={() => handleStyleChange('cool')}
+          className={`px-6 py-3 rounded-xl ${
+            selectedStyle === 'cool' ? 'bg-primary' : 'bg-background-light/30'
+          }`}
+        >
+          <StyledText 
+            className={`font-sans-medium ${
+              selectedStyle === 'cool' ? 'text-text-inverse' : 'text-text-primary'
+            }`}
+          >
+            Stilren
+          </StyledText>
+        </StyledPressable>
       </StyledView>
 
-      {/* Style buttons - visas endast för veganer */}
-      {isVegan && (
-        <StyledView className="flex-row justify-center space-x-3 px-6 mb-10">
-          <StyledPressable
-            onPress={() => handleStyleChange('cute')}
-            className={`px-6 py-3 rounded-xl ${
-              selectedStyle === 'cute' ? 'bg-primary' : 'bg-background-light/30'
-            }`}
+      {/* Avatar visning */}
+      {selectedAvatar && (
+        <StyledView className="items-center px-6" style={{marginBottom: spacingVertical * 2}}>
+          <StyledView 
+            className="bg-background-light/30 rounded-full justify-center items-center"
+            style={{ 
+              width: avatarContainerSize, 
+              height: avatarContainerSize,
+              marginBottom: spacingVertical
+            }}
           >
-            <StyledText 
-              className={`font-sans-medium ${
-                selectedStyle === 'cute' ? 'text-text-inverse' : 'text-text-primary'
-              }`}
-            >
-              Lekfull
-            </StyledText>
-          </StyledPressable>
-
-          <StyledPressable
-            onPress={() => handleStyleChange('cool')}
-            className={`px-6 py-3 rounded-xl ${
-              selectedStyle === 'cool' ? 'bg-primary' : 'bg-background-light/30'
-            }`}
-          >
-            <StyledText 
-              className={`font-sans-medium ${
-                selectedStyle === 'cool' ? 'text-text-inverse' : 'text-text-primary'
-              }`}
-            >
-              Stilren
-            </StyledText>
-          </StyledPressable>
-        </StyledView>
-      )}
-
-      {/* För icke-veganska användare visas avatarkarussellen */}
-      {!isVegan && (
-        <StyledView className="flex-1 mb-6">
-          <AvatarCarousel 
-            avatars={availableAvatars} 
-            onSelectAvatar={handleSelectAvatar} 
-            selectedAvatarId={selectedAvatar?.id || null}
-          />
-        </StyledView>
-      )}
-
-      {/* För veganska användare visas den valda avataren baserat på års-val */}
-      {isVegan && selectedAvatar && (
-        <StyledView className="items-center px-6">
-          <StyledView className="w-52 h-52 bg-background-light/30 rounded-full justify-center items-center mb-8">
             <Avatar
               source={selectedAvatar.filename}
               size="large"
@@ -179,19 +176,19 @@ export default function AvatarScreen() {
             />
           </StyledView>
 
-          <StyledText className="text-primary font-sans-bold text-2xl mb-3">
+          <StyledText className="text-primary font-sans-bold text-2xl mb-2">
             {selectedAvatar.name}
           </StyledText>
-          <StyledText className="text-text-secondary font-sans text-center mb-8">
+          <StyledText className="text-text-secondary font-sans text-center mb-4">
             {selectedAvatar.description}
           </StyledText>
 
-          {/* Visa års-väljare för veganska användare */}
-          <StyledText className="text-text-primary font-sans-bold text-2xl mb-6">
+          {/* Årsväljar-sektion */}
+          <StyledText className="text-text-primary font-sans-bold text-2xl mb-3">
             {yearsText}
           </StyledText>
 
-          <StyledView className="w-full mb-8">
+          <StyledView className="w-full mb-4">
             <Slider
               style={{ height: 36 }}
               minimumValue={0}
@@ -214,18 +211,91 @@ export default function AvatarScreen() {
           </StyledView>
         </StyledView>
       )}
+    </>
+  );
 
-      {/* Continue button */}
-      <StyledView className="px-6 mt-auto pb-8">
-        <StyledPressable
-          onPress={handleContinue}
-          className="bg-primary py-4 rounded-lg active:opacity-80"
-        >
-          <StyledText className="text-text-inverse font-sans-bold text-center">
-            Fortsätt
-          </StyledText>
-        </StyledPressable>
-      </StyledView>
+  // Funktion för att rendera supporter-sidans UI
+  const renderSupporterUI = () => (
+    <StyledView className="flex-1 mb-4">
+      {/* Endast AvatarCarousel, utan extra rubrik */}
+      <AvatarCarousel 
+        avatars={availableAvatars} 
+        onSelectAvatar={handleSelectAvatar} 
+        selectedAvatarId={selectedAvatar?.id || null}
+        showTitle={false} // Sätt denna property till false om din AvatarCarousel har detta
+      />
     </StyledView>
   );
+
+  return (
+    <SafeAreaView style={{flex: 1, backgroundColor: '#25292e'}}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{flex: 1}}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header med anpassad padding - gemensam för båda användartyperna */}
+          <View style={[styles.header, {marginTop: headerTop}]}>
+            <Text style={styles.headerText}>
+              {headerText}
+            </Text>
+          </View>
+
+          {/* Villkorlig rendering baserat på användartyp */}
+          {isVegan ? renderVeganUI() : renderSupporterUI()}
+
+          {/* Fortsättningsknapp - alltid synlig på botten */}
+          <View style={styles.bottomContainer}>
+            <Pressable
+              onPress={handleContinue}
+              style={styles.continueButton}
+              android_ripple={{color: 'rgba(0,0,0,0.2)'}}
+            >
+              <Text style={styles.continueButtonText}>
+                Fortsätt
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
+
+// Använda vanlig StyleSheet istället för NativeWind för mer exakt kontroll
+const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  header: {
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  headerText: {
+    fontSize: 24,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  bottomContainer: {
+    marginTop: 'auto',
+    paddingVertical: 16,
+  },
+  continueButton: {
+    backgroundColor: '#ffd33d',
+    paddingVertical: 16,
+    borderRadius: 8,
+  },
+  continueButtonText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: '#000000',
+    textAlign: 'center',
+    fontSize: 16,
+  }
+});

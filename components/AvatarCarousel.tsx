@@ -14,6 +14,7 @@ interface AvatarCarouselProps {
   avatars: AvatarOption[];
   onSelectAvatar: (avatar: AvatarOption) => void;
   selectedAvatarId: string | null;
+  showTitle?: boolean; // Ny valfri parameter
 }
 
 const { width } = Dimensions.get('window');

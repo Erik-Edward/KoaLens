@@ -1,6 +1,6 @@
-// app/(onboarding)/vegan-status.tsx
+// app/(onboarding)/vegan-status.tsx - Förbättrad för alla skärmstorlekar
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, SafeAreaView, ScrollView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
@@ -11,6 +11,8 @@ import { VeganStatus } from '@/stores/slices/createVeganStatusSlice';
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
+const StyledSafeAreaView = styled(SafeAreaView);
+const StyledScrollView = styled(ScrollView);
 
 const OPTIONS: Array<{
     id: string;
@@ -37,6 +39,7 @@ const OPTIONS: Array<{
 
 export default function VeganStatusScreen() {
   const setVeganStatus = useStore((state) => state.setVeganStatus);
+  const { height, width } = useWindowDimensions();
 
   const handleOptionSelect = async (value: VeganStatus) => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -44,11 +47,16 @@ export default function VeganStatusScreen() {
     router.push('/(onboarding)/avatar');
   };
 
+  // Beräkna responsiva värden baserade på skärmhöjd
+  const headerPadding = Math.max(height * 0.06, 24); // Minst 24pt padding
+  const optionsMinHeight = height * 0.35; // 35% av skärmhöjden för alternativ
+  const bottomMargin = Math.max(height * 0.03, 16); // Minst 16pt för botten
+
   const renderOption = (option: typeof OPTIONS[0]) => (
     <StyledPressable
       key={option.id}
       onPress={() => handleOptionSelect(option.value)}
-      className="bg-background-light/30 rounded-xl active:opacity-80 overflow-hidden"
+      className="bg-background-light/30 rounded-xl active:opacity-80 overflow-hidden mb-4"
       style={({ pressed }) => ({
         transform: [{ scale: pressed ? 0.98 : 1 }],
       })}
@@ -78,30 +86,37 @@ export default function VeganStatusScreen() {
   );
 
   return (
-    <StyledView className="flex-1 bg-background-main">
-      {/* Header */}
-      <StyledView className="px-6 pt-16 mb-12">
-        <StyledText className="text-text-primary font-sans-bold text-3xl text-center mb-3">
-          Välkommen till KoaLens
-        </StyledText>
-        <StyledText className="text-text-secondary font-sans text-lg text-center">
-          Välj det alternativ som passar dig bäst
-        </StyledText>
-      </StyledView>
+    <StyledSafeAreaView className="flex-1 bg-background-main">
+      <StyledScrollView 
+        contentContainerStyle={{ 
+          flexGrow: 1, 
+          paddingHorizontal: 24,
+          paddingBottom: 24
+        }}
+        bounces={false}
+      >
+        {/* Header med responsiv padding */}
+        <StyledView style={{ paddingTop: headerPadding }} className="mb-8">
+          <StyledText className="text-text-primary font-sans-bold text-3xl text-center mb-3">
+            Välkommen till KoaLens
+          </StyledText>
+          <StyledText className="text-text-secondary font-sans text-lg text-center">
+            Välj det alternativ som passar dig bäst
+          </StyledText>
+        </StyledView>
 
-      {/* Options */}
-      <StyledView className="px-6 flex-1">
-        <StyledView className="space-y-6">
+        {/* Options med minsta höjd för konsekvent layout */}
+        <StyledView style={{ minHeight: optionsMinHeight }}>
           {OPTIONS.map(renderOption)}
         </StyledView>
-      </StyledView>
 
-      {/* Bottom text */}
-      <StyledView className="px-6 pb-8 mt-auto">
-        <StyledText className="text-text-secondary/70 font-sans text-sm text-center">
-          Du kan alltid ändra detta val senare i inställningarna
-        </StyledText>
-      </StyledView>
-    </StyledView>
+        {/* Bottom text med responsiv marginal */}
+        <StyledView style={{ marginTop: 'auto', marginBottom: bottomMargin }}>
+          <StyledText className="text-text-secondary/70 font-sans text-sm text-center">
+            Du kan alltid ändra detta val senare i inställningarna
+          </StyledText>
+        </StyledView>
+      </StyledScrollView>
+    </StyledSafeAreaView>
   );
 }

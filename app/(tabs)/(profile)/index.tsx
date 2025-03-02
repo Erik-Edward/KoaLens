@@ -1,6 +1,6 @@
-// app/(tabs)/(profile)/index.tsx
-import { FC, useState, useEffect } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+// app/(tabs)/(profile)/index.tsx - Uppdaterad med scroll och responsiv layout
+import { FC, useState, useEffect, useCallback } from 'react';
+import { View, Text, Pressable, Alert, ScrollView, SafeAreaView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +24,8 @@ if (typeof global.isBlockingNavigation === 'undefined') {
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
+const StyledScrollView = styled(ScrollView);
+const StyledSafeAreaView = styled(SafeAreaView);
 
 const ProfileScreen: FC = () => {
   const { user, signOut } = useAuth();
@@ -32,6 +34,7 @@ const ProfileScreen: FC = () => {
   const setAvatar = useStore(state => state.setAvatar);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const { height } = useWindowDimensions();
   
   // Återställ navigationsspärren när komponenten monteras och demonteras
   useEffect(() => {
@@ -163,9 +166,6 @@ const ProfileScreen: FC = () => {
         // Inaktivera navigationsspärren efter 5 sekunder
         global.isBlockingNavigation = false;
         console.log('Navigationsspärr inaktiverad efter avatarbyte');
-        
-        // Vi återställer INTE avatar_update-flaggan här längre
-        // Det gör att vi inte får en andra USER_UPDATED-händelse
       }, 5000);
     } catch (error) {
       console.error('Error updating avatar:', error);
@@ -178,160 +178,175 @@ const ProfileScreen: FC = () => {
   };
 
   return (
-    <StyledView 
+    <StyledSafeAreaView 
       className="flex-1 bg-background-main"
       accessibilityLabel="Profil skärm"
     >
-      {/* Profile Info */}
-      <StyledView className="px-4 pt-12 pb-6">
-        <StyledView className="items-center">
-          {/* Visa avatar från lagrat val med klickbar funktion */}
-          <StyledPressable
-            onPress={() => setShowAvatarModal(true)}
-            className="relative"
-            accessibilityLabel="Ändra avatar"
-            accessibilityHint="Tryck för att välja en ny avatar"
-            disabled={updating}
-          >
-            {avatar.id ? (
-              <Avatar 
-                source={avatar.id}
-                size="large"
-                style={avatar.style}
-              />
-            ) : (
-              <StyledView className="w-24 h-24 bg-background-light rounded-full justify-center items-center mb-4">
-                <Ionicons name="person" size={48} color="#ffffff" />
-              </StyledView>
-            )}
-            
-            {/* Liten redigeringsikon */}
-            <StyledView className="absolute bottom-0 right-0 bg-primary rounded-full p-2">
-              <Ionicons name="pencil" size={16} color="#000000" />
-            </StyledView>
-            
-            {/* Liten indikator när uppdatering pågår */}
-            {updating && (
-              <StyledView className="absolute inset-0 bg-black/20 rounded-full items-center justify-center">
-                <Ionicons name="sync" size={32} color="#ffd33d" />
-              </StyledView>
-            )}
-          </StyledPressable>
-          
-          {/* Visa e-post */}
-          {user?.email && (
-            <StyledText 
-              className="text-text-secondary font-sans text-base text-center mt-2"
-              accessibilityLabel={`Inloggad som ${user.email}`}
+      <StyledScrollView 
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Info */}
+        <StyledView className="px-4 pt-16 pb-6">
+          <StyledView className="items-center">
+            {/* Visa avatar från lagrat val med klickbar funktion */}
+            <StyledPressable
+              onPress={() => setShowAvatarModal(true)}
+              className="relative mb-3"
+              accessibilityLabel="Ändra avatar"
+              accessibilityHint="Tryck för att välja en ny avatar"
+              disabled={updating}
             >
-              {user.email}
-            </StyledText>
-          )}
-          
-          {/* Visa vegan-status */}
-          {veganStatus && (
-            <StyledText className="text-primary font-sans-medium text-sm text-center mt-1">
-              {veganStatus === 'vegan' ? 'Vegan' : 'Utforskar växtbaserat'}
-              {avatar.veganYears > 0 && ` • ${avatar.veganYears} år`}
-            </StyledText>
-          )}
+              {avatar.id ? (
+                <Avatar 
+                  source={avatar.id}
+                  size="large"
+                  style={avatar.style}
+                />
+              ) : (
+                <StyledView 
+                  className="bg-background-light rounded-full justify-center items-center mb-4"
+                  style={{ 
+                    width: Math.min(height * 0.12, 96), 
+                    height: Math.min(height * 0.12, 96)
+                  }}
+                >
+                  <Ionicons name="person" size={48} color="#ffffff" />
+                </StyledView>
+              )}
+              
+              {/* Liten redigeringsikon */}
+              <StyledView className="absolute bottom-0 right-0 bg-primary rounded-full p-2">
+                <Ionicons name="pencil" size={16} color="#000000" />
+              </StyledView>
+              
+              {/* Liten indikator när uppdatering pågår */}
+              {updating && (
+                <StyledView className="absolute inset-0 bg-black/20 rounded-full items-center justify-center">
+                  <Ionicons name="sync" size={32} color="#ffd33d" />
+                </StyledView>
+              )}
+            </StyledPressable>
+            
+            {/* Visa e-post */}
+            {user?.email && (
+              <StyledText 
+                className="text-text-secondary font-sans text-base text-center mt-1"
+                accessibilityLabel={`Inloggad som ${user.email}`}
+              >
+                {user.email}
+              </StyledText>
+            )}
+            
+            {/* Visa vegan-status */}
+            {veganStatus && (
+              <StyledText className="text-primary font-sans-medium text-sm text-center mt-1">
+                {veganStatus === 'vegan' ? 'Vegan' : 'Utforskar växtbaserat'}
+                {avatar.veganYears > 0 && ` • ${avatar.veganYears} år`}
+              </StyledText>
+            )}
+          </StyledView>
         </StyledView>
-      </StyledView>
 
-      {/* Menu Items */}
-      <StyledView className="px-4 space-y-4">
-        {/* Settings */}
-        <StyledPressable 
-          onPress={handleSettingsPress}
-          className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Öppna inställningar"
-        >
-          <Ionicons name="settings-outline" size={24} color="#ffffff" />
-          <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-            Inställningar
-          </StyledText>
-          <Ionicons 
-            name="chevron-forward" 
-            size={24} 
-            color="#ffffff" 
-            style={{ marginLeft: 'auto' }}
-          />
-        </StyledPressable>
-        
-        {/* Support */}
-        <StyledPressable 
-          onPress={() => router.push('./support')}
-          className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Öppna support"
-        >
-          <Ionicons name="help-circle-outline" size={24} color="#ffffff" />
-          <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-            Support
-          </StyledText>
-          <Ionicons 
-            name="chevron-forward" 
-            size={24} 
-            color="#ffffff" 
-            style={{ marginLeft: 'auto' }}
-          />
-        </StyledPressable>
-
-        {/* Offline Test */}
-        <StyledPressable 
-          onPress={handleOfflineTestPress}
-          className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Öppna offline test"
-        >
-          <Ionicons name="cloud-offline-outline" size={24} color="#ffffff" />
-          <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-            Offline Test
-          </StyledText>
-          <Ionicons 
-            name="chevron-forward" 
-            size={24} 
-            color="#ffffff" 
-            style={{ marginLeft: 'auto' }}
-          />
-        </StyledPressable>
-
-        {/* Sentry Test Button - endast i utvecklingsläge */}
-        {__DEV__ && (
+        {/* Menu Items */}
+        <StyledView className="px-4 space-y-3">
+          {/* Settings */}
           <StyledPressable 
-            onPress={testSentry}
-            className="flex-row items-center p-4 bg-red-500/50 rounded-lg active:opacity-70"
+            onPress={handleSettingsPress}
+            className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel="Testa Sentry felrapportering"
+            accessibilityLabel="Öppna inställningar"
           >
-            <Ionicons name="bug-outline" size={24} color="#ffffff" />
+            <Ionicons name="settings-outline" size={24} color="#ffffff" />
             <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-              Testa Sentry
+              Inställningar
+            </StyledText>
+            <Ionicons 
+              name="chevron-forward" 
+              size={24} 
+              color="#ffffff" 
+              style={{ marginLeft: 'auto' }}
+            />
+          </StyledPressable>
+          
+          {/* Support */}
+          <StyledPressable 
+            onPress={() => router.push('./support')}
+            className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Öppna support"
+          >
+            <Ionicons name="help-circle-outline" size={24} color="#ffffff" />
+            <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+              Support
+            </StyledText>
+            <Ionicons 
+              name="chevron-forward" 
+              size={24} 
+              color="#ffffff" 
+              style={{ marginLeft: 'auto' }}
+            />
+          </StyledPressable>
+
+          {/* Utvecklingsknappar - bara synliga i utvecklingsläge */}
+          {__DEV__ && (
+            <>
+              {/* Offline Test */}
+              <StyledPressable 
+                onPress={handleOfflineTestPress}
+                className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel="Öppna offline test"
+              >
+                <Ionicons name="cloud-offline-outline" size={24} color="#ffffff" />
+                <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+                  Offline Test
+                </StyledText>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={24} 
+                  color="#ffffff" 
+                  style={{ marginLeft: 'auto' }}
+                />
+              </StyledPressable>
+
+              {/* Sentry Test Button */}
+              <StyledPressable 
+                onPress={testSentry}
+                className="flex-row items-center p-4 bg-red-500/50 rounded-lg active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel="Testa Sentry felrapportering"
+              >
+                <Ionicons name="bug-outline" size={24} color="#ffffff" />
+                <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+                  Testa Sentry
+                </StyledText>
+              </StyledPressable>
+            </>
+          )}
+
+          {/* Sign Out - alltid synlig */}
+          <StyledPressable 
+            onPress={handleSignOut}
+            className="flex-row items-center p-4 bg-status-error/80 rounded-lg mt-4 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Logga ut"
+          >
+            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+            <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+              Logga ut
             </StyledText>
           </StyledPressable>
-        )}
-
-        {/* Sign Out */}
-        <StyledPressable 
-          onPress={handleSignOut}
-          className="flex-row items-center p-4 bg-status-error/80 rounded-lg mt-4 active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Logga ut"
-        >
-          <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-          <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-            Logga ut
-          </StyledText>
-        </StyledPressable>
-        
-        {/* Version Information - Nu placerad efter utloggningsknappen */}
-        <StyledView className="items-center mt-4 pt-2">
-          <StyledText className="text-text-secondary/60 font-sans text-sm">
-            KoaLens v{Constants.expoConfig?.version || '1.0.0'}
-          </StyledText>
+          
+          {/* Version Information */}
+          <StyledView className="items-center mt-4 pt-2">
+            <StyledText className="text-text-secondary/60 font-sans text-sm">
+              KoaLens v{Constants.expoConfig?.version || '1.0.0'}
+            </StyledText>
+          </StyledView>
         </StyledView>
-      </StyledView>
+      </StyledScrollView>
 
       {/* Modals */}
       <AvatarSelectorModal
@@ -341,7 +356,7 @@ const ProfileScreen: FC = () => {
         currentAvatarId={avatar.id}
         currentAvatarStyle={avatar.style}
       />
-    </StyledView>
+    </StyledSafeAreaView>
   );
 };
 

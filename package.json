@@ -63,7 +63,8 @@
     "react-native-webview": "13.12.5",
     "sentry-expo": "~7.0.0",
     "uuid": "^11.0.4",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "expo-linear-gradient": "~14.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",

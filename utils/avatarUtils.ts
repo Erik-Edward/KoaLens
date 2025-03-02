@@ -1,4 +1,4 @@
-// utils/avatarUtils.ts - Uppdaterad med ekorre istället för grodd
+// utils/avatarUtils.ts - Uppdaterad med ekorre istället för grodd och kortare beskrivningstexter
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import { VeganStatus } from '@/stores/slices/createVeganStatusSlice';
 import { useStore } from '@/stores/useStore';
@@ -12,79 +12,79 @@ export interface AvatarOption {
   minYears?: number;
 }
 
-// Supporter (icke-veganska) avatarer med intressanta fakta
+// Supporter (icke-veganska) avatarer med kortare fakta
 const SUPPORTER_AVATARS: AvatarOption[] = [
   {
     id: 'gorilla',
     name: 'Gorilla',
-    description: 'Visste du att gorillor kan lära sig teckenspråk och kommunicera med människor? De använder också verktyg i naturen.',
+    description: 'Kan lära sig teckenspråk och använder verktyg för att lösa problem i naturen.',
     filename: 'gorilla',
     style: 'supporter'
   },
   {
     id: 'cow',
     name: 'Ko',
-    description: 'Kor är extremt sociala och bygger livslånga vänskaper. De kan känna igen över 100 andra kor och blir stressade när de separeras från sina vänner.',
+    description: 'Extremt sociala som bygger långvariga vänskaper och kan känna igen över 100 andra kor.',
     filename: 'cow',
     style: 'supporter'
   },
   {
     id: 'ostrich',
     name: 'Struts',
-    description: 'Strutsar är världens snabbaste tvåbenta djur och kan springa i 70 km/h. Deras ögon är större än deras hjärnor!',
+    description: 'Världens snabbaste tvåbenta djur som kan springa i 70 km/h.',
     filename: 'ostrich',
     style: 'supporter'
   },
   {
     id: 'giraffe',
     name: 'Giraff',
-    description: 'Giraffer har samma antal halskotor som människor - bara sju! Deras tungor kan vara upp till 50 cm långa och är blå-svarta för att skydda mot solbränna.',
+    description: 'Har bara sju halskotor, precis som människor, trots sin långa hals.',
     filename: 'giraffe',
     style: 'supporter'
   },
   {
     id: 'deer',
     name: 'Rådjur',
-    description: 'Rådjur kan höra frekvenser långt bortom mänsklig hörsel. De kan också rotera öronen 180 grader utan att flytta på huvudet!',
+    description: 'Kan rotera öronen 180 grader utan att röra på huvudet.',
     filename: 'deer',
     style: 'supporter'
   },
   {
     id: 'alpaca',
     name: 'Alpacka',
-    description: 'Alpackor nynnar för att kommunicera. De använder 20 olika ljud tillsammans med kroppsspråk för att uttrycka sina känslor.',
+    description: 'Nynnar för att kommunicera och använder 20 olika ljud för att uttrycka känslor.',
     filename: 'alpaca',
     style: 'supporter'
   },
   {
     id: 'panda',
     name: 'Panda',
-    description: 'Pandor har en "extra tumme" som hjälper dem att greppa bambu. Trots att de är klassade som rovdjur består 99% av deras diet av växter!',
+    description: 'Har en "extra tumme" som hjälper dem att greppa bambu.',
     filename: 'panda',
     style: 'supporter'
   },
   {
     id: 'hippo',
     name: 'Flodhäst',
-    description: 'Flodhästar "svettas" en röd olja som fungerar som naturlig solkräm. Trots sin storlek kan de springa fortare än en människa på land!',
+    description: '"Svettas" röd olja som fungerar som naturlig solkräm.',
     filename: 'hippo',
     style: 'supporter'
   },
   {
     id: 'moose',
     name: 'Älg',
-    description: 'Älgar kan dyka ner till 6 meters djup för att äta vattenväxter. En älgtjurs horn kan väga upp till 35 kg - lika mycket som en 10-åring!',
+    description: 'Kan dyka ner till 6 meters djup för att äta vattenväxter.',
     filename: 'moose',
     style: 'supporter'
   }
 ];
 
-// Veganska avatarer med intressanta fakta
+// Veganska avatarer med kortare fakta
 const VEGAN_AVATARS: AvatarOption[] = [
   {
     id: 'squirrel',
     name: 'Ekorre',
-    description: 'Ekorrar kan komma ihåg tusentals gömställen för nötter! De planterar omedvetet nya träd när de glömmer var de gömt vissa nötter.',
+    description: 'Planterar träd när de glömmer var de gömt sina nötter.',
     filename: 'squirrel',
     style: 'cute',
     minYears: 0
@@ -92,7 +92,7 @@ const VEGAN_AVATARS: AvatarOption[] = [
   {
     id: 'rabbit',
     name: 'Kanin',
-    description: 'När kaniner är extra glada gör de "binkies" - de hoppar upp i luften och vrider kroppen! De har också 360-graders synfält utan att behöva vända på huvudet.',
+    description: 'Gör "binkies" - hoppar upp och vrider kroppen när de är glada.',
     filename: 'rabbit',
     style: 'cute',
     minYears: 1
@@ -100,7 +100,7 @@ const VEGAN_AVATARS: AvatarOption[] = [
   {
     id: 'koala',
     name: 'Koala',
-    description: 'Koalor har fingeravtryck som är nästan identiska med människors. De sover upp till 20 timmar per dag för att spara energi från sin näringsfattiga diet.',
+    description: 'Sover upp till 20 timmar per dag för att spara energi.',
     filename: 'koala',
     style: 'cute',
     minYears: 2
@@ -108,7 +108,7 @@ const VEGAN_AVATARS: AvatarOption[] = [
   {
     id: 'turtle',
     name: 'Sköldpadda',
-    description: 'Vissa sköldpaddor kan andas genom sin bakdel! Havssköldpaddor kan också känna jordens magnetfält och navigerar efter det under långa resor.',
+    description: 'Navigerar efter jordens magnetfält under långa resor över haven.',
     filename: 'turtle',
     style: 'cute',
     minYears: 3

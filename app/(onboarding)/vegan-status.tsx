@@ -91,32 +91,34 @@ export default function VeganStatusScreen() {
         contentContainerStyle={{ 
           flexGrow: 1, 
           paddingHorizontal: 24,
-          paddingBottom: 24
         }}
         bounces={false}
       >
-        {/* Header med responsiv padding */}
-        <StyledView style={{ paddingTop: headerPadding }} className="mb-8">
-          <StyledText className="text-text-primary font-sans-bold text-3xl text-center mb-3">
-            Välkommen till KoaLens
-          </StyledText>
-          <StyledText className="text-text-secondary font-sans text-lg text-center">
-            Välj det alternativ som passar dig bäst
-          </StyledText>
-        </StyledView>
-
-        {/* Options med minsta höjd för konsekvent layout */}
-        <StyledView style={{ minHeight: optionsMinHeight }}>
-          {OPTIONS.map(renderOption)}
-        </StyledView>
-
-        {/* Bottom text med responsiv marginal */}
-        <StyledView style={{ marginTop: 'auto', marginBottom: bottomMargin }}>
-          <StyledText className="text-text-secondary/70 font-sans text-sm text-center">
-            Du kan alltid ändra detta val senare i inställningarna
-          </StyledText>
+        {/* Innehållet centrerat vertikalt */}
+        <StyledView style={{ flex: 1, justifyContent: 'center' }}>
+          {/* Header med responsiv padding */}
+          <StyledView style={{ paddingTop: headerPadding }} className="mb-8">
+            <StyledText className="text-text-primary font-sans-bold text-3xl text-center mb-3">
+              Välkommen till KoaLens
+            </StyledText>
+            <StyledText className="text-text-secondary font-sans text-lg text-center">
+              Välj det alternativ som passar dig bäst
+            </StyledText>
+          </StyledView>
+          
+          {/* Options med minsta höjd för konsekvent layout */}
+          <StyledView style={{ minHeight: optionsMinHeight }}>
+            {OPTIONS.map(renderOption)}
+          </StyledView>
         </StyledView>
       </StyledScrollView>
+
+      {/* Nedre text, oförändrad */}
+      <StyledView style={{ marginBottom: bottomMargin, paddingHorizontal: 24 }}>
+        <StyledText className="text-text-secondary/70 font-sans text-sm text-center">
+          Du kan alltid ändra detta val senare i inställningarna
+        </StyledText>
+      </StyledView>
     </StyledSafeAreaView>
   );
 }

@@ -1,7 +1,15 @@
-// app/(onboarding)/avatar.tsx - Förbättrad för alla enhetsstorlekar
+// app/(onboarding)/avatar.tsx - Med mindre avatar och mer mellanrum
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, StyleSheet } from 'react-native';
-import { styled } from 'nativewind';
+import { 
+  View, 
+  Text, 
+  Pressable, 
+  SafeAreaView, 
+  Platform, 
+  ScrollView, 
+  StyleSheet,
+  useWindowDimensions 
+} from 'react-native';
 import { router } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import { useStore } from '@/stores/useStore';
@@ -10,12 +18,6 @@ import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '@/components/Avatar';
 import { AvatarCarousel } from '@/components/AvatarCarousel';
-
-const StyledView = styled(View);
-const StyledText = styled(Text);
-const StyledPressable = styled(Pressable);
-const StyledScrollView = styled(ScrollView);
-const StyledSafeAreaView = styled(SafeAreaView);
 
 type StyleType = 'cute' | 'cool';
 
@@ -30,23 +32,23 @@ export default function AvatarScreen() {
   const setAvatar = useStore((state) => state.setAvatar);
   const veganStatus = useStore((state) => state.veganStatus.status);
 
-  // Avgör om användaren är vegan
+  // Determine if user is vegan
   const isVegan = veganStatus === 'vegan';
 
-  // Hämta rätt avatarer baserat på veganStatus och år
+  // Get appropriate avatars based on veganStatus and years
   const availableAvatars = isVegan 
     ? getAvailableAvatars(years, selectedStyle)
     : getSupporterAvatars();
 
-  // Välj initial avatar, men bara en gång
+  // Select initial avatar, but only once
   useEffect(() => {
     if (!initializedRef.current && availableAvatars.length > 0) {
       if (isVegan) {
-        // För veganska användare, välj den senaste tillgängliga avataren baserat på år
+        // For vegan users, select the latest available avatar based on years
         const latestAvatar = availableAvatars[availableAvatars.length - 1];
         setSelectedAvatar(latestAvatar);
       } else {
-        // För supporter, välj första avataren
+        // For supporters, select the first avatar
         setSelectedAvatar(availableAvatars[0]);
       }
       initializedRef.current = true;
@@ -57,7 +59,7 @@ export default function AvatarScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedStyle(style);
     
-    // När stilen ändras, uppdatera avataren baserat på den nya stilen och nuvarande år
+    // When style changes, update avatar based on new style and current years
     const newAvatars = getAvailableAvatars(years, style);
     if (newAvatars.length > 0) {
       setSelectedAvatar(newAvatars[newAvatars.length - 1]);
@@ -68,14 +70,14 @@ export default function AvatarScreen() {
     setYears(value);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // När års-slidern dras, uppdatera manuellt selectedAvatar
+    // When year slider is dragged, manually update selectedAvatar
     if (isVegan) {
       const newAvatars = getAvailableAvatars(value, selectedStyle);
       if (newAvatars.length > 0) {
-        // Välj den senaste avataren som är tillgänglig för detta årsantal
+        // Select the latest avatar available for this year count
         const latestAvatar = newAvatars[newAvatars.length - 1];
         
-        // Endast uppdatera om avataren faktiskt har ändrats
+        // Only update if the avatar has actually changed
         if (!selectedAvatar || selectedAvatar.id !== latestAvatar.id) {
           setSelectedAvatar(latestAvatar);
         }
@@ -95,11 +97,11 @@ export default function AvatarScreen() {
       setSelectedAvatar(availableAvatars[0]);
     }
 
-    // Använd den valda avataren eller den första tillgängliga
+    // Use the selected avatar or the first available one
     const avatar = selectedAvatar || (availableAvatars.length > 0 ? availableAvatars[0] : null);
     
     if (avatar) {
-      // För veganska användare använder vi selectedStyle, för supporter används 'supporter'
+      // For vegan users we use selectedStyle, for supporters we use 'supporter'
       const avatarStyle = isVegan ? selectedStyle : 'supporter';
       
       await setVeganYears(isVegan ? years : 0);
@@ -108,89 +110,92 @@ export default function AvatarScreen() {
     }
   };
 
-  // Anpassa UI-element baserat på veganStatus
-  const headerText = isVegan ? "Hur länge har du varit vegan" : "Välj din karaktär";
+  // Customize UI elements based on veganStatus
+  const headerText = isVegan ? "Hur länge har du varit vegan?" : "Välj din karaktär";
   const yearsText = years === 0 
     ? "Nybliven vegan" 
     : years === 5 
       ? "5+ år" 
       : `${years} år`;
 
-  // Beräkna adaptiva dimensioner
-  const headerTop = Math.max(height * 0.05, 20);
-  const avatarContainerSize = Math.min(width * 0.5, height * 0.2, 200);
-  const avatarSize = avatarContainerSize * 0.9;
-  const spacingVertical = Math.max(height * 0.02, 12);
-
-  // Funktion för att rendera vegansidans UI
+  // Function to render vegan page UI
   const renderVeganUI = () => (
-    <>
-      {/* Style val knappar */}
-      <StyledView className="flex-row justify-center space-x-3 px-6 mb-6">
-        <StyledPressable
+    <View style={styles.container}>
+      {/* Style selection buttons with fixed size and spacing */}
+      <View style={styles.styleButtonContainer}>
+        <Pressable
           onPress={() => handleStyleChange('cute')}
-          className={`px-6 py-3 rounded-xl ${
-            selectedStyle === 'cute' ? 'bg-primary' : 'bg-background-light/30'
-          }`}
+          style={[
+            styles.styleButton,
+            selectedStyle === 'cute' ? styles.activeStyleButton : styles.inactiveStyleButton
+          ]}
         >
-          <StyledText 
-            className={`font-sans-medium ${
-              selectedStyle === 'cute' ? 'text-text-inverse' : 'text-text-primary'
-            }`}
+          <Text 
+            style={[
+              styles.styleButtonText,
+              selectedStyle === 'cute' ? styles.activeStyleButtonText : styles.inactiveStyleButtonText
+            ]}
           >
             Lekfull
-          </StyledText>
-        </StyledPressable>
+          </Text>
+        </Pressable>
 
-        <StyledPressable
+        <Pressable
           onPress={() => handleStyleChange('cool')}
-          className={`px-6 py-3 rounded-xl ${
-            selectedStyle === 'cool' ? 'bg-primary' : 'bg-background-light/30'
-          }`}
+          style={[
+            styles.styleButton,
+            selectedStyle === 'cool' ? styles.activeStyleButton : styles.inactiveStyleButton
+          ]}
         >
-          <StyledText 
-            className={`font-sans-medium ${
-              selectedStyle === 'cool' ? 'text-text-inverse' : 'text-text-primary'
-            }`}
+          <Text 
+            style={[
+              styles.styleButtonText,
+              selectedStyle === 'cool' ? styles.activeStyleButtonText : styles.inactiveStyleButtonText
+            ]}
           >
             Stilren
-          </StyledText>
-        </StyledPressable>
-      </StyledView>
+          </Text>
+        </Pressable>
+      </View>
 
-      {/* Avatar visning */}
+      {/* Very large spacer to ensure separation */}
+      <View style={styles.spacer50} />
+
+      {/* Avatar display section with much smaller size */}
       {selectedAvatar && (
-        <StyledView className="items-center px-6" style={{marginBottom: spacingVertical * 2}}>
-          <StyledView 
-            className="bg-background-light/30 rounded-full justify-center items-center"
-            style={{ 
-              width: avatarContainerSize, 
-              height: avatarContainerSize,
-              marginBottom: spacingVertical
-            }}
-          >
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarCircleContainer}>
             <Avatar
               source={selectedAvatar.filename}
-              size="large"
+              size="medium" // Using medium instead of large
               style={selectedStyle}
             />
-          </StyledView>
+          </View>
 
-          <StyledText className="text-primary font-sans-bold text-2xl mb-2">
+          {/* Extra large fixed gap to ensure avatar name is outside the circle */}
+          <View style={styles.spacer40} />
+          
+          {/* Name outside the circle */}
+          <Text style={styles.avatarName}>
             {selectedAvatar.name}
-          </StyledText>
-          <StyledText className="text-text-secondary font-sans text-center mb-4">
+          </Text>
+
+          {/* Description with fixed margins */}
+          <Text style={styles.avatarDescription}>
             {selectedAvatar.description}
-          </StyledText>
+          </Text>
 
-          {/* Årsväljar-sektion */}
-          <StyledText className="text-text-primary font-sans-bold text-2xl mb-3">
+          {/* Larger spacer before year selector */}
+          <View style={styles.spacer24} />
+
+          {/* Year selector section */}
+          <Text style={styles.yearText}>
             {yearsText}
-          </StyledText>
+          </Text>
 
-          <StyledView className="w-full mb-4">
+          <View style={styles.sliderContainer}>
             <Slider
-              style={{ height: 36 }}
+              style={styles.slider}
               minimumValue={0}
               maximumValue={5}
               step={0.5}
@@ -200,82 +205,110 @@ export default function AvatarScreen() {
               maximumTrackTintColor="#3a3f44"
               thumbTintColor="#ffd33d"
             />
-            <StyledView className="flex-row justify-between mt-2">
-              <StyledText className="text-text-secondary font-sans">
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabel}>
                 Nybliven
-              </StyledText>
-              <StyledText className="text-text-secondary font-sans">
+              </Text>
+              <Text style={styles.sliderLabel}>
                 Veteran
-              </StyledText>
-            </StyledView>
-          </StyledView>
-        </StyledView>
+              </Text>
+            </View>
+          </View>
+        </View>
       )}
-    </>
+    </View>
   );
 
-  // Funktion för att rendera supporter-sidans UI
+  // Function to render supporter page UI
   const renderSupporterUI = () => (
-    <StyledView className="flex-1 mb-4">
-      {/* Endast AvatarCarousel, utan extra rubrik */}
+    <View style={styles.container}>
       <AvatarCarousel 
         avatars={availableAvatars} 
         onSelectAvatar={handleSelectAvatar} 
         selectedAvatarId={selectedAvatar?.id || null}
-        showTitle={false} // Sätt denna property till false om din AvatarCarousel har detta
+        showTitle={false}
       />
-    </StyledView>
+    </View>
   );
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: '#25292e'}}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{flex: 1}}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header med anpassad padding - gemensam för båda användartyperna */}
-          <View style={[styles.header, {marginTop: headerTop}]}>
-            <Text style={styles.headerText}>
-              {headerText}
-            </Text>
-          </View>
-
-          {/* Villkorlig rendering baserat på användartyp */}
-          {isVegan ? renderVeganUI() : renderSupporterUI()}
-
-          {/* Fortsättningsknapp - alltid synlig på botten */}
-          <View style={styles.bottomContainer}>
-            <Pressable
-              onPress={handleContinue}
-              style={styles.continueButton}
-              android_ripple={{color: 'rgba(0,0,0,0.2)'}}
-            >
-              <Text style={styles.continueButtonText}>
-                Fortsätt
-              </Text>
-            </Pressable>
-          </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {isVegan ? (
+            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+              <View style={styles.header}>
+                <Text
+                  style={styles.headerText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.7}
+                >
+                  {headerText}
+                </Text>
+              </View>
+              {renderVeganUI()}
+              <View style={styles.bottomSpace} />
+            </View>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+              <View style={styles.header}>
+                <Text
+                  style={styles.headerText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={true}
+                  minimumFontScale={0.7}
+                >
+                  {headerText}
+                </Text>
+              </View>
+              {renderSupporterUI()}
+              <View style={styles.bottomSpace} />
+            </View>
+          )}
         </ScrollView>
-      </KeyboardAvoidingView>
+
+        <View style={styles.buttonContainer}>
+          <Pressable
+            onPress={handleContinue}
+            style={styles.continueButton}
+            android_ripple={{ color: 'rgba(0,0,0,0.2)' }}
+          >
+            <Text style={styles.continueButtonText}>
+              Fortsätt
+            </Text>
+          </Pressable>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
 
-// Använda vanlig StyleSheet istället för NativeWind för mer exakt kontroll
+// Using fixed StyleSheet with much smaller avatar and more spacing
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#25292e',
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: '#25292e',
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingBottom: 28,
+    paddingBottom: 100, // Extra padding to ensure content doesn't hide behind button
+  },
+  container: {
+    alignItems: 'center',
+    width: '100%',
   },
   header: {
-    marginBottom: 16,
+    marginTop: 40,
+    marginBottom: 24,
     paddingHorizontal: 8,
+    width: '100%',
+    alignItems: 'center',
   },
   headerText: {
     fontSize: 24,
@@ -283,9 +316,105 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
   },
-  bottomContainer: {
-    marginTop: 'auto',
-    paddingVertical: 16,
+  styleButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  styleButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginHorizontal: 6,
+  },
+  activeStyleButton: {
+    backgroundColor: '#ffd33d',
+  },
+  inactiveStyleButton: {
+    backgroundColor: 'rgba(58, 63, 68, 0.3)',
+  },
+  styleButtonText: {
+    fontFamily: 'PlusJakartaSans-Medium',
+    fontSize: 16,
+  },
+  activeStyleButtonText: {
+    color: '#000000',
+  },
+  inactiveStyleButtonText: {
+    color: '#ffffff',
+  },
+  spacer50: {
+    height: 50, // Much larger spacer
+  },
+  spacer40: {
+    height: 40, // Very large spacer
+  },
+  spacer24: {
+    height: 24,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  avatarCircleContainer: {
+    width: 100, // Much smaller avatar (was 120px)
+    height: 100, // Much smaller avatar (was 120px)
+    borderRadius: 50,
+    backgroundColor: 'rgba(58, 63, 68, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarName: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 22,
+    color: '#ffd33d',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  avatarDescription: {
+    fontFamily: 'PlusJakartaSans-Regular',
+    fontSize: 14, // Smaller font size for description
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 24,
+    maxWidth: 280, // Limit width to ensure text doesn't stretch too wide
+  },
+  yearText: {
+    fontFamily: 'PlusJakartaSans-Bold',
+    fontSize: 22,
+    color: '#ffffff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  sliderContainer: {
+    width: '100%',
+    marginBottom: 32,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  sliderLabel: {
+    fontFamily: 'PlusJakartaSans-Regular',
+    fontSize: 14,
+    color: '#cccccc',
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#25292e',
   },
   continueButton: {
     backgroundColor: '#ffd33d',
@@ -297,5 +426,8 @@ const styles = StyleSheet.create({
     color: '#000000',
     textAlign: 'center',
     fontSize: 16,
-  }
+  },
+  bottomSpace: {
+    height: 60, // Extra large bottom space
+  },
 });

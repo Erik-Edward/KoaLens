@@ -1,4 +1,3 @@
-// components/AvatarCarousel.tsx - Förbättrad centrering
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Dimensions, FlatList, TouchableOpacity } from 'react-native';
 import { styled } from 'nativewind';
@@ -14,11 +13,11 @@ interface AvatarCarouselProps {
   avatars: AvatarOption[];
   onSelectAvatar: (avatar: AvatarOption) => void;
   selectedAvatarId: string | null;
-  showTitle?: boolean; // Ny valfri parameter
+  showTitle?: boolean;
 }
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = width * 0.8; // 80% av skärmbredden
+const ITEM_WIDTH = width * 0.8;
 
 export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({ 
   avatars, 
@@ -30,21 +29,19 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
   );
   const flatListRef = useRef<FlatList>(null);
 
-  // Beräkna offsets för varje item för att säkerställa korrekt centrering
-  const itemOffsets = avatars.map((_, index) => {
-    // Beräkna offset för varje item så att det centreras på skärmen
-    return index * ITEM_WIDTH;
-  });
+  // onViewableItemsChanged ger en snabbare uppdatering
+  const viewabilityConfig = { viewAreaCoveragePercentThreshold: 50 };
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    if (viewableItems.length > 0) {
+      const index = viewableItems[0].index;
+      if (index !== activeIndex && index !== null) {
+        setActiveIndex(index);
+        onSelectAvatar(avatars[index]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }
+  }).current;
 
-  // Hantera val av avatar
-  const handleSelectAvatar = (avatar: AvatarOption, index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveIndex(index);
-    onSelectAvatar(avatar);
-    scrollToIndex(index);
-  };
-
-  // Funktion för att scrolla till ett specifikt index
   const scrollToIndex = (index: number) => {
     if (flatListRef.current && index >= 0 && index < avatars.length) {
       flatListRef.current.scrollToOffset({ 
@@ -54,30 +51,13 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
     }
   };
 
-  // Scrolla till activeIndex vid första renderingen
-  useEffect(() => {
-    // Använd en kort timeout för att säkerställa att komponenten har monterats helt
-    const timer = setTimeout(() => {
-      scrollToIndex(activeIndex);
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Hantera när scrollningen slutar
-  const handleMomentumScrollEnd = (event: any) => {
-    // Beräkna vilket index användaren scrollat till
-    const contentOffset = event.nativeEvent.contentOffset.x;
-    const index = Math.round(contentOffset / ITEM_WIDTH);
-    
-    if (index !== activeIndex && index >= 0 && index < avatars.length) {
-      setActiveIndex(index);
-      onSelectAvatar(avatars[index]);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+  const handleSelectAvatar = (avatar: AvatarOption, index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveIndex(index);
+    onSelectAvatar(avatar);
+    scrollToIndex(index);
   };
 
-  // Rendera en enskild avatar
   const renderAvatar = ({ item, index }: { item: AvatarOption; index: number }) => {
     const isSelected = index === activeIndex;
 
@@ -114,7 +94,6 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
     );
   };
 
-  // Navigera till föregående/nästa avatar
   const navigateToAvatar = (index: number) => {
     if (index >= 0 && index < avatars.length) {
       scrollToIndex(index);
@@ -124,7 +103,6 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
     }
   };
 
-  // Prickar för navigation
   const renderDots = () => {
     return (
       <StyledView className="flex-row justify-center mt-4 space-x-2">
@@ -153,7 +131,6 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
         snapToInterval={ITEM_WIDTH}
         snapToAlignment="start"
         decelerationRate="fast"
-        onMomentumScrollEnd={handleMomentumScrollEnd}
         contentContainerStyle={{ 
           paddingHorizontal: (width - ITEM_WIDTH) / 2,
         }}
@@ -163,6 +140,8 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
           offset: ITEM_WIDTH * index,
           index,
         })}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
       />
       
       {/* Navigationsprickar */}

@@ -19,7 +19,12 @@ export const ScanGuideContent: React.FC<GuideStepProps> = ({ title, description 
       <StyledView className="pt-16 flex-1">
         {/* Title & Description */}
         <StyledView className="mb-8">
-          <StyledText className="text-text-primary font-sans-bold text-3xl text-center mb-4">
+          <StyledText
+            className="text-text-primary font-sans-bold text-3xl text-center mb-4"
+            numberOfLines={1}
+            adjustsFontSizeToFit={true}
+            minimumFontScale={0.7}
+          >
             {title}
           </StyledText>
           <StyledText className="text-text-secondary font-sans text-lg text-center">

@@ -17,10 +17,24 @@
         "SENTRY_DISABLE": "true"
       }
     },
+    "development-local": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "ENVIRONMENT": "development",
+        "API_URL": "https://api-dev.koalens.com",
+        "SENTRY_DISABLE": "true"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "ENVIRONMENT": "preview",

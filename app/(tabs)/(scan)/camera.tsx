@@ -1,7 +1,8 @@
-// app/(tabs)/(scan)/camera.tsx
+// app/(tabs)/(scan)/camera.tsx - Uppdaterad import
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import { View, Text, Pressable, Alert, Platform } from 'react-native';
+// Ersätt standard import med vår wrapper
+import { Camera, useCameraDevice, useCameraPermission } from '@/lib/visionCameraWrapper';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,7 +11,6 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraGuide } from '@/components/CameraGuide';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
-// Lägg till import för Analytics
 import { logEvent, Events, logScreenView } from '@/lib/analytics';
 
 const StyledView = styled(View);
@@ -22,9 +22,12 @@ const GUIDE_KEY = 'KOALENS_CAMERA_GUIDE_SHOWN';
 export default function CameraScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
-  const camera = useRef<Camera>(null);
+  const camera = useRef<any>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Lägg till en kontroll för webbläsarmiljön
+  const isWebEnvironment = Platform.OS === 'web';
 
   // Logga skärmvisning när komponenten monteras
   useEffect(() => {
@@ -112,6 +115,29 @@ export default function CameraScreen() {
       setShowGuide(false);
     }
   };
+
+  // Om vi är i webbläsarmiljön, visa en informativ text
+  if (isWebEnvironment) {
+    return (
+      <StyledView className="flex-1 justify-center items-center bg-background-main p-4">
+        <Ionicons name="camera-outline" size={48} color="#ffffff" />
+        <StyledText className="text-text-primary font-sans-bold text-xl text-center mt-4 mb-2">
+          Kameran är inte tillgänglig
+        </StyledText>
+        <StyledText className="text-text-secondary font-sans text-center mb-6">
+          Kamerafunktionaliteten är bara tillgänglig på fysiska enheter och i EAS builds, inte i webbläsaren eller Expo Go.
+        </StyledText>
+        <StyledPressable 
+          onPress={() => router.back()}
+          className="bg-primary px-6 py-3 rounded-lg"
+        >
+          <StyledText className="text-text-inverse font-sans-medium">
+            Gå tillbaka
+          </StyledText>
+        </StyledPressable>
+      </StyledView>
+    );
+  }
 
   if (!hasPermission) {
     return (

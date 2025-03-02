@@ -7,8 +7,8 @@ import { sv } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect } from 'react';
 import { styled } from 'nativewind';
-// Lägg till import för Analytics
-import { logEvent, Events, logScreenView } from '@/lib/analytics';
+// Ändra importen till vår wrapper
+import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);

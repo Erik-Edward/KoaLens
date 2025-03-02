@@ -1,4 +1,5 @@
 // app/(tabs)/(profile)/settings.tsx
+import TestSupabase from '@/components/TestSupabase';
 import { View, Text, Switch, ScrollView, Pressable } from 'react-native';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
@@ -127,6 +128,15 @@ export default function SettingsScreen() {
           />
         </StyledPressable>
       </StyledView>
+      {/* Supabase Test - endast för utvecklingsläge */}
+      {__DEV__ && (
+        <StyledView className="mt-6 mb-6">
+          <StyledText className="text-text-primary font-sans-medium text-lg mb-2">
+            Utvecklarverktyg
+          </StyledText>
+          <TestSupabase />
+        </StyledView>
+      )}
     </StyledScrollView>
   );
 }

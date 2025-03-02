@@ -1,6 +1,6 @@
 // app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende
 import { FC, useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing } from 'react-native';
+import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
@@ -82,6 +82,17 @@ const ScanScreen: FC = () => {
 
   const handleScanPress = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Kontrollera om vi kör på web-plattform
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        "Kameran ej tillgänglig", 
+        "Kamerafunktionen är endast tillgänglig på fysiska enheter. Använd en fysisk enhet eller EAS build för att testa kamerafunktionen.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
     router.push('./camera');
   };
 

@@ -1,8 +1,9 @@
 // app/(tabs)/(scan)/crop.tsx
 import React, { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Platform, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import ImageCropPicker, { Image as CroppedImage } from 'react-native-image-crop-picker';
+// Använd vår wrapper istället för direktimport
+import ImageCropPicker, { Image as CroppedImage } from '@/lib/imageCropPickerWrapper';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
@@ -20,8 +21,17 @@ export default function CropScreen() {
   const { photoPath } = useLocalSearchParams<{ photoPath: string }>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Kontrollera om vi kör på web eller i Expo Go
+  const isWebEnvironment = Platform.OS === 'web';
 
   const handleCrop = async () => {
+    // Om vi är i webbmiljö, visa fel och gå tillbaka
+    if (isWebEnvironment) {
+      setError('Bildbeskärning är inte tillgänglig i webbläsaren.');
+      return;
+    }
+    
     setLoading(true);
     try {
       addBreadcrumb('Starting image crop', 'crop', { photoPath });
@@ -91,9 +101,34 @@ export default function CropScreen() {
     router.back();
   };
 
-  // Starta beskärning direkt när komponenten laddas
+  // Visa ett informationsmeddelande i webbmiljön
+  if (isWebEnvironment) {
+    return (
+      <StyledView className="flex-1 bg-background-main justify-center items-center p-4">
+        <Ionicons name="crop-outline" size={48} color="#ffffff" />
+        <StyledText className="text-text-primary font-sans-bold text-xl text-center mt-4 mb-2">
+          Beskärning ej tillgänglig
+        </StyledText>
+        <StyledText className="text-text-secondary font-sans text-center mb-6">
+          Bildbeskärningsfunktionen är bara tillgänglig på fysiska enheter och i EAS builds, inte i webbläsaren eller Expo Go.
+        </StyledText>
+        <StyledPressable 
+          onPress={handleBack}
+          className="bg-primary px-6 py-3 rounded-lg"
+        >
+          <StyledText className="text-text-inverse font-sans-medium">
+            Gå tillbaka
+          </StyledText>
+        </StyledPressable>
+      </StyledView>
+    );
+  }
+
+  // Starta beskärning direkt när komponenten laddas om vi inte är på web
   React.useEffect(() => {
-    handleCrop();
+    if (!isWebEnvironment) {
+      handleCrop();
+    }
   }, []);
 
   if (error) {

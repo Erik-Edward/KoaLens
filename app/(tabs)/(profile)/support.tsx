@@ -16,7 +16,7 @@ const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
 
-export default function SupportScreen() {
+function SupportScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
@@ -185,3 +185,5 @@ export default function SupportScreen() {
     </>
   );
 }
+
+export default SupportScreen;

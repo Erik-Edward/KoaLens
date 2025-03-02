@@ -1,7 +1,8 @@
 // components/ErrorBoundary.tsx
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import * as Sentry from 'sentry-expo';
+// Använd vår wrapper istället för direkt import
+import { captureException } from '@/lib/sentryWrapper';
 import { router } from 'expo-router';
 import theme from '@/constants/theme';
 
@@ -27,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Rapportera felet till Sentry
-    Sentry.Native.captureException(error, {
+    captureException(error, {
       contexts: {
         react: {
           componentStack: errorInfo.componentStack

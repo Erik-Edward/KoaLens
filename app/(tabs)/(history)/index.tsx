@@ -5,8 +5,8 @@ import { ProductCard } from '@/components/ProductCard';
 import { useStore } from '@/stores/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
-// Lägg till import för Analytics
-import { logEvent, Events, logScreenView } from '@/lib/analytics';
+// Ändra importen till vår wrapper
+import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);

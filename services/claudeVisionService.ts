@@ -4,8 +4,8 @@ import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '@/stores/useStore';
 import { WatchedIngredientFound } from '@/types/settingsTypes';
-// Lägg till import för Analytics
-import { logEvent, Events } from '@/lib/analytics';
+// Ändra importen till vår wrapper
+import { logEvent, Events } from '@/lib/analyticsWrapper';
 
 interface IngredientAnalysisResult {
   isVegan: boolean;

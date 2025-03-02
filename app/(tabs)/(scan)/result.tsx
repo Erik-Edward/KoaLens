@@ -8,8 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
-// Lägg till import för Analytics
-import { logEvent, Events, logScreenView } from '@/lib/analytics';
+// Ändra importen till vår wrapper
+import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);

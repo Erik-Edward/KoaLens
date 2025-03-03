@@ -71,17 +71,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      
-      {/* Support-skärm (döljs från tabbar på ett annat sätt) */}
-      <Tabs.Screen
-        name="support"
-        options={{
-          title: 'Support',
-          // Ändra från tabBarButton: () => null till detta:
-          href: null, // Detta döljer skärmen från tabbaren utan att påverka layouten
-          headerShown: false,
-        }}
-      />
     </Tabs>
   );
 }

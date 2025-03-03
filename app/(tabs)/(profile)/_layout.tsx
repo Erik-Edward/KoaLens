@@ -1,29 +1,15 @@
-// app/(tabs)/(profile)/_layout.tsx
-import { FC } from 'react';
+// app/(tabs)/(profile)/_layout.jsx
+import React from 'react';
 import { Stack } from 'expo-router';
-import theme from '@/constants/theme';
 
-const ProfileLayout: FC = () => {
+function ProfileLayout() {
   return (
     <Stack
       screenOptions={{
-        // Header styling
-        headerStyle: {
-          backgroundColor: theme.colors.background.dark,
-        },
-        headerTintColor: theme.colors.text.primary,
-        headerTitleStyle: {
-          fontFamily: 'PlusJakartaSans-Medium',
-          fontSize: 18,
-        },
-        // Huvudinnehållet
+        headerShown: false,
         contentStyle: {
-          backgroundColor: theme.colors.background.main,
+          backgroundColor: '#25292e',
         },
-        // Navigation animation
-        animation: 'slide_from_right',
-        // Ta bort header shadow
-        headerShadowVisible: false,
       }}
     >
       <Stack.Screen
@@ -37,28 +23,25 @@ const ProfileLayout: FC = () => {
         name="settings"
         options={{
           title: "Inställningar",
+          headerShown: true,
         }}
       />
       <Stack.Screen
         name="advanced"
         options={{
           title: "Avancerade inställningar",
-        }}
-      />
-      <Stack.Screen
-        name="support"
-        options={{
-          title: "Support",
+          headerShown: true,
         }}
       />
       <Stack.Screen
         name="offline-test"
         options={{
           title: 'Offline Test',
+          headerShown: true,
         }}
       />
     </Stack>
   );
-};
+}
 
 export default ProfileLayout;

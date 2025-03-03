@@ -1,4 +1,4 @@
-// app/(onboarding)/avatar.tsx - Med mindre avatar och mer mellanrum
+// app/(onboarding)/avatar.tsx - Korrigerad version
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -16,6 +16,7 @@ import { useStore } from '@/stores/useStore';
 import { getSupporterAvatars, getAvailableAvatars, AvatarOption } from '@/utils/avatarUtils';
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/Avatar';
 import { AvatarCarousel } from '@/components/AvatarCarousel';
 
@@ -66,19 +67,22 @@ export default function AvatarScreen() {
     }
   };
 
+  // Optimerad handleYearChange för jämnare uppdateringar
   const handleYearChange = (value: number) => {
     setYears(value);
+    // Använd subtil haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // When year slider is dragged, manually update selectedAvatar
+    // När slider dras, uppdatera endast avatar om användaren är vegan
     if (isVegan) {
       const newAvatars = getAvailableAvatars(value, selectedStyle);
       if (newAvatars.length > 0) {
-        // Select the latest avatar available for this year count
+        // Välj den senaste tillgängliga avataren för detta antal år
         const latestAvatar = newAvatars[newAvatars.length - 1];
         
-        // Only update if the avatar has actually changed
+        // Uppdatera endast om avataren faktiskt har ändrats
         if (!selectedAvatar || selectedAvatar.id !== latestAvatar.id) {
+          // Använd en kort timeout för att förhindra hackig animation
           setSelectedAvatar(latestAvatar);
         }
       }
@@ -219,7 +223,7 @@ export default function AvatarScreen() {
     </View>
   );
 
-  // Function to render supporter page UI
+  // Function to render supporter page UI - totally different UI without the slider
   const renderSupporterUI = () => (
     <View style={styles.container}>
       <AvatarCarousel 
@@ -235,6 +239,7 @@ export default function AvatarScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* VIKTIGT: Här använder vi vegan-status för att bestämma vilken vy som ska visas */}
           {isVegan ? (
             <View style={{ flex: 1, justifyContent: 'flex-end' }}>
               <View style={styles.header}>

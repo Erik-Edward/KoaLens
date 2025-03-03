@@ -1,4 +1,4 @@
-// app/(tabs)/(profile)/index.tsx - Uppdaterad med scroll och responsiv layout
+// app/(tabs)/(profile)/index.tsx - Uppdaterad navigering till support
 import { FC, useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, Alert, ScrollView, SafeAreaView, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -270,24 +270,24 @@ const ProfileScreen: FC = () => {
             />
           </StyledPressable>
           
-          {/* Support */}
-          <StyledPressable 
-            onPress={() => router.push('./support')}
-            className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel="Öppna support"
-          >
-            <Ionicons name="help-circle-outline" size={24} color="#ffffff" />
-            <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
-              Support
-            </StyledText>
-            <Ionicons 
-              name="chevron-forward" 
-              size={24} 
-              color="#ffffff" 
-              style={{ marginLeft: 'auto' }}
-            />
-          </StyledPressable>
+          // Hitta detta avsnitt i filen:
+<StyledPressable 
+  onPress={() => router.push('/(tabs)/support')}
+  className="flex-row items-center p-4 bg-background-light/80 rounded-lg active:opacity-70"
+  accessibilityRole="button"
+  accessibilityLabel="Öppna support"
+>
+  <Ionicons name="help-circle-outline" size={24} color="#ffffff" />
+  <StyledText className="text-text-primary font-sans-medium text-lg ml-3">
+    Support
+  </StyledText>
+  <Ionicons 
+    name="chevron-forward" 
+    size={24} 
+    color="#ffffff" 
+    style={{ marginLeft: 'auto' }}
+  />
+</StyledPressable>
 
           {/* Utvecklingsknappar - bara synliga i utvecklingsläge */}
           {__DEV__ && (

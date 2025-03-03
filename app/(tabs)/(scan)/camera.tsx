@@ -1,4 +1,4 @@
-// app/(tabs)/(scan)/camera.tsx - Uppdaterad import
+// app/(tabs)/(scan)/camera.tsx - Korrigerad version med tydlig default export
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, Pressable, Alert, Platform } from 'react-native';
 // Ersätt standard import med vår wrapper
@@ -19,6 +19,7 @@ const StyledPressable = styled(Pressable);
 
 const GUIDE_KEY = 'KOALENS_CAMERA_GUIDE_SHOWN';
 
+// Tydligt deklarerad som default export-funktion
 export default function CameraScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');

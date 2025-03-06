@@ -1,47 +1,39 @@
-// app/(tabs)/(profile)/_layout.jsx
-import React from 'react';
 import { Stack } from 'expo-router';
+import theme from '@/constants/theme';
 
-function ProfileLayout() {
+export default function Layout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false,
+        headerStyle: {
+          backgroundColor: theme.colors.background.main,
+        },
+        headerTintColor: theme.colors.text.primary,
         contentStyle: {
-          backgroundColor: '#25292e',
+          backgroundColor: theme.colors.background.main,
         },
       }}
     >
       <Stack.Screen
         name="index"
         options={{
-          title: 'Min profil',
           headerShown: false,
         }}
       />
       <Stack.Screen
         name="settings"
         options={{
-          title: "Inställningar",
-          headerShown: true,
+          title: 'Inställningar',
+          headerBackTitle: 'Tillbaka',
         }}
       />
       <Stack.Screen
-        name="advanced"
+        name="support"
         options={{
-          title: "Avancerade inställningar",
-          headerShown: true,
-        }}
-      />
-      <Stack.Screen
-        name="offline-test"
-        options={{
-          title: 'Offline Test',
-          headerShown: true,
+          title: 'Support',
+          headerBackTitle: 'Tillbaka',
         }}
       />
     </Stack>
   );
-}
-
-export default ProfileLayout;
+} 

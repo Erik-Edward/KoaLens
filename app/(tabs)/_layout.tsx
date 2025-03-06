@@ -17,7 +17,7 @@ export default function TabLayout() {
       const setupNavigationBar = async () => {
         try {
           await NavigationBar.setBackgroundColorAsync(theme.colors.background.dark);
-          await NavigationBar.setBorderColorAsync(theme.colors.background.dark); // Matcha bakgrundsfärgen
+          await NavigationBar.setBorderColorAsync(theme.colors.background.dark);
           await NavigationBar.setButtonStyleAsync('light');
         } catch (error) {
           console.log('Error setting navigation bar:', error);
@@ -35,11 +35,11 @@ export default function TabLayout() {
         tabBarInactiveTintColor: theme.colors.text.secondary,
         tabBarStyle: {
           backgroundColor: theme.colors.background.dark,
-          borderTopWidth: 0, // Ta bort top border helt
+          borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
-          height: 60, // Ge lite mer höjd för bättre touch targets
-          paddingBottom: 8, // Lägg till padding i botten för bättre placering av innehåll
+          height: 60,
+          paddingBottom: 8,
         },
         headerShown: false,
       }}

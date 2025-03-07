@@ -13,7 +13,7 @@ export const WEBSITE_URL = 'https://koalens.live';
 // API endpoints och tjänster
 export const BACKEND_URL = __DEV__ 
   ? 'http://192.168.1.67:3000' 
-  : 'https://din-produktions-url.com';
+  : 'https://koalens-backend.fly.dev';
 
 // FAQ configuration
 export const FAQ_ITEMS = [

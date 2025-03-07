@@ -30,17 +30,17 @@
         "SENTRY_DISABLE": "true"
       }
     },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      },
-      "env": {
-        "ENVIRONMENT": "preview",
-        "API_URL": "https://api-staging.koalens.com",
-        "SENTRY_DISABLE": "true"
-      }
+  "preview": {
+    "distribution": "internal",
+    "android": {
+      "buildType": "apk",
+      "gradleCommand": ":app:assembleRelease"
+    },
+    "env": {
+      "ENVIRONMENT": "preview",
+      "API_URL": "https://koalens-backend.fly.dev",
+      "SENTRY_DISABLE": "true"
+    }
     },
     "production": {
       "autoIncrement": true,

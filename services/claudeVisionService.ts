@@ -23,7 +23,7 @@ interface PendingAnalysis {
   timestamp: number;
 }
 
-const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://din-produktions-url.com';
+const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://koalens-backend.fly.dev';
 
 async function performAnalysis(base64Data: string): Promise<IngredientAnalysisResult> {
   console.log('Starting API analysis request');

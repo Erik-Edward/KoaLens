@@ -11,7 +11,7 @@ import { useStore } from '@/stores/useStore';
 import 'expo-dev-client';
 
 // Backend URL från config eller env
-const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://din-produktions-url.com';
+const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://koalens-backend.fly.dev';
 
 interface Props {
   children: ReactNode;

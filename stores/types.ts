@@ -3,6 +3,7 @@ import { UserPreferences, WatchedIngredientFound } from '@/types/settingsTypes';
 import { OnboardingSlice } from './slices/createOnboardingSlice';
 import type { AvatarSlice as ImportedAvatarSlice } from './slices/createAvatarSlice';
 import { VeganStatusSlice } from './slices/createVeganStatusSlice';
+import { UsageLimitSlice } from './slices/createUsageLimitSlice';
 
 // User interface för auth
 export interface User {
@@ -60,4 +61,5 @@ export type StoreState = AuthSlice &
   HistorySlice & 
   OnboardingSlice &
   ImportedAvatarSlice &
-  VeganStatusSlice;
+  VeganStatusSlice &
+  UsageLimitSlice;

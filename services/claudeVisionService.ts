@@ -4,7 +4,6 @@ import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '@/stores/useStore';
 import { WatchedIngredientFound } from '@/types/settingsTypes';
-// Ändra importen till vår wrapper
 import { logEvent, Events } from '@/lib/analyticsWrapper';
 
 interface IngredientAnalysisResult {
@@ -25,107 +24,10 @@ interface PendingAnalysis {
 
 const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://koalens-backend.fly.dev';
 
-async function performAnalysis(base64Data: string): Promise<IngredientAnalysisResult> {
-  console.log('Starting API analysis request');
-  try {
-    const analysisResponse = await fetch(`${BACKEND_URL}/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        image: base64Data,
-        isOfflineAnalysis: true,
-        isCroppedImage: true
-      })
-    });
-
-    if (!analysisResponse.ok) {
-      const errorData = await analysisResponse.json();
-      console.error('Backend error:', errorData);
-      
-      // Logga API-fel
-      logEvent(Events.ANALYSIS_ERROR, {
-        error_type: 'api_error',
-        error_status: analysisResponse.status,
-        error_message: errorData.message || 'Unknown API error'
-      });
-      
-      throw new Error(errorData.message || 'Analysis failed');
-    }
-
-    const result = await analysisResponse.json();
-    console.log('Received analysis result:', {
-      isVegan: result.isVegan,
-      confidence: result.confidence,
-      ingredientCount: result.allIngredients?.length
-    });
-
-    if (!result || typeof result.isVegan !== 'boolean' || !Array.isArray(result.allIngredients)) {
-      console.error('Invalid response format:', result);
-      
-      // Logga formatfel
-      logEvent(Events.ANALYSIS_ERROR, {
-        error_type: 'format_error',
-        error_message: 'Invalid response format from server'
-      });
-      
-      throw new Error('Invalid response format from server');
-    }
-
-    // Hämta bevakade ingredienser från store
-    const { preferences } = useStore.getState();
-    const watchedIngredients = preferences.watchedIngredients;
-
-    // Sök efter bevakade ingredienser i ingredienslistan
-    const watchedIngredientsFound: WatchedIngredientFound[] = [];
-    
-    result.allIngredients.forEach((ingredient: string) => {
-      const lowerIngredient = ingredient.toLowerCase().trim();
-      
-      Object.entries(watchedIngredients).forEach(([key, watched]) => {
-        if (watched.enabled && lowerIngredient.includes(key.toLowerCase())) {
-          watchedIngredientsFound.push({
-            name: watched.name,
-            description: watched.description,
-            reason: `Hittade "${watched.name}" i ingrediensen "${ingredient}"`
-          });
-        }
-      });
-    });
-
-    // Logga hittade bevakade ingredienser
-    if (watchedIngredientsFound.length > 0) {
-      console.log('Found watched ingredients:', watchedIngredientsFound);
-    }
-
-    // Lägg till i historiken med de bevakade ingredienserna
-    const addProduct = useStore.getState().addProduct;
-    addProduct({
-      imageUri: `data:image/jpeg;base64,${base64Data}`,
-      isVegan: result.isVegan,
-      confidence: result.confidence,
-      nonVeganIngredients: result.nonVeganIngredients,
-      allIngredients: result.allIngredients,
-      reasoning: result.reasoning,
-      watchedIngredientsFound
-    });
-
-    return {
-      ...result,
-      watchedIngredientsFound
-    };
-  } catch (error) {
-    console.error('Error in performAnalysis:', error);
-    throw error;
-  }
-}
-
-export async function analyzeIngredients(imagePath: string): Promise<IngredientAnalysisResult> {
+export async function analyzeIngredients(imagePath: string, userId?: string): Promise<IngredientAnalysisResult> {
   try {
     console.log('Starting ingredient analysis for:', imagePath);
 
-    // Läs bilden som base64
     const response = await fetch(`file://${imagePath}`);
     const blob = await response.blob();
     const base64Data = await new Promise<string>((resolve, reject) => {
@@ -140,20 +42,17 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
 
     console.log('Image converted to base64, size:', (base64Data.length * 0.75) / 1024, 'KB');
 
-    // Kontrollera nätverksstatus
     const networkState = await NetInfo.fetch();
     console.log('Network state:', networkState);
 
     if (!networkState.isConnected) {
       console.log('Device is offline, saving analysis for later');
       
-      // Logga offline-statusen
       logEvent('analysis_saved_offline', {
         timestamp: Date.now(),
         image_size_kb: Math.round((base64Data.length * 0.75) / 1024)
       });
       
-      // Skapa en pending analys
       const analysisId = Date.now().toString();
       const pendingAnalysis: PendingAnalysis = {
         id: analysisId,
@@ -164,7 +63,6 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
 
       console.log('Created pending analysis:', analysisId);
 
-      // Spara analysen lokalt
       const analysisKey = `KOALENS_ANALYSIS_${analysisId}`;
       await AsyncStorage.setItem(
         analysisKey,
@@ -172,7 +70,6 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
       );
       console.log('Saved analysis data to AsyncStorage:', analysisKey);
 
-      // Lägg till i offline-kön
       console.log('Adding analysis to offline queue:', analysisId);
       await OfflineRequestQueue.addToQueue(
         `analyze_${analysisId}`,
@@ -186,15 +83,107 @@ export async function analyzeIngredients(imagePath: string): Promise<IngredientA
       throw new Error('OFFLINE_MODE');
     }
 
-    // Online analys av beskuren bild
-    console.log('Starting API analysis request with cropped image');
+    console.log('Starting API analysis request with cropped image', { hasUserId: !!userId });
     try {
-      const result = await performAnalysis(base64Data);
-      return result;
+      const analysisResponse = await fetch(`${BACKEND_URL}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: base64Data,
+          isOfflineAnalysis: true,
+          isCroppedImage: true,
+          userId
+        })
+      });
+
+      if (!analysisResponse.ok) {
+        const errorData = await analysisResponse.json();
+        console.error('Backend error:', errorData);
+        
+        if (errorData.error === 'USAGE_LIMIT_EXCEEDED') {
+          logEvent(Events.ANALYSIS_ERROR, {
+            error_type: 'usage_limit_exceeded',
+            analyses_used: errorData.details?.analysesUsed,
+            analyses_limit: errorData.details?.analysesLimit
+          });
+          
+          throw new Error('USAGE_LIMIT_EXCEEDED');
+        }
+        
+        logEvent(Events.ANALYSIS_ERROR, {
+          error_type: 'api_error',
+          error_status: analysisResponse.status,
+          error_message: errorData.message || 'Unknown API error'
+        });
+        
+        throw new Error(errorData.message || 'Analysis failed');
+      }
+
+      const result = await analysisResponse.json();
+      console.log('Received analysis result:', {
+        isVegan: result.isVegan,
+        confidence: result.confidence,
+        ingredientCount: result.allIngredients?.length
+      });
+
+      if (!result || typeof result.isVegan !== 'boolean' || !Array.isArray(result.allIngredients)) {
+        console.error('Invalid response format:', result);
+        
+        logEvent(Events.ANALYSIS_ERROR, {
+          error_type: 'format_error',
+          error_message: 'Invalid response format from server'
+        });
+        
+        throw new Error('Invalid response format from server');
+      }
+
+      const { preferences } = useStore.getState();
+      const watchedIngredients = preferences.watchedIngredients;
+      const watchedIngredientsFound: WatchedIngredientFound[] = [];
+      
+      result.allIngredients.forEach((ingredient: string) => {
+        const lowerIngredient = ingredient.toLowerCase().trim();
+        
+        Object.entries(watchedIngredients).forEach(([key, watched]) => {
+          if (watched.enabled && lowerIngredient.includes(key.toLowerCase())) {
+            watchedIngredientsFound.push({
+              name: watched.name,
+              description: watched.description,
+              reason: `Hittade "${watched.name}" i ingrediensen "${ingredient}"`
+            });
+          }
+        });
+      });
+
+      if (watchedIngredientsFound.length > 0) {
+        console.log('Found watched ingredients:', watchedIngredientsFound);
+      }
+
+      const addProduct = useStore.getState().addProduct;
+      addProduct({
+        imageUri: `data:image/jpeg;base64,${base64Data}`,
+        isVegan: result.isVegan,
+        confidence: result.confidence,
+        nonVeganIngredients: result.nonVeganIngredients,
+        allIngredients: result.allIngredients,
+        reasoning: result.reasoning,
+        watchedIngredientsFound
+      });
+
+      return {
+        ...result,
+        watchedIngredientsFound
+      };
+
     } catch (error) {
       console.error('API analysis failed:', error);
       
-      // Logga analysfel
+      if (error instanceof Error && error.message === 'USAGE_LIMIT_EXCEEDED') {
+        throw error;
+      }
+      
       logEvent(Events.ANALYSIS_ERROR, {
         error_type: 'api_error',
         error_message: error instanceof Error ? error.message : 'Unknown error'

@@ -9,6 +9,7 @@ import { createHistorySlice } from './slices/createHistorySlice';
 import { createOnboardingSlice } from './slices/createOnboardingSlice';
 import { createAvatarSlice } from './slices/createAvatarSlice';
 import { createVeganStatusSlice } from './slices/createVeganStatusSlice';
+import { createUsageLimitSlice } from './slices/createUsageLimitSlice';
 
 const STORE_VERSION = 1;
 
@@ -18,6 +19,7 @@ interface PersistedState {
   onboarding?: StoreState['onboarding'];
   avatar?: StoreState['avatar'];
   veganStatus?: StoreState['veganStatus'];
+  usageLimit?: StoreState['usageLimit'];
 }
 
 export const useStore = create<StoreState>()(
@@ -29,6 +31,7 @@ export const useStore = create<StoreState>()(
       ...createOnboardingSlice(...a),
       ...createAvatarSlice(...a),
       ...createVeganStatusSlice(...a),
+      ...createUsageLimitSlice(...a),
     }),
     {
       name: 'koalens-storage',
@@ -41,7 +44,11 @@ export const useStore = create<StoreState>()(
           hasCompletedOnboarding: false
         },
         avatar: state.avatar,
-        veganStatus: state.veganStatus
+        veganStatus: state.veganStatus,
+        usageLimit: {
+          ...state.usageLimit,
+          isLoading: false
+        }
       }),
       version: STORE_VERSION,
       migrate: (persistedState: unknown, version: number) => {

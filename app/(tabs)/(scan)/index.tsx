@@ -7,6 +7,10 @@ import { styled } from 'nativewind';
 import { CameraGuide } from '@/components/CameraGuide';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useUsageLimit } from '@/hooks/useUsageLimit';
+import { UsageLimitIndicator } from '@/components/UsageLimitIndicator';
+import { UsageLimitModal } from '@/components/UsageLimitModal';
+import { useAuth } from '@/providers/AuthProvider';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -16,7 +20,10 @@ const StyledAnimatedView = styled(Animated.View);
 
 const ScanScreen: FC = () => {
   const [showGuide, setShowGuide] = useState(false);
+  const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
+  const { hasReachedLimit, refreshUsageLimit } = useUsageLimit();
   const { width, height } = useWindowDimensions();
+  const { user } = useAuth();
   
   // Animation values
   const pulseAnimation = useRef(new Animated.Value(1)).current;
@@ -83,7 +90,14 @@ const ScanScreen: FC = () => {
   const handleScanPress = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Kontrollera om vi kör på web-plattform
+    // Check usage limits before proceeding
+    await refreshUsageLimit();
+    if (hasReachedLimit) {
+      setShowUsageLimitModal(true);
+      return;
+    }
+
+    // Check if running on web platform
     if (Platform.OS === 'web') {
       Alert.alert(
         "Kameran ej tillgänglig", 
@@ -93,7 +107,11 @@ const ScanScreen: FC = () => {
       return;
     }
     
-    router.push('./camera');
+    // Pass user ID to camera route
+    router.push({
+      pathname: './camera',
+      params: { userId: user?.id }
+    });
   };
 
   const handleShowGuide = async () => {
@@ -135,6 +153,7 @@ const ScanScreen: FC = () => {
         >
           {/* Title Section */}
           <StyledView className="w-full items-center mt-12 mb-4">
+            <UsageLimitIndicator />
             <StyledText className="text-text-primary font-sans-bold text-2xl text-center mb-2">
               KoaLens
             </StyledText>
@@ -321,6 +340,10 @@ const ScanScreen: FC = () => {
               </StyledText>
             </StyledPressable>
           </StyledView>
+          <UsageLimitModal 
+            visible={showUsageLimitModal} 
+            onClose={() => setShowUsageLimitModal(false)} 
+          />
         </StyledView>
       )}
     </StyledSafeAreaView>

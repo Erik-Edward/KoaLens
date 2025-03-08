@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { AvatarSelectorModal } from '@/components/AvatarSelectorModal';
 import { Avatar } from '@/components/Avatar';
 import { useUpdateUserProfile } from '@/hooks/useUpdateUserProfile';
+import { UsageLimitIndicator } from '@/components/UsageLimitIndicator';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -109,6 +110,15 @@ export default function ProfileScreen() {
                'Inte angett'}
             </StyledText>
           </StyledView>
+
+          {/* Användningsstatus */}
+          <StyledView className="bg-background-light/30 p-4 rounded-lg">
+            <StyledText className="text-text-primary font-sans-medium text-lg mb-2">
+              Månatliga analyser
+            </StyledText>
+            <UsageLimitIndicator />
+          </StyledView>
+
         </StyledView>
 
         {/* Menu Items */}
@@ -177,4 +187,4 @@ export default function ProfileScreen() {
       </StyledScrollView>
     </StyledSafeAreaView>
   );
-} 
+}

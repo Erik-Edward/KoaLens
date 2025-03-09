@@ -1,4 +1,4 @@
-// app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende
+// app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende och test-knapp
 import { FC, useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
@@ -11,6 +11,8 @@ import { useUsageLimit } from '@/hooks/useUsageLimit';
 import { UsageLimitIndicator } from '@/components/UsageLimitIndicator';
 import { UsageLimitModal } from '@/components/UsageLimitModal';
 import { useAuth } from '@/providers/AuthProvider';
+import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
+import { testUsageAPI, showTestResult } from '@/utils/usageApiTester';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -21,6 +23,7 @@ const StyledAnimatedView = styled(Animated.View);
 const ScanScreen: FC = () => {
   const [showGuide, setShowGuide] = useState(false);
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
+  const [debugMode] = useState(true); // Force debug mode ON for testing
   const { hasReachedLimit, refreshUsageLimit } = useUsageLimit();
   const { width, height } = useWindowDimensions();
   const { user } = useAuth();
@@ -29,6 +32,25 @@ const ScanScreen: FC = () => {
   const pulseAnimation = useRef(new Animated.Value(1)).current;
   const floatAnimation = useRef(new Animated.Value(0)).current;
   const innerGlowAnimation = useRef(new Animated.Value(0)).current;
+
+  // Test function for usage API
+  const testUsageLimitAPI = async () => {
+    if (!user?.id) {
+      Alert.alert('Ingen användare', 'Du måste vara inloggad för att testa');
+      return;
+    }
+    
+    try {
+      const result = await testUsageAPI(user.id);
+      showTestResult(result);
+      
+      // Uppdatera UI efter test
+      await refreshUsageLimit();
+    } catch (error) {
+      console.error('Test execution error:', error);
+      Alert.alert('Testfel', String(error));
+    }
+  };
 
   // Start animations when component mounts
   useEffect(() => {
@@ -87,6 +109,33 @@ const ScanScreen: FC = () => {
     ).start();
   }, []);
 
+  // Update usage information when component mounts
+  useEffect(() => {
+    // Logga skärmvisning när komponenten monteras
+    logScreenView('ScanScreen');
+    
+    // Uppdatera användningsgränsen när vi öppnar skärmen
+    refreshUsageLimit().catch(err => 
+      console.error('Failed to refresh usage in scan view:', err)
+    );
+  }, [refreshUsageLimit]);
+
+  // Add new useEffect for auto-testing
+  useEffect(() => {
+    if (debugMode && user?.id) {
+      Alert.alert('Debug Mode Active', 'Usage API testing is available. The test will run automatically in 3 seconds.');
+      
+      console.log('Debug mode active with user ID:', user.id);
+      
+      const timer = setTimeout(() => {
+        console.log('Auto-running usage API test...');
+        testUsageLimitAPI();
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [debugMode, user?.id]);
+
   const handleScanPress = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
@@ -95,6 +144,28 @@ const ScanScreen: FC = () => {
     if (hasReachedLimit) {
       setShowUsageLimitModal(true);
       return;
+    }
+
+    // Kontrollera att vi har ett användar-ID
+    if (!user?.id) {
+      console.warn('Missing user ID for analysis tracking!');
+      
+      // Om vi är i utvecklings-/testläge, fortsätt ändå
+      if (__DEV__) {
+        console.log('DEV mode: Continuing without user ID');
+      } else {
+        // I produktionsläge, be användaren logga in igen
+        Alert.alert(
+          "Sessionsfel",
+          "Din session kan ha gått ut. Logga ut och in igen för att fortsätta.",
+          [
+            { text: "OK" }
+          ]
+        );
+        return;
+      }
+    } else {
+      console.log('User ID found for analysis:', user.id);
     }
 
     // Check if running on web platform
@@ -144,6 +215,40 @@ const ScanScreen: FC = () => {
       className="flex-1 bg-background-main"
       accessibilityLabel="Skanna produkt skärm"
     >
+      {debugMode && (
+        <View 
+          style={{
+            position: 'absolute',
+            top: 100,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <Pressable
+            onPress={testUsageLimitAPI}
+            style={{
+              backgroundColor: 'red',
+              padding: 15,
+              borderRadius: 8,
+              width: 250,
+              borderWidth: 3,
+              borderColor: 'white'
+            }}
+          >
+            <Text style={{
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: 18,
+              textAlign: 'center'
+            }}>
+              TEST USAGE API NOW
+            </Text>
+          </Pressable>
+        </View>
+      )}
       {showGuide ? (
         <CameraGuide onClose={() => setShowGuide(false)} isTransparent={false} />
       ) : (
@@ -339,6 +444,20 @@ const ScanScreen: FC = () => {
                 Visa guide för skanning
               </StyledText>
             </StyledPressable>
+            
+            {/* Test button - only shown in development mode */}
+            {__DEV__ && (
+              <StyledView className="mt-4">
+                <StyledPressable 
+                  onPress={testUsageLimitAPI}
+                  className="bg-status-error px-4 py-3 rounded-lg active:opacity-80"
+                >
+                  <StyledText className="text-white font-sans-medium text-center">
+                    Testa användningsgräns API
+                  </StyledText>
+                </StyledPressable>
+              </StyledView>
+            )}
           </StyledView>
           <UsageLimitModal 
             visible={showUsageLimitModal} 

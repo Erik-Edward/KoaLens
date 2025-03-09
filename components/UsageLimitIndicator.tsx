@@ -1,5 +1,5 @@
 // components/UsageLimitIndicator.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { useUsageLimit } from '@/hooks/useUsageLimit';
 import { styled } from 'nativewind';
@@ -13,7 +13,19 @@ interface UsageLimitIndicatorProps {
 }
 
 export function UsageLimitIndicator({ compact = false }: UsageLimitIndicatorProps) {
-  const { remaining, analysesLimit, isLoading, isPremium } = useUsageLimit();
+  const { remaining, analysesLimit, isLoading, isPremium, analysesUsed, refreshUsageLimit } = useUsageLimit();
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  useEffect(() => {
+    console.log('UsageLimitIndicator mounted/updated, current values:', { 
+      analysesUsed, 
+      analysesLimit 
+    });
+    
+    refreshUsageLimit().then(() => {
+      setRefreshKey(prev => prev + 1);
+    });
+  }, []);
   
   if (isLoading) {
     return (

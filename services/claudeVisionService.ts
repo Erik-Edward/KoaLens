@@ -26,7 +26,7 @@ const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://koalens-back
 
 export async function analyzeIngredients(imagePath: string, userId?: string): Promise<IngredientAnalysisResult> {
   try {
-    console.log('Starting ingredient analysis for:', imagePath);
+    console.log('Starting ingredient analysis for:', imagePath, 'userId:', userId);
 
     const response = await fetch(`file://${imagePath}`);
     const blob = await response.blob();
@@ -43,10 +43,10 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
     console.log('Image converted to base64, size:', (base64Data.length * 0.75) / 1024, 'KB');
 
     const networkState = await NetInfo.fetch();
-    console.log('Network state:', networkState);
+    console.log('Network state:', networkState, 'userId:', userId);
 
     if (!networkState.isConnected) {
-      console.log('Device is offline, saving analysis for later');
+      console.log('Device is offline, saving analysis for later. userId:', userId);
       
       logEvent('analysis_saved_offline', {
         timestamp: Date.now(),
@@ -83,7 +83,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       throw new Error('OFFLINE_MODE');
     }
 
-    console.log('Starting API analysis request with cropped image', { hasUserId: !!userId });
+    console.log(`Sending analysis request to ${BACKEND_URL} with userId:`, userId);
     try {
       const analysisResponse = await fetch(`${BACKEND_URL}/analyze`, {
         method: 'POST',
@@ -122,10 +122,13 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       }
 
       const result = await analysisResponse.json();
+      console.log('Analysis completed, userId was:', userId);
+      console.log('Backend response indicates usage updated:', !!userId);
       console.log('Received analysis result:', {
         isVegan: result.isVegan,
         confidence: result.confidence,
-        ingredientCount: result.allIngredients?.length
+        ingredientCount: result.allIngredients?.length,
+        userId
       });
 
       if (!result || typeof result.isVegan !== 'boolean' || !Array.isArray(result.allIngredients)) {
@@ -178,7 +181,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       };
 
     } catch (error) {
-      console.error('API analysis failed:', error);
+      console.error('API analysis failed:', error, 'userId:', userId);
       
       if (error instanceof Error && error.message === 'USAGE_LIMIT_EXCEEDED') {
         throw error;
@@ -197,6 +200,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
 
   } catch (error) {
     console.error('Error in analyzeIngredients:', error);
+    console.error('Was using userId:', userId);
     throw error;
   }
 }

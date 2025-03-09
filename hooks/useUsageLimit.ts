@@ -10,7 +10,24 @@ export function useUsageLimit() {
   
   const refreshUsageLimit = useCallback(async () => {
     if (user?.id) {
-      await fetchUsageLimit(user.id);
+      console.log('Refreshing usage limit for user:', user.id);
+      try {
+        await fetchUsageLimit(user.id);
+        console.log('Usage limit refreshed successfully');
+        const updatedLimit = useStore.getState().usageLimit;
+        console.log('New usage values:', {
+          used: updatedLimit.analysesUsed,
+          limit: updatedLimit.analysesLimit,
+          remaining: updatedLimit.analysesLimit - updatedLimit.analysesUsed
+        });
+        return true;
+      } catch (err) {
+        console.error('Failed to refresh usage limit:', err);
+        return false;
+      }
+    } else {
+      console.warn('Cannot refresh usage limit: No user ID available');
+      return false;
     }
   }, [user, fetchUsageLimit]);
   

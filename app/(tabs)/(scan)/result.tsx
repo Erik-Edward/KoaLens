@@ -8,8 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { styled } from 'nativewind';
 import { useStore } from '@/stores/useStore';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
-// Ändra importen till vår wrapper
 import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
+import { useUsageLimit } from '@/hooks/useUsageLimit';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -24,6 +24,7 @@ export default function ResultScreen() {
   const hasAnalyzed = useRef(false);
   const initialProductCount = useRef<number | null>(null);
   const products = useStore((state) => state.products);
+  const { refreshUsageLimit } = useUsageLimit();
 
   // Logga skärmvisning när komponenten monteras
   useEffect(() => {
@@ -36,6 +37,12 @@ export default function ResultScreen() {
     } else if (products.length > initialProductCount.current && loading) {
       // Vi har fått en ny produkt och är fortfarande i laddningsläge
       const newProduct = products[0];
+      
+      refreshUsageLimit().then(() => {
+        console.log('Usage limit refreshed after analysis');
+      }).catch(err => {
+        console.error('Failed to refresh usage limit:', err);
+      });
       
       // Logga att analysen är klar med produktdetaljer
       logEvent(Events.ANALYSIS_COMPLETED, {
@@ -52,7 +59,7 @@ export default function ResultScreen() {
         params: { id: newProduct.id }
       });
     }
-  }, [products, loading, router]);
+  }, [products, loading, router, refreshUsageLimit]);
 
   useEffect(() => {
     async function analyze() {

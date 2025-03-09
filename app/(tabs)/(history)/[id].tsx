@@ -7,8 +7,8 @@ import { sv } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect } from 'react';
 import { styled } from 'nativewind';
-// Ändra importen till vår wrapper
 import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
+import { useUsageLimit } from '@/hooks/useUsageLimit';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -44,6 +44,7 @@ const Section: React.FC<{
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { refreshUsageLimit } = useUsageLimit();
   
   const product = useStore(useCallback(
     (state) => state.products.find((p) => p.id === id),
@@ -58,6 +59,11 @@ export default function ProductDetailScreen() {
     if (product) {
       logScreenView('ProductDetail');
       
+      // Uppdatera användningsgränsen när vi visar produktdetaljer
+      refreshUsageLimit().catch(err => 
+        console.error('Failed to refresh usage in detail view:', err)
+      );
+      
       // Logga produktdetaljer
       logEvent('view_product_details', {
         is_vegan: product.isVegan,
@@ -68,7 +74,7 @@ export default function ProductDetailScreen() {
         total_ingredients: product.allIngredients.length
       });
     }
-  }, [product]);
+  }, [product, refreshUsageLimit]);
 
   if (!product) {
     return (

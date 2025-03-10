@@ -1,7 +1,7 @@
 // app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende och test-knapp
-import { FC, useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert } from 'react-native';
-import { router } from 'expo-router';
+import { FC, useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert, Modal } from 'react-native';
+import { router, useNavigation, usePathname, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { CameraGuide } from '@/components/CameraGuide';
@@ -13,6 +13,8 @@ import { UsageLimitModal } from '@/components/UsageLimitModal';
 import { useAuth } from '@/providers/AuthProvider';
 import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 import { testUsageAPI, showTestResult } from '@/utils/usageApiTester';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCameraPermission } from '@/lib/visionCameraWrapper';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -23,37 +25,220 @@ const StyledAnimatedView = styled(Animated.View);
 const ScanScreen: FC = () => {
   const [showGuide, setShowGuide] = useState(false);
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
-  const [debugMode] = useState(true); // Force debug mode ON for testing
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [debugMode] = useState(false);
   const { hasReachedLimit, refreshUsageLimit } = useUsageLimit();
   const { width, height } = useWindowDimensions();
   const { user } = useAuth();
+  const navigation = useNavigation();
+  const pathname = usePathname();
+  const segments = useSegments();
+  const isScreenMounted = useRef(true);
+  const safetyTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get camera permission status directly in the scan tab
+  const { hasPermission, requestPermission } = useCameraPermission();
   
   // Animation values
   const pulseAnimation = useRef(new Animated.Value(1)).current;
   const floatAnimation = useRef(new Animated.Value(0)).current;
   const innerGlowAnimation = useRef(new Animated.Value(0)).current;
 
-  // Test function for usage API
-  const testUsageLimitAPI = async () => {
-    if (!user?.id) {
-      Alert.alert('Ingen användare', 'Du måste vara inloggad för att testa');
-      return;
+  // Function to clear any camera safety timeouts
+  const clearCameraSafetyTimeout = useCallback(async () => {
+    // Clear any timeout we're tracking in memory
+    if (safetyTimeoutId.current) {
+      clearTimeout(safetyTimeoutId.current);
+      safetyTimeoutId.current = null;
     }
     
+    // Also check AsyncStorage for any saved timeout IDs
     try {
-      const result = await testUsageAPI(user.id);
-      showTestResult(result);
-      
-      // Uppdatera UI efter test
-      await refreshUsageLimit();
-    } catch (error) {
-      console.error('Test execution error:', error);
-      Alert.alert('Testfel', String(error));
+      const timeoutString = await AsyncStorage.getItem('KOALENS_CAMERA_TIMEOUT');
+      if (timeoutString) {
+        const timeoutId = parseInt(timeoutString, 10);
+        clearTimeout(timeoutId);
+        await AsyncStorage.removeItem('KOALENS_CAMERA_TIMEOUT');
+        console.log('Cleared existing camera safety timeout');
+      }
+    } catch (err) {
+      console.error('Error clearing camera timeout:', err);
     }
-  };
+  }, []);
 
-  // Start animations when component mounts
+  // Function to reset the screen state - enhanced to be more reliable
+  const resetScreenState = useCallback(() => {
+    if (!isScreenMounted.current) return;
+    
+    console.log('Resetting scan screen state, current pathname:', pathname);
+    
+    // Ensure animations are running
+    startAnimations();
+    
+    // Refresh usage limit data
+    refreshUsageLimit().catch(err => 
+      console.error('Failed to refresh usage in scan view:', err)
+    );
+    
+    // Make sure we're on the right UI state - hide ALL modals
+    setShowGuide(false);
+    setShowPermissionModal(false);
+    setShowUsageLimitModal(false);
+    
+    // Clear any navigation safety timeouts
+    clearCameraSafetyTimeout();
+    
+    // If we detect we're not on the main scan screen, force navigate to it
+    // This is a safety mechanism in case we get stuck between views
+    if (pathname.includes('scan') && (pathname.includes('result') || pathname.includes('crop'))) {
+      console.log('Detected we are on a sub-route, forcing navigation to main scan tab');
+      router.replace('/(tabs)/(scan)');
+    }
+    
+    // Log that we reset the screen state
+    logEvent('screen_reset', { screen: 'scan', path: pathname });
+    
+    // Log screen view
+    logScreenView('ScanScreen');
+  }, [refreshUsageLimit, pathname, clearCameraSafetyTimeout, router]);
+
+  // Global function to clear ALL app navigation locks and states but WITHOUT any navigation
+  const forceResetAllAppState = useCallback(async () => {
+    console.log('Performing a global app state reset');
+    
+    try {
+      // Clear all known navigation locks
+      await AsyncStorage.removeItem('KOALENS_CAMERA_NAV_LOCK');
+      await AsyncStorage.removeItem('KOALENS_RESULT_NAV_LOCK');
+      await AsyncStorage.removeItem('KOALENS_CAMERA_TIMEOUT');
+      
+      // REMOVED: router.replace call to prevent infinite navigation loop
+      
+      console.log('Global app state reset completed');
+    } catch (err) {
+      console.error('Error during global app state reset:', err);
+    }
+  }, []);
+
+  // Reset screen state and ensure we see the scan button
   useEffect(() => {
+    console.log('ScanScreen component mounted, pathname:', pathname);
+    isScreenMounted.current = true;
+    
+    // Reset state once on mount (no navigation)
+    forceResetAllAppState();
+    resetScreenState();
+    
+    // Add a debounce mechanism to prevent multiple rapid resets
+    let isResetting = false;
+    let resetTimeout: NodeJS.Timeout | null = null;
+    
+    const debouncedReset = () => {
+      if (isResetting || !isScreenMounted.current) return;
+      
+      isResetting = true;
+      console.log('Starting debounced reset');
+      
+      // Clear any existing timeout
+      if (resetTimeout) clearTimeout(resetTimeout);
+      
+      // Set a new timeout to perform the reset
+      resetTimeout = setTimeout(() => {
+        if (isScreenMounted.current) {
+          console.log('Performing debounced reset now');
+          forceResetAllAppState();
+          resetScreenState();
+        }
+        isResetting = false;
+      }, 300); // Small delay to batch multiple reset requests
+    };
+    
+    // Handle tab focus events with debounce and force more cleanup
+    const unsubscribeTabFocus = navigation.addListener('focus', async () => {
+      if (!isScreenMounted.current) return;
+      
+      console.log('Scan tab focused, ensuring clean state');
+      
+      // Force immediate cleanup of any result screens that might be in the background
+      try {
+        // Explicitly remove result-related locks
+        await AsyncStorage.removeItem('KOALENS_RESULT_NAV_LOCK');
+        
+        // Check the current route/path to see if we're coming from result
+        const isComingFromResult = pathname.includes('result') || pathname.includes('crop');
+        
+        // If we're coming directly from a result screen, wait slightly longer before reset
+        if (isComingFromResult) {
+          console.log('Detected coming from result screen, giving extra time');
+          
+          // Brief delay to let the transition complete before resetting state
+          setTimeout(() => {
+            if (isScreenMounted.current) {
+              debouncedReset();
+            }
+          }, 100);
+        } else {
+          // Normal path - just debounce the reset
+          debouncedReset();
+        }
+      } catch (err) {
+        console.error('Error in tab focus handler:', err);
+        // Still try to reset even if there was an error
+        debouncedReset();
+      }
+    });
+    
+    // Listen for navigation state changes with better state tracking
+    const unsubscribeNavState = navigation.addListener('state', () => {
+      // Only reset if we're on the main scan screen, not a sub-route
+      if (!isScreenMounted.current) return;
+      
+      const isCameraOrSubRoute = pathname.includes('/camera') || 
+                             pathname.includes('/crop') || 
+                             pathname.includes('/result');
+                             
+      console.log('Navigation state changed, pathname:', pathname, 'isCameraOrSubRoute:', isCameraOrSubRoute);
+      
+      if (pathname === '/(tabs)/(scan)' && !isCameraOrSubRoute) {
+        console.log('Main scan screen detected, scheduling reset');
+        debouncedReset();
+      } else if (pathname === '/(tabs)/(scan)' && isCameraOrSubRoute) {
+        // When navigating to camera/crop/result, clear locks but don't reset UI
+        console.log('Scan sub-route detected, clearing locks only');
+        forceResetAllAppState().catch(err => console.error('Error clearing locks:', err));
+      }
+    });
+    
+    return () => {
+      console.log('ScanScreen component unmounting');
+      isScreenMounted.current = false;
+      
+      // Clear any pending timeout
+      if (resetTimeout) clearTimeout(resetTimeout);
+      
+      // Clean up all listeners
+      unsubscribeTabFocus();
+      unsubscribeNavState();
+      
+      // Clear any safety timeouts when unmounting
+      clearCameraSafetyTimeout();
+    };
+  }, [navigation, pathname, resetScreenState, clearCameraSafetyTimeout, forceResetAllAppState]);
+
+  // Start all animations
+  const startAnimations = () => {
+    // Stop any running animations first
+    pulseAnimation.stopAnimation();
+    floatAnimation.stopAnimation();
+    innerGlowAnimation.stopAnimation();
+    
+    // Reset animation values
+    pulseAnimation.setValue(1);
+    floatAnimation.setValue(0);
+    innerGlowAnimation.setValue(0);
+    
+    // Restart animations
     // Pulsating animation for the scan button
     Animated.loop(
       Animated.sequence([
@@ -107,18 +292,42 @@ const ScanScreen: FC = () => {
         }),
       ])
     ).start();
+  };
+
+  // Start animations when component mounts
+  useEffect(() => {
+    startAnimations();
   }, []);
 
   // Update usage information when component mounts
   useEffect(() => {
-    // Logga skärmvisning när komponenten monteras
+    // Log screen view when component mounts
     logScreenView('ScanScreen');
     
-    // Uppdatera användningsgränsen när vi öppnar skärmen
+    // Refresh usage limit when we open the screen
     refreshUsageLimit().catch(err => 
       console.error('Failed to refresh usage in scan view:', err)
     );
   }, [refreshUsageLimit]);
+
+  // Test function for usage API
+  const testUsageLimitAPI = async () => {
+    if (!user?.id) {
+      Alert.alert('Ingen användare', 'Du måste vara inloggad för att testa');
+      return;
+    }
+    
+    try {
+      const result = await testUsageAPI(user.id);
+      showTestResult(result);
+      
+      // Uppdatera UI efter test
+      await refreshUsageLimit();
+    } catch (error) {
+      console.error('Test execution error:', error);
+      Alert.alert('Testfel', String(error));
+    }
+  };
 
   // Add new useEffect for auto-testing
   useEffect(() => {
@@ -136,7 +345,65 @@ const ScanScreen: FC = () => {
     }
   }, [debugMode, user?.id]);
 
+  // Function to handle camera permission request
+  const handleRequestCameraPermission = useCallback(async () => {
+    try {
+      setIsRequestingPermission(true);
+      
+      // Provide haptic feedback
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      console.log('Requesting camera permission from scan tab...');
+      const result = await requestPermission();
+      console.log('Permission result:', result);
+      
+      // Log the permission request
+      logEvent('camera_permission', { 
+        granted: result,
+        source: 'scan_tab'
+      });
+      
+      if (result) {
+        // If permission was granted, proceed to camera
+        navigateToCamera();
+      } else {
+        // If permission was denied, show info and stay on scan tab
+        Alert.alert(
+          "Kamerabehörighet nekad",
+          "Du behöver ge KoaLens tillgång till kameran för att kunna skanna ingredienslistor.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (err) {
+      console.error('Error requesting camera permission:', err);
+    } finally {
+      setIsRequestingPermission(false);
+      setShowPermissionModal(false);
+    }
+  }, [requestPermission]);
+
+  // Function to navigate to camera after permissions are granted
+  const navigateToCamera = useCallback(() => {
+    if (!user?.id) {
+      console.warn('Missing user ID for camera navigation');
+    }
+    
+    console.log('Navigating to camera with permissions already granted');
+    
+    // Navigate to camera screen - use push (not replace) for better back navigation
+    router.push({
+      pathname: '/(tabs)/(scan)/camera',
+      params: { userId: user?.id }
+    });
+    
+    // We'll no longer use the safety timeout as it's causing unwanted navigation
+    // Instead, we'll rely on the user to manually navigate back if needed
+  }, [user]);
+
   const handleScanPress = async () => {
+    // Clear any existing safety timeouts before proceeding
+    await clearCameraSafetyTimeout();
+    
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     // Check usage limits before proceeding
@@ -146,15 +413,15 @@ const ScanScreen: FC = () => {
       return;
     }
 
-    // Kontrollera att vi har ett användar-ID
+    // Check for user ID
     if (!user?.id) {
       console.warn('Missing user ID for analysis tracking!');
       
-      // Om vi är i utvecklings-/testläge, fortsätt ändå
+      // In development mode, continue anyway
       if (__DEV__) {
         console.log('DEV mode: Continuing without user ID');
       } else {
-        // I produktionsläge, be användaren logga in igen
+        // In production mode, ask user to log in again
         Alert.alert(
           "Sessionsfel",
           "Din session kan ha gått ut. Logga ut och in igen för att fortsätta.",
@@ -164,8 +431,6 @@ const ScanScreen: FC = () => {
         );
         return;
       }
-    } else {
-      console.log('User ID found for analysis:', user.id);
     }
 
     // Check if running on web platform
@@ -178,11 +443,14 @@ const ScanScreen: FC = () => {
       return;
     }
     
-    // Pass user ID to camera route
-    router.push({
-      pathname: './camera',
-      params: { userId: user?.id }
-    });
+    // Check camera permission before navigating
+    if (!hasPermission) {
+      // Show permission modal instead of navigating to camera screen
+      setShowPermissionModal(true);
+    } else {
+      // Permission already granted, proceed to camera
+      navigateToCamera();
+    }
   };
 
   const handleShowGuide = async () => {
@@ -208,6 +476,52 @@ const ScanScreen: FC = () => {
       inputRange: [0, 1],
       outputRange: [0.5, 0.9]
     })
+  };
+
+  // Add the permission request modal
+  const renderPermissionModal = () => {
+    return (
+      <Modal
+        visible={showPermissionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPermissionModal(false)}
+      >
+        <StyledView className="flex-1 justify-center items-center bg-black/80">
+          <StyledView className="w-5/6 bg-background-main rounded-lg p-6 items-center">
+            <Ionicons name="camera-outline" size={48} color="#ffd33d" />
+            <StyledText className="text-text-primary font-sans-medium text-lg text-center mt-4 mb-2">
+              Kamerabehörighet
+            </StyledText>
+            <StyledText className="text-text-secondary font-sans text-center mb-6">
+              KoaLens behöver tillgång till kameran för att kunna skanna ingredienslistor.
+            </StyledText>
+            
+            <StyledView className="flex-row gap-4">
+              <StyledPressable 
+                onPress={() => setShowPermissionModal(false)}
+                className="bg-gray-700 px-6 py-3 rounded-lg"
+                disabled={isRequestingPermission}
+              >
+                <StyledText className="text-text-primary font-sans-medium">
+                  Avbryt
+                </StyledText>
+              </StyledPressable>
+              
+              <StyledPressable 
+                onPress={handleRequestCameraPermission}
+                className="bg-primary px-6 py-3 rounded-lg"
+                disabled={isRequestingPermission}
+              >
+                <StyledText className="text-text-inverse font-sans-medium">
+                  {isRequestingPermission ? 'Bearbetar...' : 'Ge tillgång till kamera'}
+                </StyledText>
+              </StyledPressable>
+            </StyledView>
+          </StyledView>
+        </StyledView>
+      </Modal>
+    );
   };
 
   return (
@@ -465,6 +779,9 @@ const ScanScreen: FC = () => {
           />
         </StyledView>
       )}
+      
+      {/* Camera permission modal */}
+      {renderPermissionModal()}
     </StyledSafeAreaView>
   );
 };

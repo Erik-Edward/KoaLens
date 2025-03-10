@@ -23,16 +23,16 @@ export async function testUsageAPI(userId: string) {
     const initialData = await initialResponse.json();
     console.log('Initial usage data:', initialData);
     
-    // 2. Anropa test-endpunkten som bör öka räknaren
-    console.log('Step 2: Testing increment via test endpoint...');
-    const testResponse = await fetch(`${BACKEND_URL}/test-usage/${userId}`);
+    // 2. Anropa direkt inkrementerings-endpoint som ökar räknaren
+    console.log('Step 2: Testing increment via direct endpoint...');
+    const incrementResponse = await fetch(`${BACKEND_URL}/increment-usage/${userId}`);
     
-    if (!testResponse.ok) {
-      throw new Error(`Test update failed: ${testResponse.status} ${testResponse.statusText}`);
+    if (!incrementResponse.ok) {
+      throw new Error(`Increment failed: ${incrementResponse.status} ${incrementResponse.statusText}`);
     }
     
-    const testResult = await testResponse.json();
-    console.log('Test update response:', testResult);
+    const incrementResult = await incrementResponse.json();
+    console.log('Increment response:', incrementResult);
     
     // 3. Hämta uppdaterad användningsdata
     console.log('Step 3: Fetching updated usage data...');
@@ -54,7 +54,7 @@ export async function testUsageAPI(userId: string) {
     return {
       initial: initialData,
       updated: updatedData,
-      testResponse: testResult,
+      incrementResult,
       changed,
       status: changed ? 'SUCCESS' : 'FAILED',
       summary: changed 

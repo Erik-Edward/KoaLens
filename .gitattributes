@@ -1,0 +1,12 @@
+# Set default behavior to LF line endings
+* text=auto eol=lf
+
+# Binaries should be left untouched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

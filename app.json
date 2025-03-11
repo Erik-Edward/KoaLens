@@ -26,6 +26,7 @@
         "backgroundColor": "#25292e"
       },
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.CAMERA"
       ],
       "package": "com.erikedward.KoaLens",
@@ -99,6 +100,12 @@
       "eas": {
         "projectId": "92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
     }
   }
 }

@@ -164,7 +164,7 @@ export default function OnboardingWelcomeScreen() {
             })}
           >
             <StyledText className="text-text-inverse font-sans-bold text-xl text-center">
-              Kom igång
+              Starta
             </StyledText>
           </StyledPressable>
 

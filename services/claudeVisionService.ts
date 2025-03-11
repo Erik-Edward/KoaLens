@@ -23,6 +23,48 @@ interface PendingAnalysis {
   timestamp: number;
 }
 
+// Använd alltid Fly.io-backend oavsett miljö
+const BACKEND_URL = 'https://koalens-backend.fly.dev';
+
+// Förbättrad fetch-funktion med timeout och retry
+const fetchWithRetry = async (url: string, options: RequestInit = {}, maxRetries: number = 3) => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Lägg till timeout för fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 sekunders timeout
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Kontrollera HTTP-status
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response;
+    } catch (error) {
+      console.log(`Attempt ${attempt + 1} failed:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      if (attempt < maxRetries - 1) {
+        // Exponentiell backoff: vänta längre för varje försök
+        const waitTime = Math.pow(2, attempt) * 1000;
+        console.log(`Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  throw lastError;
+};
+
 // Backoff logic configuration
 const RETRY_CONFIG = {
   maxRetries: 3,
@@ -33,8 +75,6 @@ const RETRY_CONFIG = {
 
 // Helper for exponential backoff
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const BACKEND_URL = __DEV__ ? 'http://192.168.1.67:3000' : 'https://koalens-backend.fly.dev';
 
 // Validera API-svar för robusthet
 const validateApiResponse = (data: any): boolean => {
@@ -169,6 +209,19 @@ async function retryWithBackoff<T>(
 
 export async function analyzeIngredients(imagePath: string, userId?: string): Promise<IngredientAnalysisResult> {
   try {
+    // Lägg till diagnostiska kontroller för backend-anslutning
+    console.log('Kontrollerar anslutning till:', BACKEND_URL);
+    try {
+      const ping = await fetchWithRetry(`${BACKEND_URL}`, { 
+        method: 'GET', 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+      console.log('Backend anslutning status:', ping.status, ping.ok);
+    } catch (error) {
+      console.error('Kunde inte ansluta till backend:', error);
+      // Fortsätt ändå med analysen, vi vill inte avbryta här
+    }
+    
     console.log('Starting ingredient analysis for:', imagePath, 'userId:', userId);
     addBreadcrumb('Starting ingredient analysis', 'analysis', { userId });
 
@@ -218,7 +271,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
         reader.readAsDataURL(blob);
       });
       
-      // Validera att base64-data faktiskt är strings och inte tom
+      // Validera att base64-data faktiskt är string och inte tom
       if (!base64Data || typeof base64Data !== 'string' || base64Data.length === 0) {
         throw new Error('Base64 conversion failed - empty result');
       }
@@ -287,12 +340,12 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
     console.log(`Sending analysis request to ${BACKEND_URL} with userId:`, userId);
     addBreadcrumb('Sending analysis request', 'api', { userId });
     
-    // FÖRBÄTTRING: Använda retry med backoff
+    // FÖRBÄTTRING: Använda fetchWithRetry istället för retryWithBackoff
     const analysisResult = await retryWithBackoff(
       async () => {
         // FÖRBÄTTRING: Bättre felhantering vid API-anrop
         try {
-          const response = await fetch(`${BACKEND_URL}/analyze`, {
+          const response = await fetchWithRetry(`${BACKEND_URL}/analyze`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -304,46 +357,6 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
               userId
             })
           });
-
-          if (!response.ok) {
-            // Försök läsa felmeddelandet
-            let errorMessage: string;
-            let errorData: any;
-            
-            try {
-              errorData = await response.json();
-              errorMessage = errorData.message || `Server responded with status: ${response.status}`;
-            } catch (parseError) {
-              errorMessage = `Failed to parse error response: ${response.status} ${response.statusText}`;
-            }
-            
-            console.error('Backend error:', errorMessage, errorData);
-            
-            // Hantera specifika felkoder
-            if (response.status === 429 || response.status === 529 || 
-                errorMessage.includes('Overloaded') || errorMessage.includes('too many requests')) {
-              throw new Error('CLAUDE_OVERLOADED');
-            }
-            
-            if (errorData && errorData.error === 'USAGE_LIMIT_EXCEEDED') {
-              logEvent(Events.ANALYSIS_ERROR, {
-                error_type: 'usage_limit_exceeded',
-                userId
-              });
-              
-              throw new Error('USAGE_LIMIT_EXCEEDED');
-            }
-            
-            // Logga API-fel
-            logEvent(Events.ANALYSIS_ERROR, {
-              error_type: 'api_error',
-              error_status: response.status,
-              error_message: errorMessage,
-              userId
-            });
-            
-            throw new Error(errorMessage);
-          }
 
           // FÖRBÄTTRING: Säkrare JSON-parsning
           let result;

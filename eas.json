@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "android": {
@@ -13,24 +14,22 @@
       },
       "env": {
         "ENVIRONMENT": "development",
-        "API_URL": "https://api-dev.koalens.com",
+        "API_URL": "https://koalens-backend.fly.dev",
         "SENTRY_DISABLE": "true"
       }
     },
-    "development-local": {
+    "development-simulator": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
+      "ios": {
+        "simulator": true
       },
-      "env": {
-        "ENVIRONMENT": "development",
-        "API_URL": "https://api-dev.koalens.com",
-        "SENTRY_DISABLE": "true"
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal",
       "android": {
         "buildType": "apk",
@@ -44,12 +43,13 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
         "ENVIRONMENT": "production",
-        "API_URL": "https://api.koalens.com"
+        "API_URL": "https://koalens-backend.fly.dev"
       }
     }
   },

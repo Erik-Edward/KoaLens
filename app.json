@@ -101,11 +101,12 @@
         "projectId": "92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/92c1b3f9-fe21-4872-b365-bfed3fa1b67c"
+      "url": "https://u.expo.dev/92c1b3f9-fe21-4872-b365-bfed3fa1b67c",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

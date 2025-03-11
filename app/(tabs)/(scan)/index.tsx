@@ -28,6 +28,7 @@ const ScanScreen: FC = () => {
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [debugMode] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const { hasReachedLimit, refreshUsageLimit } = useUsageLimit();
   const { width, height } = useWindowDimensions();
   const { user } = useAuth();
@@ -77,14 +78,18 @@ const ScanScreen: FC = () => {
     startAnimations();
     
     // Refresh usage limit data
-    refreshUsageLimit().catch(err => 
-      console.error('Failed to refresh usage in scan view:', err)
-    );
+    refreshUsageLimit().catch(err => {
+      console.error('Failed to refresh usage in scan view:', err);
+      setNetworkError(true);
+    });
     
     // Make sure we're on the right UI state - hide ALL modals
     setShowGuide(false);
     setShowPermissionModal(false);
     setShowUsageLimitModal(false);
+    
+    // Reset network error state (will be set again if refresh fails)
+    setNetworkError(false);
     
     // Clear any navigation safety timeouts
     clearCameraSafetyTimeout();
@@ -101,7 +106,7 @@ const ScanScreen: FC = () => {
     
     // Log screen view
     logScreenView('ScanScreen');
-  }, [refreshUsageLimit, pathname, clearCameraSafetyTimeout, router]);
+  }, [refreshUsageLimit, pathname, clearCameraSafetyTimeout, router, setNetworkError]);
 
   // Global function to clear ALL app navigation locks and states but WITHOUT any navigation
   const forceResetAllAppState = useCallback(async () => {
@@ -305,9 +310,10 @@ const ScanScreen: FC = () => {
     logScreenView('ScanScreen');
     
     // Refresh usage limit when we open the screen
-    refreshUsageLimit().catch(err => 
-      console.error('Failed to refresh usage in scan view:', err)
-    );
+    refreshUsageLimit().catch(err => {
+      console.error('Failed to refresh usage in scan view:', err);
+      setNetworkError(true);
+    });
   }, [refreshUsageLimit]);
 
   // Test function for usage API
@@ -322,10 +328,17 @@ const ScanScreen: FC = () => {
       showTestResult(result);
       
       // Uppdatera UI efter test
-      await refreshUsageLimit();
+      try {
+        await refreshUsageLimit();
+        setNetworkError(false); // Clear any network error on success
+      } catch (error) {
+        console.error('Failed to refresh usage after test:', error);
+        setNetworkError(true);
+      }
     } catch (error) {
       console.error('Test execution error:', error);
       Alert.alert('Testfel', String(error));
+      setNetworkError(true);
     }
   };
 
@@ -407,7 +420,15 @@ const ScanScreen: FC = () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     // Check usage limits before proceeding
-    await refreshUsageLimit();
+    try {
+      await refreshUsageLimit();
+      setNetworkError(false); // Clear any network error on success
+    } catch (error) {
+      console.error('Failed to refresh usage before scan:', error);
+      setNetworkError(true);
+      return; // Don't proceed with scan if we can't verify usage limits
+    }
+    
     if (hasReachedLimit) {
       setShowUsageLimitModal(true);
       return;
@@ -577,8 +598,28 @@ const ScanScreen: FC = () => {
               KoaLens
             </StyledText>
             <StyledText className="text-text-secondary font-sans text-base text-center">
-              Skanna ingredienser för att kontrollera om produkten är vegansk
+              Skanna ingredienser för att kontrollera om produkten är vegansk!
             </StyledText>
+            
+            {/* Network Error UI */}
+            {networkError && (
+              <StyledView className="bg-status-error/20 p-4 rounded-lg mt-4 w-full">
+                <StyledText className="text-status-error font-sans-medium text-center">
+                  Kunde inte ansluta till servern. Vänligen kontrollera din internetanslutning.
+                </StyledText>
+                <StyledPressable 
+                  onPress={() => { 
+                    setNetworkError(false); 
+                    refreshUsageLimit().catch(err => setNetworkError(true)); 
+                  }}
+                  className="bg-primary mt-2 py-2 rounded-lg"
+                >
+                  <StyledText className="text-text-inverse font-sans text-center">
+                    Försök igen
+                  </StyledText>
+                </StyledPressable>
+              </StyledView>
+            )}
           </StyledView>
 
           {/* Main Scan Button - Enhanced with better animations and gradient */}

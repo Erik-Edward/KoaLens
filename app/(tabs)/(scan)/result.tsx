@@ -1,4 +1,4 @@
-// app/(tabs)/(scan)/result.tsx - Förbättrad timing för navigering
+// app/(tabs)/(scan)/result.tsx - Förbättrad version med robustare felhantering och tillståndshantering
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, ActivityIndicator, Pressable, BackHandler, Platform } from 'react-native';
 import { useLocalSearchParams, router, useNavigation, useRootNavigationState } from 'expo-router';
@@ -20,6 +20,32 @@ const StyledPressable = styled(Pressable);
 // Navigation lock key to prevent unwanted navigation
 const NAV_LOCK_KEY = 'KOALENS_RESULT_NAV_LOCK';
 
+// Validera API-svar för att säkerställa att alla nödvändiga fält finns
+const validateApiResponse = (result: any): boolean => {
+  if (!result) return false;
+  
+  // Kontrollera att alla nödvändiga fält finns och har korrekt typ
+  const requiredFields = [
+    { name: 'isVegan', type: 'boolean' },
+    { name: 'confidence', type: 'number' },
+    { name: 'allIngredients', type: 'array' },
+    { name: 'nonVeganIngredients', type: 'array' },
+    { name: 'reasoning', type: 'string' }
+  ];
+  
+  for (const field of requiredFields) {
+    if (field.type === 'array' && !Array.isArray(result[field.name])) {
+      console.error(`Validation failed: ${field.name} is not an array`);
+      return false;
+    } else if (field.type !== 'array' && typeof result[field.name] !== field.type) {
+      console.error(`Validation failed: ${field.name} is not a ${field.type}`);
+      return false;
+    }
+  }
+  
+  return true;
+};
+
 export default function ResultScreen() {
   const { photoPath } = useLocalSearchParams<{ photoPath: string }>();
   const [loading, setLoading] = useState(true);
@@ -38,6 +64,23 @@ export default function ResultScreen() {
   const products = useStore(state => state.products);
   const navigation = useNavigation();
   const navState = useRootNavigationState();
+  
+  // Diagnostik för felsökning - endast i utvecklingsläge
+  const [diagnostics, setDiagnostics] = useState<{
+    apiCallSucceeded: boolean;
+    productAdded: boolean;
+    productId: string | null;
+    errorState: string | null;
+    navigationAttempted: boolean;
+    productCount: number;
+  }>({
+    apiCallSucceeded: false,
+    productAdded: false,
+    productId: null,
+    errorState: null,
+    navigationAttempted: false,
+    productCount: 0
+  });
   
   // Track navigation state for debugging
   const [navigationLog, setNavigationLog] = useState<string[]>([]);
@@ -143,36 +186,34 @@ export default function ResultScreen() {
         clearTimeout(navigationTimerRef.current);
         navigationTimerRef.current = null;
       }
-      
-      // NOTE: We'll avoid the AsyncStorage call during unmount
-      // as it might be causing issues in the cleanup phase
     };
   }, []);
 
   // Function to safely navigate to history detail (without requiring a product ID)
   const navigateToHistoryDetail = useCallback(() => {
-    if (!isScreenMounted.current || navigationAttempts.current >= 3) {
-      logNavigation(`Navigation aborted: mounted=${isScreenMounted.current}, attempts=${navigationAttempts.current}`);
+    if (!isScreenMounted.current) {
+      logNavigation(`Navigation aborted: mounted=${isScreenMounted.current}`);
       return;
     }
     
-    navigationAttempts.current += 1;
-    logNavigation(`Navigation attempt ${navigationAttempts.current}`);
+    setDiagnostics(prev => ({ ...prev, navigationAttempted: true }));
+    logNavigation(`Starting navigation to history detail`);
     
     try {
-      // Only clear nav lock if we're still mounted
-      if (isScreenMounted.current) {
-        // Unlock navigation
-        setNavLocked(false);
-        AsyncStorage.removeItem(NAV_LOCK_KEY)
-          .catch(err => console.error('Failed to clear navigation lock:', err));
-      }
+      // Frigör navigationslåset
+      AsyncStorage.removeItem(NAV_LOCK_KEY)
+        .catch(err => console.error('Failed to clear navigation lock:', err));
+      setNavLocked(false);
       
-      // Get the latest product info
+      // Hämta produktinformation med bättre felhantering
       const currentProducts = useStore.getState().products;
+      const productCount = currentProducts.length;
       
-      if (currentProducts.length === 0) {
-        logNavigation('No products found for navigation, going to history tab');
+      setDiagnostics(prev => ({ ...prev, productCount }));
+      logNavigation(`Current products count: ${productCount}`);
+      
+      if (productCount === 0) {
+        logNavigation('No products found, redirecting to history tab');
         router.replace('/(tabs)/(history)');
         return;
       }
@@ -181,21 +222,22 @@ export default function ResultScreen() {
       const productId = newestProduct.id;
       
       logNavigation(`Found product for navigation: ${productId}`);
+      setDiagnostics(prev => ({ ...prev, productId }));
       
-      // Using a simple, direct approach to minimize rendering issues
+      // VIKTIGT: Använd en enklare navigeringsmetod utan nested timeouts
       logNavigation(`Using simplified navigation to history detail`);
       
-      // Navigate directly to history detail
-      router.navigate('/(tabs)/(history)');
-      setTimeout(() => {
-        router.push({
-          pathname: '/(tabs)/(history)/[id]',
-          params: { id: productId }
-        });
-      }, 500);
+      // VIKTIGT: Använd replace istället för push för konsekvent beteende
+      router.replace({
+        pathname: '/(tabs)/(history)/[id]',
+        params: { id: productId }
+      });
     } catch (err) {
       logNavigation(`Navigation error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      router.navigate('/(tabs)/(history)');
+      setDiagnostics(prev => ({ ...prev, errorState: 'Navigation error' }));
+      
+      // Fallback till historik-fliken vid fel
+      router.replace('/(tabs)/(history)');
     }
   }, []);
 
@@ -226,6 +268,10 @@ export default function ResultScreen() {
         // Log that analysis has started
         logEvent(Events.ANALYSIS_STARTED);
         
+        // Rensa eventuella tidigare fel
+        setError(null);
+        setIsOffline(false);
+        
         // Set a flag to identify what stage we're at
         let analysisStage = 'starting';
         
@@ -234,10 +280,29 @@ export default function ResultScreen() {
           analysisStage = 'api_call';
           const result = await analyzeIngredients(photoPath, user?.id);
           console.log('Analysis API call successful', result);
+          setDiagnostics(prev => ({ ...prev, apiCallSucceeded: true }));
+
+          // VIKTIGT: Lägg till extra validering med mer detaljerad loggning
+          if (!result || typeof result !== 'object') {
+            console.error('Invalid API response: Result is null or not an object', result);
+            throw new Error('API returned invalid result');
+          }
+          
+          // Kontrollera att alla nödvändiga fält finns med korrekt typ
+          const isValid = validateApiResponse(result);
+          if (!isValid) {
+            console.error('API response validation failed:', result);
+            throw new Error('API response validation failed');
+          }
+          
+          console.log('Result structure validation passed');
+          
+          // VIKTIGT: Skapa en djup kopia av resultatet för säkerhets skull
+          const safeResult = JSON.parse(JSON.stringify(result));
 
           // STAGE 2: Validate result structure
           analysisStage = 'validation';
-          if (!result) {
+          if (!safeResult) {
             throw new Error('API returned empty result');
           }
           
@@ -246,27 +311,44 @@ export default function ResultScreen() {
           // STAGE 3: Add to product store
           analysisStage = 'store_add';
           console.log('Adding product to store', { 
-            isVegan: result.isVegan,
-            confidence: result.confidence
+            isVegan: safeResult.isVegan,
+            confidence: safeResult.confidence
           });
           
           // Try to add the product and capture the result
-          let productId;
+          let productId: string | undefined;
           try {
-            productId = addProduct({
+            // VIKTIGT: Explicit typkontroll för varje fält
+            // Spara resultatet i en temporär variabel och använd type assertion
+            const result = addProduct({
               imageUri: `file://${photoPath}`,
-              isVegan: result.isVegan !== undefined ? result.isVegan : false,
-              confidence: result.confidence !== undefined ? result.confidence : 0,
-              nonVeganIngredients: result.nonVeganIngredients || [],
-              allIngredients: result.allIngredients || [],
-              reasoning: result.reasoning || '',
-              watchedIngredientsFound: result.watchedIngredientsFound || []
+              isVegan: typeof safeResult.isVegan === 'boolean' ? safeResult.isVegan : false,
+              confidence: typeof safeResult.confidence === 'number' ? safeResult.confidence : 0,
+              nonVeganIngredients: Array.isArray(safeResult.nonVeganIngredients) ? safeResult.nonVeganIngredients : [],
+              allIngredients: Array.isArray(safeResult.allIngredients) ? safeResult.allIngredients : [],
+              reasoning: typeof safeResult.reasoning === 'string' ? safeResult.reasoning : '',
+              watchedIngredientsFound: Array.isArray(safeResult.watchedIngredientsFound) ? safeResult.watchedIngredientsFound : []
             });
+            
+            // Använd type assertion för att hantera returtypen
+            productId = result as unknown as string;
+            
+            setDiagnostics(prev => ({ 
+              ...prev, 
+              productAdded: true, 
+              productId: typeof productId === 'string' ? productId : null 
+            }));
+            
             console.log('Product successfully added to store with ID:', productId);
           } catch (addError) {
             console.error('Error adding product to store:', addError);
-            throw new Error('Kunde inte lägga till produkt i historik: ' + (addError instanceof Error ? addError.message : 'okänt fel'));
+            throw new Error('Kunde inte lägga till produkt i historik: ' + 
+              (addError instanceof Error ? addError.message : 'okänt fel'));
           }
+          
+          // VIKTIGT: Lägg till en kort fördröjning innan tillståndsuppdateringar
+          // för att säkerställa att produkten har lagts till fullständigt
+          await new Promise(resolve => setTimeout(resolve, 100));
           
           // STAGE 4: Update usage limit
           analysisStage = 'update_usage';
@@ -282,6 +364,7 @@ export default function ResultScreen() {
           // STAGE 6: Verify product was added
           analysisStage = 'verify_product';
           const newProducts = useStore.getState().products;
+          setDiagnostics(prev => ({ ...prev, productCount: newProducts.length }));
           console.log('Product count after addition:', newProducts.length);
           
           if (newProducts.length > 0) {
@@ -305,8 +388,45 @@ export default function ResultScreen() {
             throw new Error('Produkten kunde inte läggas till i historik');
           }
         } catch (err) {
-          // Log the specific stage where the error occurred
-          console.error(`Error during analysis stage "${analysisStage}":`, err);
+          // VIKTIGT: Förbättrad loggning vid fel
+          const errorDetails = err instanceof Error ? 
+            { message: err.message, stack: err.stack } : 
+            { message: String(err) };
+          
+          console.error(`Error during analysis stage "${analysisStage}":`, errorDetails);
+          setDiagnostics(prev => ({ 
+            ...prev, 
+            errorState: err instanceof Error ? err.message : String(err)
+          }));
+          
+          // VIKTIGT: Kontrollera om produkten faktiskt lades till trots fel
+          const currentProducts = useStore.getState().products;
+          const productCount = currentProducts.length;
+          setDiagnostics(prev => ({ ...prev, productCount }));
+          
+          console.log('Current product count despite error:', productCount);
+          
+          // Om produkten lades till trots felet, maska felet och fortsätt
+          if (productCount > 0 && 
+              currentProducts[0].imageUri.includes(photoPath.replace(/\\/g, '/'))) {
+            console.log('Product was actually added despite error, masking error...');
+            logNavigation('Product exists in store despite error - continuing normally');
+            
+            // Uppdatera UI till slutfört-läge trots felmeddelandet
+            setLoading(false);
+            setAnalysisComplete(true);
+            setError(null);
+            
+            // Lägg till Sentry breadcrumb om detta specifika fall
+            addBreadcrumb('Analysis succeeded despite error', 'analysis', { 
+              errorMessage: errorDetails.message,
+              productId: currentProducts[0].id,
+              analysisStage
+            });
+            
+            return; // Avbryt felhanteringen
+          }
+          
           throw new Error(`Fel i analysen (${analysisStage}): ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
       } catch (err) {
@@ -375,6 +495,35 @@ export default function ResultScreen() {
     analyze();
   }, [photoPath, user, addProduct]);
 
+  // VIKTIGT: Kontrollera om produkten lades till trots eventuella fel
+  useEffect(() => {
+    if (error && photoPath) {
+      // Om vi har ett felmeddelande men ser att en produkt faktiskt har lagts till,
+      // uppdatera UI för att fortsätta normalt flöde
+      const currentProducts = useStore.getState().products;
+      
+      if (currentProducts.length > 0) {
+        const newestProduct = currentProducts[0];
+        const normalizedPhotoPath = photoPath.replace(/\\/g, '/');
+        
+        if (newestProduct.imageUri.includes(normalizedPhotoPath)) {
+          console.log('Product exists in store despite error showing - fixing UI state');
+          logNavigation('Fixing UI state: Product exists despite error');
+          
+          // Rensa felmeddelandet och markera analys som framgångsrik
+          setError(null);
+          setLoading(false);
+          setAnalysisComplete(true);
+          
+          // Lägg till en breadcrumb för Sentry
+          addBreadcrumb('Fixed error state - product was actually added', 'ui_fix', {
+            productId: newestProduct.id
+          });
+        }
+      }
+    }
+  }, [error, photoPath, products]);
+
   // Handle navigation to history tab
   const handleNavigateToHistory = () => {
     // Log navigation
@@ -414,6 +563,21 @@ export default function ResultScreen() {
         <StyledText className="text-text-primary font-sans mt-4">
           Analyserar ingredienser...
         </StyledText>
+        
+        {/* Diagnostik i dev-läge */}
+        {__DEV__ && (
+          <StyledView className="absolute bottom-4 left-4 right-4 bg-background-dark/70 p-2 rounded">
+            <StyledText className="text-white text-xs">
+              Diagnostik:{'\n'}
+              API Success: {diagnostics.apiCallSucceeded ? '✅' : '❌'}{'\n'}
+              Product Added: {diagnostics.productAdded ? '✅' : '❌'}{'\n'}
+              Product ID: {diagnostics.productId || 'None'}{'\n'}
+              Product Count: {diagnostics.productCount}{'\n'}
+              Error: {diagnostics.errorState || 'None'}{'\n'}
+              Navigation: {diagnostics.navigationAttempted ? 'Attempted' : 'Not attempted'}
+            </StyledText>
+          </StyledView>
+        )}
       </StyledView>
     );
   }
@@ -456,6 +620,17 @@ export default function ResultScreen() {
                 {log}
               </StyledText>
             ))}
+            
+            <StyledText className="text-yellow-400 font-mono text-xs mt-2">
+              Diagnostik:
+            </StyledText>
+            <StyledText className="text-white text-xs">
+              API Success: {diagnostics.apiCallSucceeded ? '✅' : '❌'}{'\n'}
+              Product Added: {diagnostics.productAdded ? '✅' : '❌'}{'\n'}
+              Product ID: {diagnostics.productId || 'None'}{'\n'}
+              Product Count: {diagnostics.productCount}{'\n'}
+              Navigation: {diagnostics.navigationAttempted ? 'Attempted' : 'Not attempted'}
+            </StyledText>
           </StyledView>
         )}
       </StyledView>
@@ -507,11 +682,20 @@ export default function ResultScreen() {
           {error}
         </StyledText>
         
-        {/* Show debug info in development mode */}
-        {__DEV__ && navigationLog.length > 0 && (
+        {/* Visa nuvarande produktantal i diagnostisk info */}
+        {__DEV__ && (
           <StyledView className="mt-2 mb-6 p-2 bg-gray-800 rounded-lg max-w-[90%]">
             <StyledText className="text-yellow-400 font-mono text-xs">
-              Debug logs:
+              Debug info:
+            </StyledText>
+            <StyledText className="text-gray-300 font-mono text-[10px] mt-1">
+              Current products: {diagnostics.productCount}
+            </StyledText>
+            <StyledText className="text-gray-300 font-mono text-[10px] mt-1">
+              API Success: {diagnostics.apiCallSucceeded ? 'Yes' : 'No'}
+            </StyledText>
+            <StyledText className="text-gray-300 font-mono text-[10px] mt-1">
+              Product added: {diagnostics.productAdded ? 'Yes' : 'No'}
             </StyledText>
             {navigationLog.slice(-5).map((log, i) => (
               <StyledText key={i} className="text-gray-300 font-mono text-[10px] mt-1">
@@ -521,19 +705,47 @@ export default function ResultScreen() {
           </StyledView>
         )}
         
+        {/* Kolla efter produkt trots fel */}
         <StyledPressable 
           onPress={() => {
-            // First clear all navigation locks
-            AsyncStorage.removeItem(NAV_LOCK_KEY)
-              .catch(err => console.error('Error clearing navigation lock:', err));
+            // Kolla om produkten trots allt finns i historiken
+            const currentProducts = useStore.getState().products;
+            
+            if (currentProducts.length > 0) {
+              const newestProduct = currentProducts[0];
+              const normalizedPhotoPath = photoPath?.replace(/\\/g, '/') || '';
               
-            // Then navigate back to scan tab
+              if (newestProduct.imageUri.includes(normalizedPhotoPath)) {
+                console.log('Product found in history despite error, navigating to it');
+                
+                // Navigera till produktdetalj trots felmeddelande
+                logEvent('navigation_despite_error', {
+                  product_id: newestProduct.id,
+                  error_message: error
+                });
+                
+                // Lås upp navigation
+                AsyncStorage.removeItem(NAV_LOCK_KEY)
+                  .catch(err => console.error('Failed to clear navigation lock:', err));
+                
+                router.replace({
+                  pathname: '/(tabs)/(history)/[id]',
+                  params: { id: newestProduct.id }
+                });
+                return;
+              }
+            }
+            
+            // Navigera tillbaka till startsidan om produkten inte finns
+            AsyncStorage.removeItem(NAV_LOCK_KEY)
+              .catch(err => console.error('Failed to clear navigation lock:', err));
+              
             router.replace('/(tabs)/(scan)');
           }}
           className="mt-6 bg-primary px-6 py-3 rounded-lg"
         >
           <StyledText className="text-text-inverse font-sans-medium">
-            Återgå till huvudsidan
+            {diagnostics.productCount > 0 ? 'Kolla historik' : 'Återgå till huvudsidan'}
           </StyledText>
         </StyledPressable>
       </StyledView>
@@ -564,6 +776,20 @@ export default function ResultScreen() {
       <StyledText className="text-text-primary font-sans text-center mt-4">
         Återställer vy...
       </StyledText>
+      
+      {/* Diagnostik i dev-läge */}
+      {__DEV__ && (
+        <StyledView className="absolute bottom-4 left-4 right-4 bg-background-dark/70 p-2 rounded">
+          <StyledText className="text-white text-xs">
+            Fallback-läge status:{'\n'}
+            Loading: {loading ? 'Yes' : 'No'}{'\n'}
+            Analysis Complete: {analysisComplete ? 'Yes' : 'No'}{'\n'}
+            Error: {error || 'None'}{'\n'}
+            Offline: {isOffline ? 'Yes' : 'No'}{'\n'}
+            Product Count: {diagnostics.productCount}
+          </StyledText>
+        </StyledView>
+      )}
     </StyledView>
   );
 }

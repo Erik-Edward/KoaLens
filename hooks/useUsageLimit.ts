@@ -65,8 +65,18 @@ export function useUsageLimit() {
         const usageData = await response.json();
         console.log('Usage data received:', usageData);
 
-        // Update store with fetched usage data
-        await fetchUsageLimit(user.id);
+        // Uppdatera store direkt med data från API-anropet
+        // Detta är snabbare än att göra ett nytt anrop via fetchUsageLimit
+        useStore.setState(state => ({
+          usageLimit: {
+            ...state.usageLimit,
+            analysesUsed: usageData.analysesUsed,
+            analysesLimit: usageData.analysesLimit,
+            isPremium: usageData.isPremium || false,
+            lastChecked: new Date().toISOString(),
+            isLoading: false
+          }
+        }));
         
         console.log('Usage limit refreshed successfully');
         const updatedLimit = useStore.getState().usageLimit;

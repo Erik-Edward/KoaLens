@@ -50,17 +50,22 @@ const createValidProduct = (productData: Partial<ScannedProduct>): ScannedProduc
         invalidFields: JSON.stringify(productData)
       });
     }
-  
-    // Ensure all required fields are present with valid default values if missing
-    const validProduct: ScannedProduct = {
-      id: uuidv4(),
+    
+    // Skapa ett unikt ID för produkten
+    const id = uuidv4();
+    console.log('Creating valid product:', id, {
+      confidence: productData.confidence || 0,
+      isVegan: productData.isVegan ?? false,
+      ingredients: (productData.allIngredients?.length || 0)
+    });
+    
+    // Skapa produkten med standardvärden där data saknas
+    const product: ScannedProduct = {
+      id,
       timestamp: new Date().toISOString(),
-      isFavorite: false,
       imageUri: productData.imageUri || '',
       isVegan: typeof productData.isVegan === 'boolean' ? productData.isVegan : false,
-      confidence: typeof productData.confidence === 'number' && !isNaN(productData.confidence) 
-        ? productData.confidence 
-        : 0,
+      confidence: typeof productData.confidence === 'number' ? productData.confidence : 0,
       nonVeganIngredients: Array.isArray(productData.nonVeganIngredients) 
         ? productData.nonVeganIngredients 
         : [],
@@ -68,35 +73,31 @@ const createValidProduct = (productData: Partial<ScannedProduct>): ScannedProduc
         ? productData.allIngredients 
         : [],
       reasoning: typeof productData.reasoning === 'string' ? productData.reasoning : '',
-      watchedIngredientsFound: Array.isArray(productData.watchedIngredientsFound) 
-        ? productData.watchedIngredientsFound 
-        : []
+      isFavorite: false,
+      watchedIngredientsFound: Array.isArray(productData.watchedIngredientsFound)
+        ? productData.watchedIngredientsFound
+        : [],
+      userId: productData.userId // Lägg till användar-ID
     };
     
-    // Log the product creation
-    console.log('Creating valid product:', validProduct.id, {
-      isVegan: validProduct.isVegan,
-      confidence: validProduct.confidence,
-      ingredients: validProduct.allIngredients.length
-    });
-    
-    return validProduct;
+    return product;
   } catch (error) {
-    console.error('Error creating valid product:', error);
-    captureException(error instanceof Error ? error : new Error('Failed to create valid product'));
+    console.error('Error creating product:', error);
+    captureException(error instanceof Error ? error : new Error('Error creating product'));
     
-    // Fallback to a minimal valid product if all else fails
+    // Returnera en säker fallback-produkt vid fel
     return {
       id: uuidv4(),
       timestamp: new Date().toISOString(),
-      isFavorite: false,
       imageUri: productData.imageUri || '',
       isVegan: false,
       confidence: 0,
       nonVeganIngredients: [],
       allIngredients: [],
-      reasoning: 'Ett fel uppstod vid skapande av produkten',
-      watchedIngredientsFound: []
+      reasoning: 'Error creating product',
+      isFavorite: false,
+      watchedIngredientsFound: [],
+      userId: productData.userId // Lägg till användar-ID här också
     };
   }
 };
@@ -105,8 +106,26 @@ const createValidProduct = (productData: Partial<ScannedProduct>): ScannedProduc
 export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> = (set, get) => ({
   products: [],
 
+  // Filtrerar produkter baserat på inloggad användare
+  getUserProducts: () => {
+    const allProducts = get().products;
+    const currentUser = get().user;
+    
+    // Om ingen användare är inloggad, returnera tom array
+    if (!currentUser) return [];
+    
+    // VIKTIGT: Filtrera ENDAST produkter som tillhör den inloggade användaren
+    // Tidigare kod tillät produkter utan userId, vilket kunde orsaka läckage
+    return allProducts.filter(product => 
+      product.userId === currentUser.id
+    );
+  },
+
   addProduct: (productData: Omit<ScannedProduct, 'id' | 'timestamp' | 'isFavorite'>) => {
     try {
+      // Hämta aktuell användare
+      const currentUser = get().user;
+      
       console.log('Adding product, data:', {
         imageUri: productData.imageUri ? 'provided' : 'missing',
         isVegan: productData.isVegan,
@@ -114,14 +133,21 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
         ingredientsCount: productData.allIngredients?.length || 0,
       });
       
+      // Lägg till användar-ID i produktdata
+      const productWithUserId = {
+        ...productData,
+        userId: currentUser?.id
+      };
+      
       // Skapa produktobjekt med säker validering och default-värden
-      const validProduct = createValidProduct(productData);
+      const validProduct = createValidProduct(productWithUserId);
       
       // Lägg till breadcrumb för spårning
       addBreadcrumb('Adding product to store', 'store', {
         productId: validProduct.id,
         isVegan: validProduct.isVegan,
-        confidence: validProduct.confidence
+        confidence: validProduct.confidence,
+        userId: validProduct.userId
       });
       
       // Kontrollera aktuellt antal produkter före
@@ -146,16 +172,15 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
       // Lägg till bekräftelse-breadcrumb
       addBreadcrumb('Product successfully added to store', 'store', {
         productId: validProduct.id,
-        totalProducts: newCount
+        totalProducts: newCount,
+        userId: validProduct.userId
       });
       
-      // Log successful addition
-      console.log('Product added successfully:', validProduct.id);
       return validProduct.id;
     } catch (error) {
       console.error('Error adding product to store:', error);
-      captureException(error instanceof Error ? error : new Error('Failed to add product to history'));
-      throw new Error('Failed to add product to history: ' + (error instanceof Error ? error.message : 'unknown error'));
+      captureException(error instanceof Error ? error : new Error('Error adding product to store'));
+      throw error;
     }
   },
 
@@ -194,6 +219,28 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
     } catch (error) {
       console.error('Error clearing history:', error);
       captureException(error instanceof Error ? error : new Error('Failed to clear history'));
+    }
+  },
+
+  // Rensa alla produkter som saknar användar-ID (administrativ funktion)
+  clearProductsWithoutUser: () => {
+    try {
+      console.log('Clearing products without user ID');
+      set((state: StoreState) => ({
+        products: state.products.filter(product => !!product.userId)
+      }));
+      
+      addBreadcrumb('Cleared products without user ID', 'store');
+      
+      // Kontrollera resultat
+      const remainingProducts = get().products;
+      console.log(`Remaining products after cleanup: ${remainingProducts.length}`);
+      
+      return remainingProducts.length;
+    } catch (error) {
+      console.error('Error clearing products without user ID:', error);
+      captureException(error instanceof Error ? error : new Error('Error clearing products without user ID'));
+      return -1;
     }
   },
 });

@@ -44,6 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [showFirstLoginOverlay, setShowFirstLoginOverlay] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Hjälpfunktion för att markera onboarding som slutförd
   const markOnboardingAsCompleted = async () => {
@@ -606,29 +607,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
+      setLoading(true)
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
-      });
-
-      if (error) throw error;
+        password,
+      })
       
-      // Sätt användarkontext i Sentry
+      if (error) throw error
+      
       if (data.user) {
+        // VIKTIGT: Lägg till validering av användarkontext i Sentry
+        // när användaren loggar in
         setUserContext(data.user.id, data.user.email || undefined);
         addBreadcrumb('User signed in', 'auth');
+        
+        // Synkronisera användardata till store från supabase session
+        const user = data.user;
+        
+        // Uppdatera store med användardata
+        const store = useStore.getState();
+        
+        // Uppdatera lokala user context med data från user_metadata
+        if (user.user_metadata) {
+          // Synkronisera avatar-inställningar om de finns
+          if (user.user_metadata.avatar_id && user.user_metadata.avatar_style) {
+            store.setAvatar(
+              user.user_metadata.avatar_style as AvatarStyle,
+              user.user_metadata.avatar_id as string
+            );
+            
+            if (typeof user.user_metadata.vegan_years === 'number') {
+              store.setVeganYears(user.user_metadata.vegan_years);
+            }
+          }
+          
+          // Synkronisera vegan status om det finns
+          if (user.user_metadata.vegan_status) {
+            store.setVeganStatus(user.user_metadata.vegan_status as VeganStatus);
+          }
+        }
+        
+        // Vi måste uppdatera usage limit för den nya användaren
+        // Detta görs i useUsageLimit hooken som finns på Result-sidan
+        // Produktfiltrering sker nu automatiskt via getUserProducts funktionen
       }
-      
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('AuthProvider: Fel vid inloggning', error)
       // Lägg till Sentry-rapportering
       captureException(error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      setAuthError(error instanceof AuthError ? error.message : String(error))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const signUp = async (email: string, password: string): Promise<SignUpResult> => {
     console.log('AuthProvider: Startar registreringsprocess med email', { email })
@@ -678,6 +710,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Lägg till breadcrumb i Sentry
       addBreadcrumb('User signing out', 'auth');
       
+      // Rensa produkthistoriken innan utloggning
+      const store = useStore.getState();
+      store.clearHistory();
+      console.log('AuthProvider: Produkthistorik rensad vid utloggning');
+      
       const { error } = await supabase.auth.signOut()
       console.log('AuthProvider: Svar vid utloggning', { error: error?.message })
       
@@ -687,7 +724,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       clearUserContext();
       
       // Kontrollera onboarding-status innan omdirigering vid utloggning
-      const store = useStore.getState()
       if (!store.onboarding.hasCompletedOnboarding) {
         router.replace('/(onboarding)')
       } else {
@@ -698,9 +734,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Lägg till Sentry-rapportering
       captureException(error instanceof Error ? error : new Error(String(error)));
       if (error instanceof AuthError) {
-        Alert.alert('Utloggningsfel', error.message)
-      } else {
-        Alert.alert('Fel', 'Ett oväntat fel inträffade vid utloggning')
+        setAuthError(error.message)
       }
     } finally {
       setLoading(false)

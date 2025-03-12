@@ -181,7 +181,13 @@ async function retryWithBackoff<T>(
         lastError.message.includes('timeout') ||
         lastError.message.includes('fetch failed');
       
-      const shouldRetry = (isOverloadedError || isNetworkError) && retryCount < maxRetries;
+      // Internal server errors (500) should also be retried
+      const isServerError = lastError.message.includes('500') ||
+        lastError.message.includes('Internal server error') ||
+        lastError.message.includes('internal error') ||
+        lastError.message.includes('server error');
+      
+      const shouldRetry = (isOverloadedError || isNetworkError || isServerError) && retryCount < maxRetries;
       
       // Check if we should retry
       if (!shouldRetry) {
@@ -189,12 +195,19 @@ async function retryWithBackoff<T>(
         throw lastError;
       }
 
+      // För 500-fel, vänta lite längre innan retry
+      if (isServerError) {
+        // Dubbla väntetiden för serverfel för att ge mer tid för återhämtning
+        delay = delay * 2;
+        console.log(`Server error detected, increasing delay to ${delay}ms`);
+      }
+
       console.log(`Retry ${retryCount}/${maxRetries} after ${delay}ms for ${options.functionName}`);
       logEvent('analysis_retry', {
         retry_count: retryCount,
         delay_ms: delay,
         function_name: options.functionName,
-        error_type: isOverloadedError ? 'overloaded' : 'network',
+        error_type: isServerError ? 'server_error' : (isOverloadedError ? 'overloaded' : 'network'),
         error_message: lastError.message
       });
 

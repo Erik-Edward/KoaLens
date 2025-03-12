@@ -15,6 +15,7 @@ import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 import { testUsageAPI, showTestResult } from '@/utils/usageApiTester';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCameraPermission } from '@/lib/visionCameraWrapper';
+import { useStore } from '@/stores/useStore';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -47,25 +48,15 @@ const ScanScreen: FC = () => {
   const innerGlowAnimation = useRef(new Animated.Value(0)).current;
 
   // Function to clear any camera safety timeouts
-  const clearCameraSafetyTimeout = useCallback(async () => {
+  const clearCameraSafetyTimeout = useCallback(() => {
     // Clear any timeout we're tracking in memory
     if (safetyTimeoutId.current) {
       clearTimeout(safetyTimeoutId.current);
       safetyTimeoutId.current = null;
+      console.log('Cleared existing camera safety timeout from memory');
     }
     
-    // Also check AsyncStorage for any saved timeout IDs
-    try {
-      const timeoutString = await AsyncStorage.getItem('KOALENS_CAMERA_TIMEOUT');
-      if (timeoutString) {
-        const timeoutId = parseInt(timeoutString, 10);
-        clearTimeout(timeoutId);
-        await AsyncStorage.removeItem('KOALENS_CAMERA_TIMEOUT');
-        console.log('Cleared existing camera safety timeout');
-      }
-    } catch (err) {
-      console.error('Error clearing camera timeout:', err);
-    }
+    // No longer using AsyncStorage for timeout IDs - this was causing significant delays
   }, []);
 
   // Function to reset the screen state - enhanced to be more reliable
@@ -75,9 +66,11 @@ const ScanScreen: FC = () => {
     console.log('Resetting scan screen state, current pathname:', pathname);
     
     // Ensure animations are running
-    startAnimations();
+    if (startAnimations) {
+      startAnimations();
+    }
     
-    // Refresh usage limit data
+    // Refresh usage limit data in background, don't block UI
     refreshUsageLimit().catch(err => {
       console.error('Failed to refresh usage in scan view:', err);
       setNetworkError(true);
@@ -97,15 +90,9 @@ const ScanScreen: FC = () => {
     // If we detect we're not on the main scan screen, force navigate to it
     // This is a safety mechanism in case we get stuck between views
     if (pathname.includes('scan') && (pathname.includes('result') || pathname.includes('crop'))) {
-      console.log('Detected we are on a sub-route, forcing navigation to main scan tab');
+      console.log('Detected we are on a sub-route, forcing navigation to main scan screen');
       router.replace('/(tabs)/(scan)');
     }
-    
-    // Log that we reset the screen state
-    logEvent('screen_reset', { screen: 'scan', path: pathname });
-    
-    // Log screen view
-    logScreenView('ScanScreen');
   }, [refreshUsageLimit, pathname, clearCameraSafetyTimeout, router, setNetworkError]);
 
   // Global function to clear ALL app navigation locks and states but WITHOUT any navigation
@@ -113,12 +100,12 @@ const ScanScreen: FC = () => {
     console.log('Performing a global app state reset');
     
     try {
-      // Clear all known navigation locks
-      await AsyncStorage.removeItem('KOALENS_CAMERA_NAV_LOCK');
-      await AsyncStorage.removeItem('KOALENS_RESULT_NAV_LOCK');
-      await AsyncStorage.removeItem('KOALENS_CAMERA_TIMEOUT');
-      
-      // REMOVED: router.replace call to prevent infinite navigation loop
+      // Använd multiRemove för att rensa alla lås i en operation
+      await AsyncStorage.multiRemove([
+        'KOALENS_CAMERA_NAV_LOCK',
+        'KOALENS_RESULT_NAV_LOCK',
+        'KOALENS_CAMERA_TIMEOUT'
+      ]);
       
       console.log('Global app state reset completed');
     } catch (err) {
@@ -397,9 +384,8 @@ const ScanScreen: FC = () => {
 
   // Function to navigate to camera after permissions are granted
   const navigateToCamera = useCallback(() => {
-    if (!user?.id) {
-      console.warn('Missing user ID for camera navigation');
-    }
+    // Ge direkt haptisk feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(console.error);
     
     console.log('Navigating to camera with permissions already granted');
     
@@ -409,69 +395,57 @@ const ScanScreen: FC = () => {
       params: { userId: user?.id }
     });
     
-    // We'll no longer use the safety timeout as it's causing unwanted navigation
-    // Instead, we'll rely on the user to manually navigate back if needed
-  }, [user]);
+    // We no longer need a safety timeout as it's causing navigation issues
+  }, [router, user]);
 
   const handleScanPress = async () => {
-    // Clear any existing safety timeouts before proceeding
-    await clearCameraSafetyTimeout();
+    // Clear any existing safety timeouts in memory
+    clearCameraSafetyTimeout();
     
+    // Ge direkt haptisk feedback
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Check usage limits before proceeding
-    try {
-      await refreshUsageLimit();
-      setNetworkError(false); // Clear any network error on success
-    } catch (error) {
-      console.error('Failed to refresh usage before scan:', error);
-      setNetworkError(true);
-      return; // Don't proceed with scan if we can't verify usage limits
-    }
-    
-    if (hasReachedLimit) {
-      setShowUsageLimitModal(true);
-      return;
-    }
-
-    // Check for user ID
-    if (!user?.id) {
-      console.warn('Missing user ID for analysis tracking!');
-      
-      // In development mode, continue anyway
-      if (__DEV__) {
-        console.log('DEV mode: Continuing without user ID');
-      } else {
-        // In production mode, ask user to log in again
-        Alert.alert(
-          "Sessionsfel",
-          "Din session kan ha gått ut. Logga ut och in igen för att fortsätta.",
-          [
-            { text: "OK" }
-          ]
-        );
-        return;
-      }
-    }
-
-    // Check if running on web platform
+    // Check platform first - quick return for web
     if (Platform.OS === 'web') {
       Alert.alert(
         "Kameran ej tillgänglig", 
-        "Kamerafunktionen är endast tillgänglig på fysiska enheter. Använd en fysisk enhet eller EAS build för att testa kamerafunktionen.",
+        "Kamerafunktionen är endast tillgänglig på fysiska enheter.",
         [{ text: "OK" }]
       );
       return;
     }
     
-    // Check camera permission before navigating
-    if (!hasPermission) {
-      // Show permission modal instead of navigating to camera screen
-      setShowPermissionModal(true);
-    } else {
-      // Permission already granted, proceed to camera
-      navigateToCamera();
+    // Kontrollera användningsgräns innan vi fortsätter
+    try {
+      // Använd variabeln från useUsageLimit-hooken
+      if (hasReachedLimit) {
+        setShowUsageLimitModal(true);
+        // Logga händelse
+        logEvent('usage_limit_reached', {
+          source: 'scan_button'
+        });
+        return;
+      }
+      
+      // Uppdatera användningsgräns i bakgrunden utan att blockera
+      refreshUsageLimit().catch(err => {
+        console.warn('Background usage refresh failed');
+        // Fortsätt med kameranavigering trots fel
+      });
+    } catch (error) {
+      // Fortsätt med kameranavigering trots fel med användningsgränskontrollen
+      console.warn('Usage check failed but proceeding with camera');
     }
+    
+    // Kontrollera kameratillstånd innan navigering
+    if (!hasPermission) {
+      // Visa tillståndsmodal istället för att navigera
+      setShowPermissionModal(true);
+      return;
+    }
+    
+    // Om vi kommer hit har tillstånd beviljats, navigera till kameran
+    navigateToCamera();
   };
 
   const handleShowGuide = async () => {

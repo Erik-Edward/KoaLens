@@ -16,13 +16,15 @@ const StyledSafeAreaView = styled(SafeAreaView);
 const StyledScrollView = styled(ScrollView);
 
 export default function HistoryScreen() {
-  const products = useStore((state) => state.products);
+  // Använd getUserProducts istället för att direkt accessa products
+  const getUserProducts = useStore((state) => state.getUserProducts);
+  const userProducts = getUserProducts();
   const clearHistory = useStore((state) => state.clearHistory);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // Lägg till för debugging
-  console.log('Current products in store:', products);
+  console.log('Current user products in store:', userProducts);
   
   // Logga skärmvisning när komponenten monteras
   useEffect(() => {
@@ -30,13 +32,13 @@ export default function HistoryScreen() {
     
     // Logga statusstatistik
     logEvent('history_stats', {
-      total_products: products.length,
-      vegan_products: products.filter(p => p.isVegan).length,
-      favorite_products: products.filter(p => p.isFavorite).length
+      total_products: userProducts.length,
+      vegan_products: userProducts.filter(p => p.isVegan).length,
+      favorite_products: userProducts.filter(p => p.isFavorite).length
     });
-  }, []);
+  }, [userProducts.length]);
 
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = userProducts.filter((product) => {
     const matchesSearch = product.allIngredients
       .join(' ')
       .toLowerCase()
@@ -47,7 +49,7 @@ export default function HistoryScreen() {
   
   // Hantera töming av historik med bekräftelse och loggning
   const handleClearHistory = () => {
-    if (products.length === 0) return;
+    if (userProducts.length === 0) return;
     
     Alert.alert(
       'Rensa historik',
@@ -63,9 +65,9 @@ export default function HistoryScreen() {
           onPress: () => {
             // Logga händelsen innan historiken rensas
             logEvent(Events.CLEAR_HISTORY, { 
-              product_count: products.length,
-              vegan_product_count: products.filter(p => p.isVegan).length,
-              favorite_product_count: products.filter(p => p.isFavorite).length
+              product_count: userProducts.length,
+              vegan_product_count: userProducts.filter(p => p.isVegan).length,
+              favorite_product_count: userProducts.filter(p => p.isFavorite).length
             });
             
             clearHistory();
@@ -85,8 +87,8 @@ export default function HistoryScreen() {
       filter_name: 'favorites_only',
       new_value: newValue ? 'true' : 'false',
       matches_count: newValue ? 
-        products.filter(p => p.isFavorite).length : 
-        products.length
+        userProducts.filter(p => p.isFavorite).length : 
+        userProducts.length
     });
   };
   
@@ -153,7 +155,7 @@ export default function HistoryScreen() {
             </StyledText>
           </StyledPressable>
 
-          {products.length > 0 && (
+          {userProducts.length > 0 && (
             <StyledPressable
               onPress={handleClearHistory}
               className="bg-status-error/80 p-2 rounded-lg"
@@ -178,7 +180,7 @@ export default function HistoryScreen() {
               <StyledView className="bg-background-light/20 p-6 rounded-lg items-center">
                 <Ionicons name="scan-outline" size={48} color="#9ca3af" />
                 <StyledText className="text-text-secondary text-center mt-4 font-sans">
-                  {products.length === 0
+                  {userProducts.length === 0
                     ? 'Inga skanningar än. Börja med att skanna en produkt!'
                     : 'Inga produkter matchar din sökning.'}
                 </StyledText>
@@ -188,6 +190,39 @@ export default function HistoryScreen() {
         </StyledView>
         <StyledView className="h-4" />
       </StyledScrollView>
+      
+      {/* Lägg till AdminControls komponent i utvecklingsläge */}
+      {__DEV__ && <AdminControls />}
+    </StyledView>
+  );
+}
+
+// Administrativ knapp för att rensa produkter utan användar-ID (endast i utvecklingsläge)
+function AdminControls() {
+  const clearProductsWithoutUser = useStore((state) => state.clearProductsWithoutUser);
+  
+  const handleCleanup = () => {
+    const remainingCount = clearProductsWithoutUser();
+    Alert.alert(
+      'Rensning slutförd',
+      `Produkter utan användar-ID har rensats. Kvarstående produkter: ${remainingCount}`
+    );
+  };
+
+  return (
+    <StyledView className="border-t border-gray-700 py-2 px-4">
+      <StyledText className="text-yellow-500 font-mono text-xs mb-2">
+        Admin Controls (DEV Only)
+      </StyledText>
+      
+      <StyledPressable
+        onPress={handleCleanup}
+        className="bg-red-800 py-2 rounded-lg mb-1"
+      >
+        <StyledText className="text-white font-mono text-xs text-center">
+          Rensa produkter utan användar-ID
+        </StyledText>
+      </StyledPressable>
     </StyledView>
   );
 }

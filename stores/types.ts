@@ -34,15 +34,18 @@ export interface ScannedProduct {
   reasoning: string;
   isFavorite: boolean;
   watchedIngredientsFound: WatchedIngredientFound[];
+  userId?: string; // Användar-ID som äger produkten, optional för bakåtkompatibilitet
 }
 
 // History slice interface
 export interface HistorySlice {
   products: ScannedProduct[];
+  getUserProducts: () => ScannedProduct[]; // Filtrerar produkter baserat på inloggad användare
   addProduct: (product: Omit<ScannedProduct, 'id' | 'timestamp' | 'isFavorite'>) => void;
   removeProduct: (id: string) => void;
   toggleFavorite: (id: string) => void;
   clearHistory: () => void;
+  clearProductsWithoutUser: () => number; // Administrativ funktion för att rensa produkter utan användar-ID
 }
 
 // Settings slice interface

@@ -10,6 +10,7 @@ Detta dokument beskriver hur du arbetar med utvecklingsmiljön för KoaLens-appe
 - Expo CLI: `npm install -g expo-cli`
 - Expo Go-appen installerad på testenheter (för enkel testning)
 - Development build installerad på fysiska enheter (för kameratestning)
+- Nödvändiga npm-paket: axios, uuid, async-storage
 
 ### Konfiguration
 - **app.json**: Innehåller app-metadata, plugins och uppdateringskonfiguration
@@ -63,20 +64,47 @@ eas build --profile preview --platform android
 
 ## Backend-integration
 
-- Appen är konfigurerad att använda Fly.io-backend i alla miljöer
-- Backend-URL: `https://koalens-backend.fly.dev`
+### Claude Vision Integration
+- Appen använder Claude Vision för bildanalys via backend
+- Backend-URL: `https://koalens-backend.fly.dev/analyze`
+- API-krav:
+  - UUID-format användar-ID
+  - Base64-kodad bild
+  - Korrekt innehållstyp (application/json)
+
+### API-hantering
+- Alla API-anrop görs med Axios
+- Utvecklingsmiljön använder samma backend-API som produktion
 - Fel i nätverksanrop hanteras med automatiska retries och backoff
+
+### Användar-ID hantering
+- Alla användar-ID:n måste vara i korrekt UUID-v4 format
+- Validering sker med regex: `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`
+- Om ett användar-ID saknas eller är ogiltigt genereras ett nytt med `uuidv4()`
 
 ## Debugging
 
 ### Visa utvecklarmeny på enheten
 - Skaka enheten eller använd `adb shell input keyevent 82` i terminalen
 
+### Loggar och felsökning
+- Använd `console.log` för standardloggar
+- För viktiga steg i appen, använd `logEvent` från analytics för att spåra händelser
+- För att se loggar under utveckling:
+  ```bash
+  # För Android
+  adb logcat *:S ReactNative:V ReactNativeJS:V
+  
+  # För iOS
+  xcrun simctl spawn booted log stream --predicate 'eventMessage contains "ReactNative"'
+  ```
+
 ### Vanliga problem och lösningar
 
 1. **Nätverksfel**:
    - Kontrollera internetanslutning
    - Verifiera att backend-tjänsten är igång via `curl https://koalens-backend.fly.dev`
+   - Kontrollera att användar-ID är i korrekt UUID-v4 format
 
 2. **Uppdateringar syns inte**:
    - Kontrollera att appen använder rätt kanal (`development` eller `preview`)
@@ -85,6 +113,16 @@ eas build --profile preview --platform android
 3. **Kamera fungerar inte**:
    - Verifiera att development build används (inte Expo Go)
    - Kontrollera kamerarättigheter i Android-inställningar
+
+4. **Bildanalys misslyckas**:
+   - Kontrollera att bilden är korrekt croppad
+   - Verifiera att API-anrop innehåller giltigt användar-ID
+   - Kontrollera att bilddata är korrekt kodad i base64
+
+5. **Produkter sparas inte i historiken**:
+   - Kontrollera att produkten har ett giltigt användar-ID i metadata
+   - Verifiera att AsyncStorage fungerar korrekt
+   - Säkerställ att product.metadata.isSavedToHistory är true
 
 ## Användning av EAS Update
 
@@ -117,3 +155,16 @@ Ett nytt bygge krävs när:
 4. Du modifierar native-kod i Android eller iOS-mapparna
 
 I andra fall är det tillräckligt med EAS Update.
+
+## Kodorganisation
+
+- **/app**: Huvudapp-strukturen (Expo Router)
+- **/components**: Återanvändbara UI-komponenter
+- **/constants**: Konstanter och konfiguration
+- **/hooks**: React-hooks för affärslogik
+- **/lib**: Hjälpfunktioner och verktyg
+- **/models**: Datamodeller och typer
+- **/services**: Tjänster för externa API:er och datåtkomst
+- **/stores**: State management (Zustand och adapters)
+- **/styles**: Stilar och teman
+- **/utils**: Gemensamma hjälpfunktioner

@@ -15,16 +15,36 @@ const StyledImage = styled(Image);
 
 interface ProductCardProps {
   product: ScannedProduct;
+  onPress?: () => void;
+  onFavoriteToggle?: () => void;
+  onDelete?: () => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ 
+  product, 
+  onPress, 
+  onFavoriteToggle, 
+  onDelete 
+}) => {
   const toggleFavorite = useStore((state) => state.toggleFavorite);
 
   const handlePress = () => {
-    router.push({
-      pathname: '/(tabs)/(history)/[id]',
-      params: { id: product.id }
-    });
+    if (onPress) {
+      onPress();
+    } else {
+      router.push({
+        pathname: '/(tabs)/(history)/[id]',
+        params: { id: product.id }
+      });
+    }
+  };
+
+  const handleToggleFavorite = () => {
+    if (onFavoriteToggle) {
+      onFavoriteToggle();
+    } else {
+      toggleFavorite(product.id);
+    }
   };
 
   const formattedDate = formatDistanceToNow(new Date(product.timestamp), {
@@ -65,17 +85,33 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </StyledView>
 
             {/* Favorite Button */}
-            <StyledPressable
-              onPress={() => toggleFavorite(product.id)}
-              className="p-2"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name={product.isFavorite ? 'star' : 'star-outline'}
-                size={24}
-                color={product.isFavorite ? '#ffd700' : '#ffffff'}
-              />
-            </StyledPressable>
+            <StyledView className="flex-row">
+              <StyledPressable
+                onPress={handleToggleFavorite}
+                className="p-2"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={product.isFavorite ? 'star' : 'star-outline'}
+                  size={24}
+                  color={product.isFavorite ? '#ffd700' : '#ffffff'}
+                />
+              </StyledPressable>
+              
+              {onDelete && (
+                <StyledPressable
+                  onPress={onDelete}
+                  className="p-2"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={22}
+                    color="#ffffff"
+                  />
+                </StyledPressable>
+              )}
+            </StyledView>
           </StyledView>
 
           {/* Timestamp */}

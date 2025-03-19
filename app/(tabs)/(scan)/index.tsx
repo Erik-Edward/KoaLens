@@ -70,11 +70,26 @@ const ScanScreen: FC = () => {
       startAnimations();
     }
     
-    // Refresh usage limit data in background, don't block UI
-    refreshUsageLimit().catch(err => {
-      console.error('Failed to refresh usage in scan view:', err);
-      setNetworkError(true);
-    });
+    // Forcera uppdatering av användardata med en fördröjning för att ge backend tid att reagera
+    console.log('Forcerar uppdatering av användningsgränser med fördröjning...');
+    setTimeout(() => {
+      refreshUsageLimit()
+        .then(() => {
+          console.log('Användargränser uppdaterade framgångsrikt efter delay');
+          
+          // Kontrollera den nuvarande användargränsen
+          const currentUsageLimit = useStore.getState().usageLimit;
+          console.log('Aktuell användargräns:', {
+            total: currentUsageLimit.total,
+            limit: currentUsageLimit.limit,
+            remaining: currentUsageLimit.remaining
+          });
+        })
+        .catch(err => {
+          console.error('Failed to refresh usage in scan view:', err);
+          setNetworkError(true);
+        });
+    }, 1500); // 1.5 sekunder bör vara tillräckligt för att backend ska ha uppdaterat databasen
     
     // Make sure we're on the right UI state - hide ALL modals
     setShowGuide(false);
@@ -708,7 +723,7 @@ const ScanScreen: FC = () => {
                 className="text-text-primary font-sans-medium text-center text-base leading-relaxed"
                 accessibilityRole="text"
               >
-                Tryck för att skanna en ingredienslista
+                Skanna en ingredienslista
               </StyledText>
             </StyledView>
           </StyledView>

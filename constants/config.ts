@@ -15,6 +15,9 @@ export const BACKEND_URL = __DEV__
   ? 'http://192.168.1.67:3000' 
   : 'https://koalens-backend.fly.dev';
 
+// Alias för bakåtkompatibilitet
+export const API_BASE_URL = BACKEND_URL;
+
 // FAQ configuration
 export const FAQ_ITEMS = [
   {

@@ -1,42 +1,52 @@
 // stores/slices/createUsageLimitSlice.ts
 import { StateCreator } from 'zustand';
 import { StoreState } from '../types';
-import { BACKEND_URL } from '@/constants/config';
+import { BACKEND_URL, API_BASE_URL } from '@/constants/config';
 import { supabase } from '@/lib/supabase';
+import { captureException } from '@/lib/sentry';
+import type { StoreState as AppState } from '../types';
 
 export interface UsageLimitState {
-  analysesUsed: number;
-  analysesLimit: number;
+  total: number;
+  limit: number;
+  remaining: number;
   isPremium: boolean;
-  lastChecked: string | null; // ISO tidsstämpel-sträng
-  isLoading: boolean;
+  loading: boolean;
+  lastChecked: string | null; 
 }
 
 export interface UsageLimitSlice {
   usageLimit: UsageLimitState;
   setUsageLimit: (usageData: Partial<UsageLimitState>) => void;
-  fetchUsageLimit: (userId: string) => Promise<void>;
+  fetchUsageLimit: (userId: string) => Promise<boolean>;
   resetUsageLimit: () => void;
+  refreshUsageLimit: (data: Partial<UsageLimitState>) => void;
 }
 
 const initialState: UsageLimitState = {
-  analysesUsed: 0,
-  analysesLimit: 2,
+  total: 0,
+  limit: 2,
+  remaining: 2,
   isPremium: false,
-  lastChecked: null,
-  isLoading: false
+  loading: false,
+  lastChecked: null
 };
 
+export interface UsageLimitActions {
+  fetchUsageLimit: (userId: string) => Promise<boolean>;
+  refreshUsageLimit: (data: Partial<UsageLimitState>) => void;
+}
+
 export const createUsageLimitSlice: StateCreator<
-  StoreState,
+  AppState,
   [],
   [],
-  UsageLimitSlice
+  UsageLimitState & UsageLimitActions
 > = (set, get) => ({
-  usageLimit: initialState,
-  
-  setUsageLimit: (usageData) => {
-    set((state) => ({
+  ...initialState,
+
+  setUsageLimit: (usageData: Partial<UsageLimitState>) => {
+    set((state: AppState) => ({
       usageLimit: {
         ...state.usageLimit,
         ...usageData
@@ -44,58 +54,97 @@ export const createUsageLimitSlice: StateCreator<
     }));
   },
 
-  fetchUsageLimit: async (userId) => {
-    if (!userId) return;
-    
+  fetchUsageLimit: async (userId: string) => {
     try {
-      set((state) => ({
-        usageLimit: {
-          ...state.usageLimit,
-          isLoading: true
-        }
+      set((state: AppState) => ({ 
+        usageLimit: { ...state.usageLimit, loading: true } 
       }));
       
-      console.log(`Fetching usage for user: ${userId}`);
+      console.log(`Fetching usage data for user: ${userId}`);
       const response = await fetch(`${BACKEND_URL}/usage/${userId}`);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API error:', errorData);
-        throw new Error(errorData.message || 'Kunde inte hämta användningsdata');
+        throw new Error(`Error fetching usage limit: ${response.status}`);
       }
       
       const usageData = await response.json();
-      console.log('Usage data received:', usageData);
+      console.log('Usage data received from API:', usageData);
       
-      set((state) => {
-        console.log('Updating store with usage data:', usageData);
-        return {
-          usageLimit: {
-            ...state.usageLimit,
-            analysesUsed: usageData.analysesUsed,
-            analysesLimit: usageData.analysesLimit,
-            isPremium: usageData.isPremium,
-            lastChecked: new Date().toISOString(),
-            isLoading: false
-          }
-        };
+      // Hantera båda formaten - camelCase och snake_case
+      const analysesUsed = usageData.analysesUsed !== undefined 
+        ? usageData.analysesUsed 
+        : usageData.analyses_used || 0;
+      
+      const analysesLimit = usageData.analysesLimit !== undefined 
+        ? usageData.analysesLimit 
+        : usageData.analyses_limit || 2;
+      
+      const isPremium = usageData.isPremium !== undefined 
+        ? usageData.isPremium 
+        : usageData.is_premium || false;
+      
+      const remaining = isPremium ? 999 : Math.max(0, analysesLimit - analysesUsed);
+      
+      console.log('Mapped usage values:', { 
+        total: analysesUsed, 
+        limit: analysesLimit, 
+        remaining, 
+        isPremium,
+        lastChecked: new Date().toISOString() 
       });
       
-      // Använd get() för att få tillgång till uppdaterat tillstånd
-      const currentState = get();
-      console.log('Store state after update:', currentState.usageLimit);
-    } catch (error) {
-      console.error('Fel vid hämtning av användningsgräns:', error);
-      set((state) => ({
+      // Uppdatera store med de nya värdena
+      set((state: AppState) => ({
         usageLimit: {
           ...state.usageLimit,
-          isLoading: false
+          total: analysesUsed,
+          limit: analysesLimit,
+          remaining: remaining,
+          isPremium: isPremium,
+          loading: false,
+          lastChecked: new Date().toISOString()
         }
       }));
+      
+      // Verifiera att uppdateringen genomfördes
+      setTimeout(() => {
+        const currentState = get().usageLimit;
+        console.log('Verifying store update:', {
+          total: currentState.total,
+          limit: currentState.limit,
+          remaining: currentState.remaining
+        });
+      }, 100);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to fetch usage limit:', error);
+      if (error instanceof Error) {
+        captureException(error);
+      }
+      
+      set((state: AppState) => ({
+        usageLimit: {
+          ...state.usageLimit,
+          loading: false
+        }
+      }));
+      
+      return false;
     }
   },
 
   resetUsageLimit: () => {
     set({ usageLimit: initialState });
+  },
+
+  refreshUsageLimit: (data: Partial<UsageLimitState>) => {
+    set((state: AppState) => ({
+      usageLimit: {
+        ...state.usageLimit,
+        ...data,
+        lastChecked: new Date().toISOString()
+      }
+    }));
   }
 });

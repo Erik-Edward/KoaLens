@@ -10,6 +10,8 @@ import { FirstLoginOverlay } from '@/components/FirstLoginOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Lägg till denna import för Sentry
 import { setUserContext, clearUserContext, captureException, addBreadcrumb } from '@/lib/sentry';
+// Lägg till import för ProductRepository
+import { ProductRepository } from '@/services/productRepository'
 
 // Imports för avatar och vegan-status
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice'
@@ -57,15 +59,73 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return false;
   };
 
-  // Lyssna på djuplänkar
+  // Uppdatera store med användardata när vi har en session
+  const updateStoreWithUserData = useCallback(async (userData: User | null) => {
+    if (!userData) {
+      console.log('AuthProvider: Inget användar-objekt att uppdatera store med');
+      return;
+    }
+    
+    const store = useStore.getState();
+    console.log('AuthProvider: Uppdaterar store med användardata', {
+      userId: userData.id,
+      email: userData.email,
+      hasMetadata: !!userData.user_metadata
+    });
+    
+    // Uppdatera användar-ID direkt i userSlice
+    try {
+      await AsyncStorage.setItem('@koalens:user_id', userData.id);
+      store.initializeUser();
+      console.log(`AuthProvider: Sparade Supabase användar-ID ${userData.id} i AsyncStorage`);
+    } catch (error) {
+      console.error('AuthProvider: Kunde inte spara användar-ID:', error);
+      captureException(error instanceof Error ? error : new Error('Failed to save user ID'));
+    }
+    
+    // Uppdatera auth-slice
+    store.login(userData as any, userData.id);
+    console.log('AuthProvider: Store uppdaterad med användardata');
+  }, []);
+  
+  // Lägg till detta i useEffect för sessionshantering, efter att vi uppdaterat session och user:
+  useEffect(() => {
+    if (user) {
+      console.log('AuthProvider: User state uppdaterad, synkar med store');
+      updateStoreWithUserData(user);
+    }
+  }, [user, updateStoreWithUserData]);
+
+  // Lyssna på djuplänkar - placera denna useEffect EFTER updateStoreWithUserData deklarationen
   useEffect(() => {
     // Hantera deep links
     const handleDeepLink = async (event: { url: string }) => {
       console.log('AuthProvider: Deep link detected:', event.url);
       
+      // Hantera felmeddelanden i länken (vanligtvis utgångna länkar)
+      if (event.url.includes('error=') && (event.url.includes('error_code=otp_expired') || event.url.includes('error_code=access_denied'))) {
+        console.log('AuthProvider: Error detected in deep link - expired or invalid link');
+        
+        // Markera onboarding som slutförd ändå
+        await markOnboardingAsCompleted();
+        
+        // Visa felmeddelande till användaren och dirigera till login
+        Alert.alert(
+          'Verifieringslänk utgången',
+          'Länken för att verifiera din e-post har gått ut. Vänligen logga in med ditt lösenord.',
+          [{ text: 'OK' }]
+        );
+        
+        router.replace('/(auth)/login');
+        return;
+      }
+      
       // Autentiseringslänk från Supabase innehåller access_token
       if (event.url.includes('access_token') && event.url.includes('type=signup')) {
         console.log('AuthProvider: Verification deep link detected with token');
+        
+        // Sätt onboarding som slutförd omedelbart vid djuplänk
+        await markOnboardingAsCompleted();
         
         try {
           // NYTT: Försök extrahera e-postadressen direkt från token
@@ -114,13 +174,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
           
           // Försök refresha sessionen som tidigare
-          const { data: sessionData } = await supabase.auth.refreshSession();
+          console.log('AuthProvider: Attempting to refresh session with token');
+          const { data: sessionData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error('AuthProvider: Error refreshing session:', refreshError);
+            captureException(refreshError);
+            
+            // Om det finns en e-postadress, använd den ändå
+            if (email) {
+              console.log('AuthProvider: Using extracted email despite refresh error');
+              router.replace({
+                pathname: '/(auth)/login',
+                params: { 
+                  verified: 'true', 
+                  email: encodeURIComponent(email)
+                }
+              });
+            } else {
+              router.replace('/(auth)/login?verified=true');
+            }
+            return;
+          }
+          
           const { session } = sessionData;
           
           if (session) {
-            console.log('AuthProvider: Session refreshed after verification');
+            console.log('AuthProvider: Session refreshed after verification', { userId: session.user.id });
             setSession(session);
             setUser(session.user);
+            
+            // Uppdatera store med användardata
+            await updateStoreWithUserData(session.user);
             
             // Sätt användarkontext i Sentry
             setUserContext(session.user.id, session.user.email || undefined);
@@ -161,9 +246,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           }
           
-          // Sätt onboarding som slutförd
-          await markOnboardingAsCompleted();
-          
         } catch (error) {
           console.error('AuthProvider: Error handling deep link:', error);
           // Lägg till Sentry-rapportering
@@ -187,7 +269,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [updateStoreWithUserData]);
 
   // Huvudsaklig auth-setup
   useEffect(() => {
@@ -319,76 +401,45 @@ export function AuthProvider({ children }: AuthProviderProps) {
       router.replace('/(tabs)/(scan)')
       setLoading(false)
     })
-
-    // Lyssnar på auth-ändringar och synkroniserar store med användardata
+  }, []);
+  
+  // Hantera auth-ändringar från Supabase - flyttad utanför den andra useEffect för att undvika nästlade useEffect
+  useEffect(() => {
+    console.log('AuthProvider: Konfigurerar auth-ändringshanterare');
+    
+    // Lyssna på auth-ändringar
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthProvider: Auth state change', { event, hasSession: !!session })
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      // Sätt användarkontext i Sentry när sessionen uppdateras
-      if (session?.user) {
-        setUserContext(session.user.id, session.user.email || undefined);
-        addBreadcrumb('User session updated', 'auth', { 
-          event_type: event,
-          email_confirmed: !!session.user.email_confirmed_at
-        });
-      } else {
-        // Rensa användarkontext om det inte finns en session
-        clearUserContext();
-      }
-
-      // Synkronisera användardata med Zustand store när vi har en session
-      if (session?.user) {
-        const userData = session.user
-        const store = useStore.getState()
-        
-        // Om användaren har verifierad e-post, sätt onboarding till slutförd
-        if (userData.email_confirmed_at) {
-          await markOnboardingAsCompleted();
-        }
-        
-        if (userData.user_metadata) {
-          const metadata = userData.user_metadata
-          
-          // Uppdatera avatar-information om den finns
-          if (metadata.avatar_style && metadata.avatar_id) {
-            console.log('AuthProvider: Synkroniserar avatar från user_metadata vid auth change:', {
-              style: metadata.avatar_style,
-              id: metadata.avatar_id
-            });
-            
-            await store.setAvatar(
-              metadata.avatar_style as AvatarStyle, 
-              metadata.avatar_id as string
-            )
-            
-            if (typeof metadata.vegan_years === 'number') {
-              await store.setVeganYears(metadata.vegan_years)
-            }
-          }
-          
-          // Uppdatera vegan-status om den finns
-          if (metadata.vegan_status) {
-            await store.setVeganStatus(metadata.vegan_status as VeganStatus)
-          }
-          console.log('AuthProvider: Användarprofil synkroniserad med store vid auth change')
-        }
-      }
-
+      console.log('AuthProvider: Auth state change:', event, {
+        hasSession: !!session,
+        userId: session?.user?.id
+      });
+      
       switch (event) {
+        case 'SIGNED_IN':
+          if (session) {
+            console.log('AuthProvider: User signed in, updating session');
+            setSession(session);
+            setUser(session.user);
+            
+            // Uppdatera store direkt vid inloggning
+            await updateStoreWithUserData(session.user);
+            
+            // Lägg till Sentry-rapportering
+            setUserContext(session.user.id, session.user.email || undefined);
+            addBreadcrumb('User signed in', 'auth');
+          }
+          break;
         case 'SIGNED_OUT':
           console.log('AuthProvider: Användare loggad ut')
           // Rensa användarkontext i Sentry
           clearUserContext();
           addBreadcrumb('User signed out', 'auth');
           
-          if (!useStore.getState().onboarding.hasCompletedOnboarding) {
-            router.replace('/(onboarding)')
-          } else {
-            router.replace('/(auth)/login')
-          }
-          break
+          // Ta bort router.replace-anropet härifrån eftersom det också finns i signOut-funktionen
+          // vilket kan orsaka navigationsproblem
+          setSession(null);
+          setUser(null);
+          break;
         case 'USER_UPDATED':
           console.log('AuthProvider: Användare uppdaterad', {
             emailConfirmed: session?.user.email_confirmed_at,
@@ -470,39 +521,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           }
           break
-        case 'SIGNED_IN':
-          console.log('AuthProvider: Användare inloggad', {
-            emailConfirmed: session?.user.email_confirmed_at,
-            email: session?.user.email,
-            hasAvatar: !!session?.user.user_metadata?.avatar_id
-          })
-          
-          // Lägg till en breadcrumb i Sentry
-          addBreadcrumb('User signed in', 'auth', {
-            emailConfirmed: !!session?.user.email_confirmed_at
-          });
-          
-          if (session?.user.email_confirmed_at) {
-            router.replace('/(tabs)/(scan)')
-          } else {
-            console.log('AuthProvider: Oververifierad inloggning upptäckt – tvingar utloggning')
-            supabase.auth.signOut()
-            router.replace('/(auth)/login')
-          }
-          break
         case 'TOKEN_REFRESHED':
           console.log('AuthProvider: Token uppdaterad')
           break
         default:
           console.log('AuthProvider: Hanterar ej auth event', event)
       }
-    })
+    });
 
     return () => {
       console.log('AuthProvider: Städar upp - avregistrerar prenumeration')
       subscription.unsubscribe()
     }
-  }, [])
+  }, [updateStoreWithUserData, markOnboardingAsCompleted]);
 
   // Lyssna på route-ändringar indirekt via en timer
   useEffect(() => {
@@ -710,9 +741,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Lägg till breadcrumb i Sentry
       addBreadcrumb('User signing out', 'auth');
       
+      // Hämta användar-ID och rensa användarens produkter
+      try {
+        const userId = user?.id;
+        if (userId) {
+          console.log(`AuthProvider: Rensar produkter för användare ${userId} vid utloggning`);
+          
+          // Importera repository direkt istället för dynamiskt
+          const repository = ProductRepository.getInstance();
+          
+          // Rensa användarens produkter
+          await repository.clearUserProducts(userId);
+        }
+      } catch (clearError) {
+        console.error('AuthProvider: Fel vid rensning av användarprodukter:', clearError);
+        // Fortsätt ändå med utloggningen
+      }
+      
       // Rensa produkthistoriken innan utloggning
       const store = useStore.getState();
       store.clearHistory();
+
       console.log('AuthProvider: Produkthistorik rensad vid utloggning');
       
       const { error } = await supabase.auth.signOut()
@@ -723,11 +772,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Rensa användarkontext i Sentry vid utloggning
       clearUserContext();
       
+      // Återställ navigationsspärren för att säkerställa att navigering fungerar
+      if (global.isBlockingNavigation === true) {
+        console.log('AuthProvider: Återställer navigationsspärr vid utloggning');
+        global.isBlockingNavigation = false;
+      }
+      
       // Kontrollera onboarding-status innan omdirigering vid utloggning
       if (!store.onboarding.hasCompletedOnboarding) {
-        router.replace('/(onboarding)')
+        console.log('AuthProvider: Navigerar till onboarding efter utloggning');
+        router.replace('/(onboarding)');
       } else {
-        router.replace('/(auth)/login')
+        console.log('AuthProvider: Navigerar till inloggning efter utloggning');
+        router.replace('/(auth)/login');
       }
     } catch (error) {
       console.error('AuthProvider: Fel vid utloggning', error)

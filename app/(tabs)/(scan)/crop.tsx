@@ -7,6 +7,8 @@ import ImageCropPicker, { Image as CroppedImage } from '@/lib/imageCropPickerWra
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
+import { AnalysisService } from '@/services/analysisService';
+import { logEvent } from '@/lib/analytics';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -69,17 +71,108 @@ export default function CropScreen() {
         path: croppedImage.path
       });
   
-      // Skicka med orientering och dimensioner till result
-      router.push({
-        pathname: './result',
-        params: { 
-          photoPath: croppedImage.path,
-          width: croppedImage.width.toString(),
-          height: croppedImage.height.toString(),
-          isLandscape: (croppedImage.width > croppedImage.height).toString(),
-          isCroppedImage: 'true'  // Redan en sträng
-        }
+      // Extrahera ingredienser från bilden
+      setLoading(true);
+      
+      // Logga att vi startar bildanalys
+      logEvent('image_analysis_started', {
+        imageWidth: croppedImage.width,
+        imageHeight: croppedImage.height,
+        isLandscape: croppedImage.width > croppedImage.height
       });
+      
+      try {
+        addBreadcrumb('Starting image analysis', 'analysis', { path: croppedImage.path });
+        
+        // Använd analystjänsten för att extrahera ingredienser
+        const analysisService = new AnalysisService();
+        const ingredients = await analysisService.extractIngredientsFromImage(croppedImage.path);
+        
+        addBreadcrumb('Image analysis completed', 'analysis', { 
+          ingredientsCount: ingredients.length 
+        });
+        
+        // Logga att bildanalys lyckades
+        logEvent('image_analysis_completed', {
+          ingredientsCount: ingredients.length
+        });
+        
+        // Skicka med både bilden och ingredienserna till result
+        console.log('Navigating to result screen with extracted ingredients:', ingredients.length);
+        try {
+          await new Promise(resolve => setTimeout(resolve, 300)); // Kort väntetid för att säkerställa navigering
+          console.log('Försöker navigera till resultatskärmen med params:', {
+            pathname: '/(tabs)/(scan)/result',
+            photoPath: croppedImage.path,
+            ingredients: `${ingredients.length} st`
+          });
+          
+          router.replace({
+            pathname: '/(tabs)/(scan)/result',
+            params: { 
+              photoPath: croppedImage.path,
+              image: croppedImage.path,
+              ingredients: JSON.stringify(ingredients),
+              width: croppedImage.width.toString(),
+              height: croppedImage.height.toString(),
+              isLandscape: (croppedImage.width > croppedImage.height).toString(),
+              isCroppedImage: 'true'  // Already a string
+            }
+          });
+          console.log('Navigation till resultatskärmen slutförd');
+        } catch (navError) {
+          console.error('Navigation error:', navError);
+          // Fallback direkt till resultatskärmen om router.replaceAll misslyckas
+          try {
+            router.navigate('/(tabs)/(scan)/result');
+          } catch (fallbackError) {
+            console.error('Even fallback navigation failed:', fallbackError);
+          }
+        }
+      } catch (analysisError) {
+        console.error('Analysis error:', analysisError);
+        captureException(analysisError instanceof Error ? analysisError : new Error(String(analysisError)));
+        
+        // Logga att bildanalys misslyckades
+        logEvent('image_analysis_failed', {
+          errorMessage: analysisError instanceof Error ? analysisError.message : String(analysisError)
+        });
+        
+        // Anpassa felmeddelandet baserat på typen av fel
+        let errorMessage = "Vi kunde inte identifiera några ingredienser i bilden. Försök ta en tydligare bild av ingredienslistan.";
+        
+        if (analysisError instanceof Error) {
+          const errorMsg = analysisError.message.toLowerCase();
+          
+          if (errorMsg.includes('timeout') || 
+              errorMsg.includes('nå servern') || 
+              errorMsg.includes('internet') ||
+              errorMsg.includes('kunde inte förbereda begäran')) {
+            errorMessage = "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+          } else if (errorMsg.includes('serverfel') || 
+                     errorMsg.includes('oväntat svar') ||
+                     errorMsg.includes('api svarade med ett fel')) {
+            errorMessage = "Det uppstod ett problem med analysen på servern. Vänta en stund och försök igen.";
+          } else if (errorMsg.includes('ogilt') || 
+                     errorMsg.includes('kunde inte läsa') ||
+                     errorMsg.includes('tom base64')) {
+            errorMessage = "Det uppstod ett problem med bilden. Försök ta en ny bild av ingredienslistan.";
+          } else if (errorMsg.includes('inga ingredienser')) {
+            errorMessage = "Vi hittade inga ingredienser i bilden. Försök ta en tydligare bild där hela ingredienslistan syns.";
+          }
+          
+          console.log('Detaljerat felmeddelande:', analysisError.message);
+          console.log('Visar användarvänligt felmeddelande:', errorMessage);
+        }
+        
+        Alert.alert(
+          "Kunde inte tolka bilden",
+          errorMessage,
+          [{ text: "OK" }]
+        );
+        
+        router.back();
+      }
     } catch (error) {
       const cropError = error as CropError;
       

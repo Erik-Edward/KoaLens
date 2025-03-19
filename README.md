@@ -48,3 +48,57 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Teststrategi för ny arkitektur
+
+För att säkerställa att den nya arkitekturen fungerar korrekt bör följande tester utföras efter varje större ändring:
+
+### Manuella tester
+
+1. **Dev-fliken test**:
+   - Kontrollera att Dev-fliken syns i appen
+   - Använd funktionerna i Dev-vyn för att skapa testprodukter
+   - Kontrollera att testprodukterna visas korrekt i historiken
+
+2. **Produkthantering**:
+   - Skanna en produkt och se till att den sparas korrekt
+   - Kontrollera att produkten visas i både den gamla och den nya historiken
+   - Markera en produkt som favorit och verifiera att statusen uppdateras
+   - Ta bort en produkt och verifiera att den försvinner från listan
+
+3. **Analyshantering**:
+   - Genomför en analys och kontrollera att räknaren uppdateras korrekt
+   - Verifiera att analyser visas korrekt i historikvyn
+   - Testa att analysbegränsningen fungerar när gränsen nås
+
+### Automatiserade tester (framtida implementering)
+
+För framtida implementation bör följande automatiserade tester skapas:
+
+1. **Enhetstester**:
+   - Testa `ProductRepository`-funktioner
+   - Testa `AnalyticsService`-funktioner
+   - Testa hooks som `useProducts` och `useAnalytics`
+
+2. **Integrationstester**:
+   - Testa flödet från skanning till visning i historiken
+   - Testa att gamla och nya system kan samexistera
+
+3. **UI-tester**:
+   - Testa grundläggande UI-interaktioner med React Native Testing Library
+   - Verifiera att produktkort och detaljer visas korrekt
+
+### Utvecklingsverktyg
+
+Använd utvecklingsverktyg för att underlätta testning:
+
+1. **Dev-fliken**:
+   - Använd "Skapa Testprodukter" för att generera testdata
+   - Använd "Testa Analytics" för att simulera analysanvändning
+   - Använd "Visa användar-ID" för att felsöka användarspecifika problem
+
+2. **AsyncStorage-inspektion**:
+   - Använd "Rensa AsyncStorage" för att återställa appstatus vid behov
+   - Inspektera AsyncStorage för att verifiera att data sparas korrekt
+
+Genom att följa denna teststrategi kan vi säkerställa att den nya arkitekturen fungerar som förväntat och att övergången från det gamla systemet går smidigt.

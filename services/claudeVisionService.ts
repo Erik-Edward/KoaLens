@@ -221,6 +221,9 @@ async function retryWithBackoff<T>(
 }
 
 export async function analyzeIngredients(imagePath: string, userId?: string): Promise<IngredientAnalysisResult> {
+  // Säkerställ att userId är en sträng innan vi fortsätter
+  let userIdToUse = userId ? String(userId) : undefined;
+  
   try {
     // Lägg till diagnostiska kontroller för backend-anslutning
     console.log('Kontrollerar anslutning till:', BACKEND_URL);
@@ -235,8 +238,24 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       // Fortsätt ändå med analysen, vi vill inte avbryta här
     }
     
-    console.log('Starting ingredient analysis for:', imagePath, 'userId:', userId);
-    addBreadcrumb('Starting ingredient analysis', 'analysis', { userId });
+    // Förbättrad loggning av användar-ID
+    if (!userIdToUse) {
+      console.warn('VARNING: Inget användar-ID tillgängligt vid analys!');
+      // Försök hämta från store som fallback
+      try {
+        const storeUser = useStore.getState().user;
+        if (storeUser && storeUser.id) {
+          console.log('Hittade användar-ID från store:', storeUser.id);
+          // Använd användar-ID från store
+          userIdToUse = String(storeUser.id);
+        }
+      } catch (storeError) {
+        console.error('Kunde inte hämta användar-ID från store:', storeError);
+      }
+    }
+    
+    console.log('Starting ingredient analysis for:', imagePath, 'userId:', userIdToUse || 'ej tillgängligt');
+    addBreadcrumb('Starting ingredient analysis', 'analysis', { userId: userIdToUse });
 
     // Validera att sökvägen finns
     if (!imagePath) {
@@ -288,32 +307,20 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       if (!base64Data || typeof base64Data !== 'string' || base64Data.length === 0) {
         throw new Error('Base64 conversion failed - empty result');
       }
-    } catch (conversionError) {
-      console.error('Error converting image to base64:', conversionError);
-      addBreadcrumb('Image conversion error', 'error', { 
-        error: conversionError instanceof Error ? conversionError.message : String(conversionError)
-      });
-      
-      // Logga händelsen separerat för tydlighet
-      logEvent(Events.ANALYSIS_ERROR, {
-        error_type: 'image_conversion',
-        error_message: conversionError instanceof Error ? 
-          conversionError.message : 'Unknown conversion error',
-        userId
-      });
-      
-      throw new Error('Kunde inte läsa bilden. Försök igen med en annan bild.');
+    } catch (err) {
+      console.error('Failed to convert image to base64:', err);
+      throw new Error('Kunde inte läsa bilden: ' + (err instanceof Error ? err.message : String(err)));
     }
 
-    console.log('Image converted to base64, size:', Math.round((base64Data.length * 0.75) / 1024), 'KB');
+    console.log('Image converted to base64 successfully, size:', Math.round(base64Data.length * 0.75 / 1024), 'KB');
 
-    // FÖRBÄTTRING: Bättre nätverkskontroll
+    // Kontrollera nätverksstatus
     const networkState = await NetInfo.fetch();
     const isConnected = networkState.isConnected && networkState.isInternetReachable !== false;
-    console.log('Network state:', networkState, 'isConnected:', isConnected, 'userId:', userId);
+    console.log('Network state:', networkState, 'isConnected:', isConnected, 'userId:', userIdToUse);
 
     if (!isConnected) {
-      console.log('Device is offline, saving analysis for later. userId:', userId);
+      console.log('Device is offline, saving analysis for later. userId:', userIdToUse);
       
       logEvent('analysis_saved_offline', {
         timestamp: Date.now(),
@@ -350,14 +357,16 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       throw new Error('OFFLINE_MODE');
     }
 
-    console.log(`Sending analysis request to ${BACKEND_URL} with userId:`, userId);
-    addBreadcrumb('Sending analysis request', 'api', { userId });
+    console.log(`Sending analysis request to ${BACKEND_URL} with userId:`, userIdToUse);
+    addBreadcrumb('Sending analysis request', 'api', { userId: userIdToUse });
     
     // FÖRBÄTTRING: Använda fetchWithRetry istället för retryWithBackoff
     const analysisResult = await retryWithBackoff(
       async () => {
         // FÖRBÄTTRING: Bättre felhantering vid API-anrop
         try {
+          console.log('Sending analysis request with userId:', userIdToUse || 'ingen');
+          
           const response = await fetchWithRetry(`${BACKEND_URL}/analyze`, {
             method: 'POST',
             headers: {
@@ -367,7 +376,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
               image: base64Data,
               isOfflineAnalysis: false,
               isCroppedImage: true,
-              userId
+              userId: userIdToUse // Använd den säkrade versionen
             })
           });
 
@@ -389,7 +398,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
           const errorDetails = {
             message: fetchError instanceof Error ? fetchError.message : String(fetchError),
             stack: fetchError instanceof Error ? fetchError.stack : undefined,
-            userId
+            userId: userIdToUse
           };
           
           addBreadcrumb('Fetch error in analyzeIngredients', 'error', errorDetails);
@@ -400,12 +409,12 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       },
       { 
         functionName: 'analyzeIngredients',
-        userId
+        userId: userIdToUse
       }
     );
     
-    console.log('Analysis completed, userId was:', userId);
-    addBreadcrumb('Analysis API call succeeded', 'api', { userId });
+    console.log('Analysis completed, userId was:', userIdToUse);
+    addBreadcrumb('Analysis API call succeeded', 'api', { userId: userIdToUse });
     
     // FÖRBÄTTRING: Validera svaret innan vi använder det
     if (!validateApiResponse(analysisResult)) {
@@ -470,7 +479,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       // Lägg till en breadcrumb för detta specifika fel
       addBreadcrumb('Error processing watched ingredients', 'error', { 
         error: watchedError instanceof Error ? watchedError.message : String(watchedError),
-        userId
+        userId: userIdToUse
       });
       
       // Fortsätt med tomt watchedIngredientsFound-fält istället för att avbryta hela analysen
@@ -484,14 +493,14 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       ingredient_count: sanitizedResult.allIngredients.length,
       non_vegan_count: sanitizedResult.nonVeganIngredients.length,
       watched_found: sanitizedResult.watchedIngredientsFound.length,
-      userId
+      userId: userIdToUse
     });
     
     console.log('Analysis successful, returning sanitized result');
     return sanitizedResult;
     
   } catch (error) {
-    console.error('API analysis failed:', error, 'userId:', userId);
+    console.error('API analysis failed:', error, 'userId:', userIdToUse);
     
     // FÖRBÄTTRING: Bättre felhantering för specifika feltyper
     if (error instanceof Error) {
@@ -504,7 +513,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       
       // Lägg till i Sentry för spårning
       captureException(error, {
-        tags: { userId },
+        tags: { userId: userIdToUse },
         level: 'error'
       });
       
@@ -512,7 +521,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
       logEvent(Events.ANALYSIS_ERROR, {
         error_type: 'api_error',
         error_message: error.message,
-        userId
+        userId: userIdToUse
       });
       
       // Kontrollera efter vanliga nätverksfel
@@ -536,7 +545,7 @@ export async function analyzeIngredients(imagePath: string, userId?: string): Pr
     
     // Generiskt felmeddelande för okända fel
     captureException(new Error('Unknown analysis error: ' + String(error)), {
-      tags: { userId },
+      tags: { userId: userIdToUse },
       level: 'error'
     });
     

@@ -1,19 +1,13 @@
 // app/_layout.tsx
-import 'react-native-reanimated';
-import { FC, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Image, Text } from 'react-native';
 import { AuthProvider } from '../providers/AuthProvider';
-import theme from '@/constants/theme';
-import { UserProfileSync } from '@/components/UserProfileSync';
-import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-// Använd wrappers istället för direkta importer
-import { initSentry } from '@/lib/sentryWrapper';
-import { preventAutoHideAsync, hideAsync } from '@/lib/splashScreenWrapper';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { initAnalytics } from '@/lib/analyticsWrapper';
+import { UserProfileSync } from '@/components/UserProfileSync';
+import { AppInitializer } from '@/components/AppInitializer';
+import theme from '@/constants/theme';
 import { styled } from 'nativewind';
 import { supabase } from '@/lib/supabase';
 
@@ -21,101 +15,55 @@ import { supabase } from '@/lib/supabase';
 const StyledView = styled(View);
 const StyledText = styled(Text);
 
-// Initiera Sentry så tidigt som möjligt
-initSentry();
+export default function RootLayout() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-// Visa splashscreen tills appen är redo
-preventAutoHideAsync().catch(() => {
-  /* ingen åtgärd vid fel */
-});
-
-const RootLayout: FC = () => {
-  const [initialized, setInitialized] = useState(false);
-  const [initError, setInitError] = useState<string | null>(null);
-
-  // Supabase initialiserings-useEffect
+  // Hantera fördröjd laddning och initialization
   useEffect(() => {
-    const initSupabase = async () => {
-      try {
-        console.log('Initializing Supabase in layout...');
-        
-        // Utför en enkel operation för att initiera Supabase-klienten
-        // Detta triggar den lazy-initialized klienten i lib/supabase.ts
-        await supabase.auth.getSession();
-        
-        console.log('Supabase initialized successfully');
-        setInitialized(true);
-      } catch (error) {
-        console.error('Supabase initialization error:', error);
-        setInitError(error instanceof Error ? error.message : 'Unknown initialization error');
-        
-        // Fortsätt ändå efter en kort fördröjning för att inte blockera appen helt
-        setTimeout(() => setInitialized(true), 1000);
+    // Minsta laddningstiden är 1 sekund för att visa splash-skärmen
+    const timer = setTimeout(() => {
+      // Om appen är initialiserad, fortsätt
+      if (isInitialized) {
+        setIsLoading(false);
       }
+    }, 1000);
+
+    // Om initialiseringen inte är klar inom 5 sekunder, fortsätt ändå
+    const fallbackTimer = setTimeout(() => {
+      if (!isInitialized) {
+        console.warn('App initialization timed out, proceeding anyway');
+        setIsLoading(false);
+      }
+    }, 5000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
     };
+  }, [isInitialized]);
 
-    initSupabase();
-  }, []);
-
-  // Förbättrad djuplänkhantering (detta stör inte AuthProvider:s egen hantering)
-  useEffect(() => {
-    // Dölj splash screen när komponenten är monterad
-    if (initialized) {
-      hideAsync().catch((error) => {
-        // Logga felet men fortsätt
-        console.log('Error hiding splash screen:', error);
-      });
-    }
+  // Hantera slutförd initialisering
+  const handleInitialized = () => {
+    console.log('App initialization complete');
+    setIsInitialized(true);
     
-    // Initiera Firebase Analytics när appen har initialiserats
-    if (initialized) {
-      initAnalytics().then(success => {
-        if (success) {
-          console.log('Analytics initialized successfully');
-        } else {
-          console.warn('Failed to initialize Analytics');
-        }
-      });
-    }
-    
-    // Hantera initial URL när appen startas via en djuplänk
-    if (initialized) {
-      const getInitialURL = async () => {
-        const url = await Linking.getInitialURL();
-        if (url) {
-          console.log('RootLayout: Initial URL detected:', url);
-          
-          // För verifieringslänkar, se till att navigera till login direkt
-          // Detta är ett säkerhetsnät om AuthProvider misslyckas
-          if (url.includes('type=signup')) {
-            console.log('RootLayout: Detected signup verification, will ensure login redirect');
-            
-            // Sätt en timer för att säkerställa att vi navigerar till login om inget annat händer
-            const redirectTimer = setTimeout(() => {
-              console.log('RootLayout: Safety redirect to login triggered');
-              router.replace('/(auth)/login?verified=true');
-            }, 3000);
-            
-            // Rensa timern om komponenten unmountas
-            return () => clearTimeout(redirectTimer);
-          }
-        }
-      };
-      
-      getInitialURL();
-    }
-  }, [initialized]);
+    // Om minsta laddningstiden har passerat, avsluta laddningsskärmen
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
+  };
 
-  // Visa laddningsskärm medan Supabase initialiseras
-  if (!initialized) {
+  if (isLoading) {
     return (
-      <StyledView className="flex-1 bg-background-main justify-center items-center">
-        <ActivityIndicator size="large" color="#ffd33d" />
-        <StyledText className="text-text-primary font-sans-medium mt-4 text-center px-6">
-          {initError 
-            ? `Ett problem uppstod: ${initError}\n\nStartar ändå...` 
-            : 'Förbereder KoaLens...'}
-        </StyledText>
+      <StyledView className="flex-1 justify-center items-center bg-[#070F2B]">
+        <Image 
+          source={require('../assets/images/splashscreen_logo.png')} 
+          style={{ width: 100, height: 100, marginBottom: 20 }}
+        />
+        <ActivityIndicator size="large" color="#4FB4F2" />
+        <StyledText className="text-white mt-4 text-lg">KoaLens</StyledText>
+        <StyledText className="text-gray-400 mt-1">Läser in...</StyledText>
       </StyledView>
     );
   }
@@ -123,6 +71,7 @@ const RootLayout: FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <AppInitializer onInitialized={handleInitialized} />
         <StatusBar 
           style="light"
           backgroundColor={theme.colors.background.main}
@@ -161,5 +110,3 @@ const RootLayout: FC = () => {
     </ErrorBoundary>
   );
 };
-
-export default RootLayout;

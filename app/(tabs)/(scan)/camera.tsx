@@ -163,11 +163,42 @@ export default function CameraScreen() {
         addBreadcrumb('Photo captured', 'camera', { path: photo.path });
         
         // Navigate to crop screen
-        console.log('Navigating to crop screen');
-        router.push({
-          pathname: './crop',
-          params: { photoPath: photo.path }
-        });
+        console.log('Navigating to crop screen with photo path:', photo.path);
+        try {
+          // Kort väntetid för att säkerställa att bilden är tillgänglig
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Försök navigera med router.replace för att ersätta nuvarande skärm
+          router.replace({
+            pathname: '/(tabs)/(scan)/crop',
+            params: { photoPath: photo.path }
+          });
+          
+          console.log('Navigation till crop-skärmen initierad');
+          
+          // Sätt en timer som fallback om navigeringen misslyckas
+          setTimeout(() => {
+            console.log('Kontrollerar om fallback-navigering behövs');
+            try {
+              // Fallback-navigering som sista säkerhet
+              router.navigate('/(tabs)/(scan)/crop');
+            } catch (innerError) {
+              console.error('Fallback-timer navigation error:', innerError);
+            }
+          }, 1000);
+        } catch (navError) {
+          console.error('Navigeringsfel till beskärningsskärmen:', navError);
+          
+          // Sista utvägen: Använd navigate som fallback
+          try {
+            router.navigate('/(tabs)/(scan)/crop');
+          } catch (fallbackError) {
+            console.error('Även fallback-navigation misslyckades:', fallbackError);
+            
+            // Visa felmeddelande till användaren
+            Alert.alert('Navigeringsfel', 'Kunde inte navigera vidare. Försök igen eller starta om appen.');
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to take photo:', error);

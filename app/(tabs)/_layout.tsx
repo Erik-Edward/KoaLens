@@ -31,25 +31,30 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary.DEFAULT,
-        tabBarInactiveTintColor: theme.colors.text.secondary,
-        tabBarStyle: {
-          backgroundColor: theme.colors.background.dark,
-          borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 60,
-          paddingBottom: 8,
-        },
         headerShown: false,
+        tabBarActiveTintColor: '#6366f1',
+        tabBarInactiveTintColor: '#6b7280',
+        tabBarStyle: {
+          backgroundColor: '#ffffff',
+          borderTopColor: '#e5e7eb',
+        },
       }}
     >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Hem',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" color={color} size={size} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="(scan)"
         options={{
           title: 'Skanna',
-          tabBarIcon: ({ color, size }: TabBarIconProps) => (
-            <Ionicons name="camera-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="scan-outline" color={color} size={size} />
           ),
         }}
       />
@@ -57,18 +62,27 @@ export default function TabLayout() {
         name="(history)"
         options={{
           title: 'Historik',
-          tabBarIcon: ({ color, size }: TabBarIconProps) => (
-            <Ionicons name="time-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="(profile)"
+        name="settings"
         options={{
-          title: 'Profil',
-          tabBarIcon: ({ color, size }: TabBarIconProps) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          title: 'Inställningar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="dev"
+        options={{
+          title: 'Utveckling',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="code-outline" color={color} size={size} />
+          )
         }}
       />
     </Tabs>

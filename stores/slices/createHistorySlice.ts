@@ -4,6 +4,9 @@ import { StateCreator } from 'zustand';
 import { HistorySlice, ScannedProduct, StoreState } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
+import * as adapter from '../adapter';
+import { productsToScannedProducts, scannedProductsToProducts } from '../adapter';
+import { Product } from '@/models/productModel';
 
 // Helper för produktvalidering
 const validateProductData = (data: Partial<ScannedProduct>): boolean => {
@@ -102,145 +105,86 @@ const createValidProduct = (productData: Partial<ScannedProduct>): ScannedProduc
   }
 };
 
-// Export the createHistorySlice creator function
+// Uppdatera createHistorySlice för att delegera till den nya implementationen
 export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> = (set, get) => ({
+  // Använd produktadapter för att konvertera Product[] till ScannedProduct[]
   products: [],
 
-  // Filtrerar produkter baserat på inloggad användare
+  // Nya implementationer som använder adapter-funktioner
   getUserProducts: () => {
-    const allProducts = get().products;
-    const currentUser = get().user;
+    // Produkter kommer från produktslice
+    const products = get().getProducts();
+    if (!Array.isArray(products)) {
+      // Om getProducts inte returnerarar array, försök med async-funktionen
+      console.log('Using async method to get products');
+      return [];
+    }
     
-    // Om ingen användare är inloggad, returnera tom array
-    if (!currentUser) return [];
+    // Konvertera till ScannedProduct format
+    return productsToScannedProducts(products);
+  },
+
+  addProduct: (productData) => {
+    if (!productData) {
+      console.warn('Attempted to add null/undefined product!');
+      return;
+    }
+
+    try {
+      const product = createValidProduct(productData);
+      set(state => ({ products: [...state.products, product] }));
+      
+      // Försök uppdatera även i nya systemet
+      adapter.addProduct(product).catch(error => {
+        console.warn('Failed to add product to new system:', error);
+      });
+    } catch (error) {
+      console.error('Error in addProduct:', error);
+      captureException(error instanceof Error ? error : new Error('Error in addProduct'));
+    }
+  },
+
+  removeProduct: (id) => {
+    set(state => ({
+      products: state.products.filter(p => p.id !== id),
+    }));
     
-    // VIKTIGT: Filtrera ENDAST produkter som tillhör den inloggade användaren
-    // Tidigare kod tillät produkter utan userId, vilket kunde orsaka läckage
-    return allProducts.filter(product => 
-      product.userId === currentUser.id
-    );
+    // Försök radera även i nya systemet
+    adapter.removeProduct(id).catch(error => {
+      console.warn('Failed to remove product from new system:', error);
+    });
   },
 
-  addProduct: (productData: Omit<ScannedProduct, 'id' | 'timestamp' | 'isFavorite'>) => {
-    try {
-      // Hämta aktuell användare
-      const currentUser = get().user;
-      
-      console.log('Adding product, data:', {
-        imageUri: productData.imageUri ? 'provided' : 'missing',
-        isVegan: productData.isVegan,
-        confidence: productData.confidence,
-        ingredientsCount: productData.allIngredients?.length || 0,
-      });
-      
-      // Lägg till användar-ID i produktdata
-      const productWithUserId = {
-        ...productData,
-        userId: currentUser?.id
-      };
-      
-      // Skapa produktobjekt med säker validering och default-värden
-      const validProduct = createValidProduct(productWithUserId);
-      
-      // Lägg till breadcrumb för spårning
-      addBreadcrumb('Adding product to store', 'store', {
-        productId: validProduct.id,
-        isVegan: validProduct.isVegan,
-        confidence: validProduct.confidence,
-        userId: validProduct.userId
-      });
-      
-      // Kontrollera aktuellt antal produkter före
-      const currentCount = get().products.length;
-      
-      // Uppdatera butiken med den nya produkten först i listan
-      set((state: StoreState) => ({
-        products: [
-          validProduct,
-          ...state.products,
-        ],
-      }));
-      
-      // Verifiera att tillägg faktiskt fungerade
-      const newCount = get().products.length;
-      if (newCount <= currentCount) {
-        console.warn('Product may not have been added correctly, counts:', { before: currentCount, after: newCount });
-      } else {
-        console.log('Product added successfully:', validProduct.id, 'New count:', newCount);
-      }
-      
-      // Lägg till bekräftelse-breadcrumb
-      addBreadcrumb('Product successfully added to store', 'store', {
-        productId: validProduct.id,
-        totalProducts: newCount,
-        userId: validProduct.userId
-      });
-      
-      return validProduct.id;
-    } catch (error) {
-      console.error('Error adding product to store:', error);
-      captureException(error instanceof Error ? error : new Error('Error adding product to store'));
-      throw error;
-    }
-  },
-
-  removeProduct: (id: string) => {
-    try {
-      set((state: StoreState) => ({
-        products: state.products.filter((product) => product.id !== id),
-      }));
-      console.log('Product removed successfully:', id);
-    } catch (error) {
-      console.error('Error removing product:', error);
-      captureException(error instanceof Error ? error : new Error('Failed to remove product'));
-    }
-  },
-
-  toggleFavorite: (id: string) => {
-    try {
-      set((state: StoreState) => ({
-        products: state.products.map((product) =>
-          product.id === id
-            ? { ...product, isFavorite: !product.isFavorite }
-            : product
-        ),
-      }));
-      console.log('Product favorite status toggled:', id);
-    } catch (error) {
-      console.error('Error toggling favorite status:', error);
-      captureException(error instanceof Error ? error : new Error('Failed to toggle favorite status'));
-    }
+  toggleFavorite: (id) => {
+    set(state => ({
+      products: state.products.map(p =>
+        p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
+      ),
+    }));
+    
+    // Försök uppdatera även i nya systemet
+    adapter.toggleFavorite(id).catch(error => {
+      console.warn('Failed to toggle favorite in new system:', error);
+    });
   },
 
   clearHistory: () => {
-    try {
-      set({ products: [] });
-      console.log('History cleared successfully');
-    } catch (error) {
-      console.error('Error clearing history:', error);
-      captureException(error instanceof Error ? error : new Error('Failed to clear history'));
-    }
+    set({ products: [] });
   },
 
-  // Rensa alla produkter som saknar användar-ID (administrativ funktion)
   clearProductsWithoutUser: () => {
-    try {
-      console.log('Clearing products without user ID');
-      set((state: StoreState) => ({
-        products: state.products.filter(product => !!product.userId)
-      }));
+    let count = 0;
+    
+    set(state => {
+      const filtered = state.products.filter(p => {
+        const shouldKeep = !!p.userId;
+        if (!shouldKeep) count++;
+        return shouldKeep;
+      });
       
-      addBreadcrumb('Cleared products without user ID', 'store');
-      
-      // Kontrollera resultat
-      const remainingProducts = get().products;
-      console.log(`Remaining products after cleanup: ${remainingProducts.length}`);
-      
-      return remainingProducts.length;
-    } catch (error) {
-      console.error('Error clearing products without user ID:', error);
-      captureException(error instanceof Error ? error : new Error('Error clearing products without user ID'));
-      return -1;
-    }
+      return { products: filtered };
+    });
+    
+    return count;
   },
 });

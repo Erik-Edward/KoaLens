@@ -1,228 +1,526 @@
 // app/(tabs)/(history)/index.tsx
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, SafeAreaView, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, ScrollView, TextInput, Pressable, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { ProductCard } from '@/components/ProductCard';
 import { useStore } from '@/stores/useStore';
-import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
-// Ändra importen till vår wrapper
+import { Ionicons } from '@expo/vector-icons';
 import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScannedProduct, StoreState } from '@/stores/types';
+import { useNavigation } from '@react-navigation/native';
+import { Redirect, usePathname, useRouter } from 'expo-router';
+import { shouldUseModernUI, getUseNewUI, getUIPreferences, UIVersion } from '../../../constants/uiPreferences';
+import * as SplashScreen from 'expo-splash-screen';
+import { router } from 'expo-router';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledTextInput = styled(TextInput);
-const StyledPressable = styled(Pressable);
-const StyledSafeAreaView = styled(SafeAreaView);
 const StyledScrollView = styled(ScrollView);
+const StyledSafeAreaView = styled(SafeAreaView);
+const StyledPressable = styled(Pressable);
 
-export default function HistoryScreen() {
-  // Använd getUserProducts istället för att direkt accessa products
-  const getUserProducts = useStore((state) => state.getUserProducts);
-  const userProducts = getUserProducts();
-  const clearHistory = useStore((state) => state.clearHistory);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+// Förhindra autohide av splash screen vid appens boot
+SplashScreen.preventAutoHideAsync();
 
-  // Lägg till för debugging
-  console.log('Current user products in store:', userProducts);
-  
-  // Logga skärmvisning när komponenten monteras
+/**
+ * Historik-router
+ * Denna komponent ansvarar för att dirigera till rätt historiksida
+ */
+export default function HistoryIndexRouter() {
   useEffect(() => {
-    logScreenView('History');
-    
-    // Logga statusstatistik
-    logEvent('history_stats', {
-      total_products: userProducts.length,
-      vegan_products: userProducts.filter(p => p.isVegan).length,
-      favorite_products: userProducts.filter(p => p.isFavorite).length
-    });
-  }, [userProducts.length]);
+    // Denna timeout säkerställer att splash screen visas korrekt
+    // innan vi navigerar till nästa skärm
+    const navigateTimer = setTimeout(() => {
+      // Navigera till den nya historikskärmen och dölj splash screen när vi är redo
+      try {
+        router.replace('/(tabs)/(history)/history');
+        SplashScreen.hideAsync();
+      } catch (error) {
+        console.error('Navigation error:', error);
+        SplashScreen.hideAsync();
+      }
+    }, 100);
 
-  const filteredProducts = userProducts.filter((product) => {
-    const matchesSearch = product.allIngredients
-      .join(' ')
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFavorites = showFavoritesOnly ? product.isFavorite : true;
-    return matchesSearch && matchesFavorites;
-  });
-  
-  // Hantera töming av historik med bekräftelse och loggning
-  const handleClearHistory = () => {
-    if (userProducts.length === 0) return;
-    
-    Alert.alert(
-      'Rensa historik',
-      'Är du säker på att du vill rensa hela historiken? Detta kan inte ångras.',
-      [
-        {
-          text: 'Avbryt',
-          style: 'cancel'
-        },
-        {
-          text: 'Rensa',
-          style: 'destructive',
-          onPress: () => {
-            // Logga händelsen innan historiken rensas
-            logEvent(Events.CLEAR_HISTORY, { 
-              product_count: userProducts.length,
-              vegan_product_count: userProducts.filter(p => p.isVegan).length,
-              favorite_product_count: userProducts.filter(p => p.isFavorite).length
-            });
-            
-            clearHistory();
-          }
-        }
-      ]
-    );
-  };
-  
-  // Hantera favorit-filter med loggning
-  const handleToggleFavoritesFilter = () => {
-    const newValue = !showFavoritesOnly;
-    setShowFavoritesOnly(newValue);
-    
-    // Logga filterhändelse
-    logEvent('toggle_filter', {
-      filter_name: 'favorites_only',
-      new_value: newValue ? 'true' : 'false',
-      matches_count: newValue ? 
-        userProducts.filter(p => p.isFavorite).length : 
-        userProducts.length
-    });
-  };
-  
-  // Hantera sökning med loggning
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    
-    // Logga sökhändelse när användaren skriver minst 3 tecken
-    if (text.length >= 3) {
-      logEvent('search_history', {
-        search_term_length: text.length
-      });
-    }
-  };
+    return () => clearTimeout(navigateTimer);
+  }, []);
 
+  // Visar en laddningsindikator medan vi förbereder för navigation
   return (
-    <StyledView className="flex-1 bg-background-main">
-      {/* Fixed header section */}
-      <StyledView className="pt-12">
-        {/* Search Bar */}
-        <StyledView className="px-4 mb-4">
-          <StyledView className="flex-row items-center bg-background-light/30 rounded-lg px-4 py-3">
-            <Ionicons name="search" size={20} color="#9ca3af" />
-            <StyledTextInput
-              className="flex-1 ml-3 text-text-primary font-sans"
-              placeholder="Sök i historik..."
-              placeholderTextColor="#9ca3af"
-              value={searchQuery}
-              onChangeText={handleSearch}
-            />
-            {searchQuery.length > 0 && (
-              <StyledPressable 
-                onPress={() => setSearchQuery('')}
-                onPressIn={() => {
-                  // Logga när användaren rensar sökningen
-                  if (searchQuery.length > 0) {
-                    logEvent('clear_search', {
-                      search_term_length: searchQuery.length
-                    });
-                  }
-                }}
-              >
-                <Ionicons name="close-circle" size={20} color="#9ca3af" />
-              </StyledPressable>
-            )}
-          </StyledView>
-        </StyledView>
-
-        {/* Filters */}
-        <StyledView className="flex-row justify-between px-4 mb-4">
-          <StyledPressable
-            onPress={handleToggleFavoritesFilter}
-            className={`flex-row items-center p-2 rounded-lg ${
-              showFavoritesOnly ? 'bg-primary' : 'bg-background-light/30'
-            }`}
-          >
-            <Ionicons
-              name={showFavoritesOnly ? 'star' : 'star-outline'}
-              size={20}
-              color="#ffffff"
-            />
-            <StyledText className="text-text-primary font-sans ml-2">
-              Visa favoriter
-            </StyledText>
-          </StyledPressable>
-
-          {userProducts.length > 0 && (
-            <StyledPressable
-              onPress={handleClearHistory}
-              className="bg-status-error/80 p-2 rounded-lg"
-            >
-              <StyledText className="text-text-primary font-sans">
-                Rensa historik
-              </StyledText>
-            </StyledPressable>
-          )}
-        </StyledView>
-      </StyledView>
-
-      {/* Scrollable content */}
-      <StyledScrollView className="flex-1">
-        <StyledView className="px-4">
-          {filteredProducts.length > 0 ? (
-            filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))
-          ) : (
-            <StyledView className="py-12">
-              <StyledView className="bg-background-light/20 p-6 rounded-lg items-center">
-                <Ionicons name="scan-outline" size={48} color="#9ca3af" />
-                <StyledText className="text-text-secondary text-center mt-4 font-sans">
-                  {userProducts.length === 0
-                    ? 'Inga skanningar än. Börja med att skanna en produkt!'
-                    : 'Inga produkter matchar din sökning.'}
-                </StyledText>
-              </StyledView>
-            </StyledView>
-          )}
-        </StyledView>
-        <StyledView className="h-4" />
-      </StyledScrollView>
-      
-      {/* Lägg till AdminControls komponent i utvecklingsläge */}
-      {__DEV__ && <AdminControls />}
+    <StyledView className="flex-1 justify-center items-center bg-background-main">
+      <ActivityIndicator size="large" color="#4FB4F2" />
+      <StyledText className="text-text-secondary mt-4">
+        Laddar historik...
+      </StyledText>
     </StyledView>
   );
 }
 
-// Administrativ knapp för att rensa produkter utan användar-ID (endast i utvecklingsläge)
-function AdminControls() {
-  const clearProductsWithoutUser = useStore((state) => state.clearProductsWithoutUser);
+export function HistoryScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const getUserProducts = useStore(state => state.getUserProducts);
+  const addProduct = useStore(state => state.addProduct);
+  const [filterFavorites, setFilterFavorites] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(Date.now());
+  const navigation = useNavigation();
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Funktion för att uppdatera produktlistan
+  const updateProductsList = useCallback(() => {
+    // Tvinga omrendering genom att uppdatera forceUpdate-statet
+    setForceUpdate(Date.now());
+    console.log('Uppdaterar produktlista i historik');
+  }, []);
+  
+  // Använd useMemo för att beräkna produktlistan baserat på aktuella filter
+  const userProducts = useMemo(() => {
+    // Hämta ALLA produkter först för debugging
+    const allStoredProducts = useStore.getState().products;
+    const currentUser = useStore.getState().user;
+    
+    // Logga alla produkter för debugging
+    console.log('DEBUG: Alla produkter i store:', 
+      allStoredProducts.map(p => ({ 
+        id: p.id, 
+        userId: p.userId,
+        isFavorite: p.isFavorite,
+        isVegan: p.isVegan,
+        timestamp: p.timestamp
+      }))
+    );
+    
+    // Logga användarinfo
+    console.log('DEBUG: Nuvarande användare:', currentUser ? currentUser.id : 'ingen inloggad användare');
+    
+    // Hämta produkter som vi normalt skulle visa, för debugging
+    const products = getUserProducts();
+    console.log('History: Fick', products.length, 'produkter från getUserProducts');
+    
+    // Om inga produkter från getUserProducts, analysera varför
+    if (products.length === 0 && allStoredProducts.length > 0) {
+      console.warn('VIKTIGT: getUserProducts returnerar 0 produkter trots att det finns', 
+        allStoredProducts.length, 'produkter i store - möjlig användarfiltrering');
+        
+      // Check vilka produkter som filtreras bort pga användare
+      const productsWithoutUserId = allStoredProducts.filter(p => !p.userId);
+      const productsWithDifferentUserId = allStoredProducts.filter(p => 
+        p.userId && currentUser && p.userId !== currentUser.id);
+      
+      console.log('Produkter utan användar-ID:', productsWithoutUserId.length);
+      console.log('Produkter med annat användar-ID:', productsWithDifferentUserId.length);
+      
+      // I utvecklingsläge, visa alla produkter oavsett användar-ID
+      if (__DEV__) {
+        console.log('DEV-läge: Visar alla produkter oavsett användar-ID');
+        return allStoredProducts;
+      }
+    }
+    
+    return products;
+  }, [getUserProducts, forceUpdate]);
+  
+  // Tvinga uppdatering var 5:e sekund och när komponenten visas
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Uppdaterar produktlistan...');
+      setForceUpdate(Date.now());
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  useEffect(() => {
+    // Logga skärmvisning
+    logScreenView('HistoryScreen');
+    
+    // Statistik om produkterna
+    const totalProducts = userProducts.length;
+    const veganProducts = userProducts.filter((p: ScannedProduct) => p.isVegan).length;
+    const favorites = userProducts.filter((p: ScannedProduct) => p.isFavorite).length;
+    
+    console.log(`Historievy: ${totalProducts} produkter totalt, ${veganProducts} veganska, ${favorites} favoriter`);
+  }, [userProducts]);
+  
+  // Filtrera produkterna baserat på sökning och favoriter
+  const filteredProducts = useMemo(() => {
+    return userProducts
+      .filter((product: ScannedProduct) => {
+        // Ändra sökning till att matcha antingen ingredienser eller ID om produktnamn saknas
+        const matchesSearch = searchQuery === '' || 
+          (product.allIngredients && product.allIngredients.join(' ').toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (product.id && product.id.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesFavorite = !filterFavorites || product.isFavorite;
+        return matchesSearch && matchesFavorite;
+      })
+      .sort((a: ScannedProduct, b: ScannedProduct) => {
+        // Säkrare jämförelse för timestamp som kan vara string eller saknas
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeB - timeA; // Nyast först
+      });
+  }, [userProducts, searchQuery, filterFavorites]);
+
+  const handleFavoriteFilter = () => {
+    setFilterFavorites(!filterFavorites);
+    // Använd generisk logEvent istället för TOGGLE_FAVORITES_FILTER som inte existerar
+    logEvent('toggle_filter', { filterType: 'favorites', newState: !filterFavorites });
+  };
+
+  // Uppdatera produkter när fliken får fokus
+  useEffect(() => {
+    // Automatisk uppdatering när komponenten renderas
+    setRefreshing(true);
+    updateProductsList();
+    
+    // Hämta även produkter från AsyncStorage om det finns sådana
+    const syncFromAsyncStorage = async () => {
+      try {
+        const productsJson = await AsyncStorage.getItem('koalens-latest-products');
+        if (productsJson) {
+          const asyncProducts = JSON.parse(productsJson);
+          if (Array.isArray(asyncProducts) && asyncProducts.length > 0) {
+            console.log(`Hittade ${asyncProducts.length} produkter i AsyncStorage`);
+            
+            // Lägg till produkter från AsyncStorage till store om de inte redan finns där
+            const storeProducts = getUserProducts();
+            const storeProductIds = new Set(storeProducts.map(p => p.id));
+            
+            // Räkna nya produkter som inte finns i store
+            let newProductCount = 0;
+            
+            // För varje produkt i AsyncStorage
+            for (const asyncProduct of asyncProducts) {
+              if (asyncProduct && asyncProduct.id && !storeProductIds.has(asyncProduct.id)) {
+                try {
+                  // Använd addProduct från store för att lägga till produkten
+                  console.log('Lägger till produkt från AsyncStorage i store:', asyncProduct.id);
+                  
+                  addProduct({
+                    imageUri: asyncProduct.imageUri,
+                    isVegan: asyncProduct.isVegan,
+                    confidence: asyncProduct.confidence,
+                    nonVeganIngredients: asyncProduct.nonVeganIngredients || [],
+                    allIngredients: asyncProduct.allIngredients || [],
+                    reasoning: asyncProduct.reasoning || '',
+                    watchedIngredientsFound: asyncProduct.watchedIngredientsFound || [],
+                    userId: asyncProduct.userId || 'unknown'
+                  });
+                  
+                  newProductCount++;
+                } catch (error) {
+                  console.error('Fel vid tillägg av produkt från AsyncStorage:', error);
+                }
+              }
+            }
+            
+            if (newProductCount > 0) {
+              console.log(`Lade till ${newProductCount} nya produkter från AsyncStorage till store`);
+              // Uppdatera produktlistan igen efter att vi lagt till från AsyncStorage
+              updateProductsList();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Fel vid synkronisering från AsyncStorage:', error);
+      } finally {
+        setRefreshing(false);
+      }
+    };
+    
+    syncFromAsyncStorage();
+    
+    // Registrera en fokus-lyssnare för att uppdatera när fliken visas
+    const unsubscribe = navigation?.addListener('focus', () => {
+      console.log('Historikfliken fick fokus, uppdaterar produktlistan');
+      updateProductsList();
+      syncFromAsyncStorage();
+    });
+    
+    return () => {
+      unsubscribe && unsubscribe();
+    };
+  }, [navigation]);
+
+  // Överskrid getUserProducts i DEV för att visa alla produkter
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('DEV-läge: Skapar en funktion som visar alla produkter');
+      
+      // Sätt en override i store för getUserProducts
+      const originalGetUserProducts = useStore.getState().getUserProducts;
+      
+      // Spara original-funktionen i en ref för återställning senare
+      const getAllProductsOverride = () => {
+        return useStore.getState().products;
+      };
+      
+      // Logga för att verifiera
+      console.log('DEV: Override getUserProducts för att visa alla produkter');
+      
+      // Override getUserProducts direkt i store
+      useStore.setState({
+        getUserProducts: getAllProductsOverride
+      });
+      
+      // Återställ när komponenten avmonteras
+      return () => {
+        console.log('DEV: Återställer getUserProducts till original');
+        useStore.setState({
+          getUserProducts: originalGetUserProducts
+        });
+      };
+    }
+  }, []);
+
+  return (
+    <StyledSafeAreaView className="flex-1 bg-background-main">
+      <StyledView className="px-4 pt-2 pb-4">
+        <StyledText className="text-2xl font-sans-bold text-text-primary mb-4">
+          Historik
+        </StyledText>
+        
+        <StyledView className="flex-row items-center mb-4">
+          <StyledView className="flex-1 mr-2 bg-background-secondary rounded-lg flex-row items-center px-3 py-2">
+            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <StyledTextInput
+              className="flex-1 ml-2 text-text-primary font-sans"
+              placeholder="Sök produkter..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+        </StyledView>
+
+          <StyledPressable
+            className={`p-2 rounded-lg ${filterFavorites ? 'bg-primary' : 'bg-background-secondary'}`}
+            onPress={handleFavoriteFilter}
+          >
+            <Ionicons
+              name="star" 
+              size={20}
+              color={filterFavorites ? '#fff' : '#9CA3AF'} 
+            />
+          </StyledPressable>
+        </StyledView>
+      </StyledView>
+
+      {userProducts.length === 0 ? (
+        <StyledView className="flex-1 justify-center items-center px-6">
+          <StyledText className="text-text-secondary text-center font-sans-medium text-lg mb-2">
+            Ingen historik än
+          </StyledText>
+          <StyledText className="text-text-tertiary text-center font-sans">
+            När du skannar ingredienser kommer dina analyser att visas här.
+                </StyledText>
+              </StyledView>
+      ) : filteredProducts.length === 0 ? (
+        <StyledView className="flex-1 justify-center items-center px-6">
+          <StyledText className="text-text-secondary text-center font-sans-medium text-lg mb-2">
+            Inga produkter hittades
+          </StyledText>
+          <StyledText className="text-text-tertiary text-center font-sans">
+            Prova att ändra dina sökfilter för att hitta produkter.
+          </StyledText>
+        </StyledView>
+      ) : (
+        <StyledScrollView className="flex-1">
+          <StyledView className="px-4 pb-24">
+            {filteredProducts.map((product) => (
+              <ProductCard 
+                key={product.id} 
+                product={product}
+              />
+            ))}
+          </StyledView>
+      </StyledScrollView>
+      )}
+      
+      {__DEV__ && <AdminControls setForceUpdate={setForceUpdate} />}
+    </StyledSafeAreaView>
+  );
+}
+
+// Administrativ kontroll för utvecklingsläge
+interface AdminControlsProps {
+  setForceUpdate: React.Dispatch<React.SetStateAction<number>>;
+}
+
+function AdminControls({ setForceUpdate }: AdminControlsProps) {
+  const clearProductsWithoutUser = useStore((state: StoreState) => state.clearProductsWithoutUser);
+  const currentUser = useStore((state: StoreState) => state.user);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const allProducts = useStore((state: StoreState) => state.products);
+  
+  // Kontrollera AsyncStorage för aktuell inställning vid montering
+  useEffect(() => {
+    const checkSetting = async () => {
+      try {
+        const value = await AsyncStorage.getItem('DEV_SHOW_ALL_PRODUCTS');
+        if (value !== null) {
+          setShowAllProducts(value === 'true');
+          // Sätt global variabel för omedelbar effekt
+          // @ts-ignore
+          global.__DEV_SHOW_ALL_PRODUCTS = (value === 'true');
+        }
+      } catch (error) {
+        console.error('Fel vid läsning av DEV-flagga:', error);
+      }
+    };
+    
+    checkSetting();
+  }, []);
   
   const handleCleanup = () => {
-    const remainingCount = clearProductsWithoutUser();
+    const before = useStore.getState().products.length;
+    clearProductsWithoutUser();
+    const after = useStore.getState().products.length;
+    
     Alert.alert(
       'Rensning slutförd',
-      `Produkter utan användar-ID har rensats. Kvarstående produkter: ${remainingCount}`
+      `Borttagna produkter: ${before - after}\nÅterstående produkter: ${after}`,
+      [
+        { text: 'OK' }
+      ]
     );
+    
+    // Uppdatera listan
+    setForceUpdate(Date.now());
+  };
+
+  // Hämta session direkt från supabase
+  const checkSupabaseSession = async () => {
+    try {
+      const { supabase } = require('@/lib/supabase');
+      
+      // Testa både gamla och nya API-anrop
+      let sessionInfo = "Kunde inte hämta session";
+      let userId = "Okänd";
+      
+      // Försök med nyare API
+      try {
+        console.log("Testar nya Supabase API:et (getSession)");
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          sessionInfo = "Session hittad via getSession()";
+          userId = data.session?.user?.id || "saknas";
+        }
+      } catch (e) {
+        console.log("Fel med nya API:et:", e);
+      }
+      
+      // Försök med äldre API
+      try {
+        console.log("Testar äldre Supabase API (session())");
+        if (typeof supabase.auth.session === 'function') {
+          const sessionData = supabase.auth.session();
+          if (sessionData) {
+            sessionInfo += "\nSession hittad via session()";
+            userId = sessionData?.user?.id || userId;
+          }
+        }
+      } catch (e) {
+        console.log("Fel med äldre API:et:", e);
+      }
+      
+      Alert.alert(
+        'Supabase Session',
+        `Status: ${sessionInfo}\nUser ID: ${userId}\n\nProdukter i store: ${allProducts.length}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Fel vid kontroll av session:', error);
+      Alert.alert('Fel', 'Kunde inte hämta session');
+    }
+  };
+  
+  const forceReload = () => {
+    console.log("Manuell uppdatering begärd, uppdaterar...");
+    setForceUpdate(Date.now());
+    
+    // Visa toast eller alert för att bekräfta
+    Alert.alert('Uppdatering', 'Produktlistan uppdateras...', [
+      { text: 'OK' }
+    ]);
+  };
+  
+  const toggleShowAllProducts = async () => {
+    const newValue = !showAllProducts;
+    setShowAllProducts(newValue);
+    
+    try {
+      await AsyncStorage.setItem('DEV_SHOW_ALL_PRODUCTS', newValue ? 'true' : 'false');
+      
+      // Sätt global variabel för omedelbar effekt
+      // @ts-ignore
+      global.__DEV_SHOW_ALL_PRODUCTS = newValue;
+      
+      // Tvinga uppdatering
+      setForceUpdate(Date.now());
+      
+      // Visa ett meddelande om att inställningen är aktiverad
+      Alert.alert(
+        'Inställning sparad',
+        `Admin-läge för att visa alla produkter: ${newValue ? 'AKTIVERAT' : 'INAKTIVERAT'}`,
+        [
+          { text: 'OK' }
+        ]
+      );
+    } catch (err) {
+      console.error('Fel vid inställning av DEV-flagga:', err);
+      Alert.alert('Fel', 'Kunde inte spara inställningen');
+    }
   };
 
   return (
-    <StyledView className="border-t border-gray-700 py-2 px-4">
-      <StyledText className="text-yellow-500 font-mono text-xs mb-2">
-        Admin Controls (DEV Only)
+    <StyledView className="p-4 bg-gray-800 rounded-t-lg">
+      <StyledText className="text-white font-sans-bold mb-2">Admin-verktyg (DEV)</StyledText>
+      <StyledText className="text-gray-300 text-sm mb-2">
+        Inloggad som: {currentUser?.id || 'Inte inloggad'}
+      </StyledText>
+      <StyledText className="text-gray-300 text-sm mb-2">
+        Totalt antal produkter i store: {allProducts.length}
       </StyledText>
       
+      <StyledView className="flex-row mt-2 mb-2">
       <StyledPressable
+          className="bg-red-600 rounded-lg py-2 px-4 mr-2 flex-1"
         onPress={handleCleanup}
-        className="bg-red-800 py-2 rounded-lg mb-1"
-      >
-        <StyledText className="text-white font-mono text-xs text-center">
-          Rensa produkter utan användar-ID
+        >
+          <StyledText className="text-white text-center font-sans-medium">
+            Rensa utan användar-ID
+          </StyledText>
+        </StyledPressable>
+        
+        <StyledPressable 
+          className={`rounded-lg py-2 px-4 flex-1 ${showAllProducts ? 'bg-green-600' : 'bg-gray-600'}`}
+          onPress={toggleShowAllProducts}
+        >
+          <StyledText className="text-white text-center font-sans-medium">
+            {showAllProducts ? 'Visa endast mina' : 'Visa alla produkter'}
+          </StyledText>
+        </StyledPressable>
+      </StyledView>
+
+      <StyledView className="flex-row mt-2 mb-2">
+        <StyledPressable
+          className="bg-blue-600 rounded-lg py-2 px-4 mr-2 flex-1"
+          onPress={checkSupabaseSession}
+        >
+          <StyledText className="text-white text-center font-sans-medium">
+            Kontrollera session
+          </StyledText>
+        </StyledPressable>
+        
+        <StyledPressable
+          className="bg-orange-600 rounded-lg py-2 px-4 flex-1"
+          onPress={forceReload}
+        >
+          <StyledText className="text-white text-center font-sans-medium">
+            Uppdatera nu
         </StyledText>
       </StyledPressable>
+      </StyledView>
     </StyledView>
   );
 }

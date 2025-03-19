@@ -1,290 +1,428 @@
-// app/(tabs)/(history)/[id].tsx
-import { View, Text, ScrollView, Image, Share, Pressable, Alert } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useStore } from '@/stores/useStore';
+/**
+ * Produktdetaljskärmen
+ * Använder den nya produktmodellen och våra custom hooks
+ */
+
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  View, Text, Image, ScrollView, ActivityIndicator,
+  Pressable, SafeAreaView, Alert, Share, Platform 
+} from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { styled } from 'nativewind';
+import { Ionicons } from '@expo/vector-icons';
+import { useProducts } from '../../../hooks/useProducts';
+import { Product } from '../../../models/productModel';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect } from 'react';
-import { styled } from 'nativewind';
-import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
-import { useUsageLimit } from '@/hooks/useUsageLimit';
 
+// Styled components
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledScrollView = styled(ScrollView);
 const StyledPressable = styled(Pressable);
+const StyledSafeAreaView = styled(SafeAreaView);
 const StyledImage = styled(Image);
 
-// Sektion-komponent för bättre struktur
-const Section: React.FC<{
-  title: string;
-  icon?: string;
-  iconColor?: string;
-  children: React.ReactNode;
-  className?: string;
-}> = ({ title, icon, iconColor = '#ffffff', children, className = '' }) => (
-  <StyledView className={`mb-6 ${className}`}>
-    <StyledView className="flex-row items-center mb-2">
-      {icon && (
-        <Ionicons 
-          name={icon as any} 
-          size={20} 
-          color={iconColor}
-          style={{ marginRight: 8 }}
-        />
-      )}
-      <StyledText className="text-text-primary font-sans-medium text-lg">
-        {title}
-      </StyledText>
-    </StyledView>
-    {children}
+// Hårdkodade strings för skärmen
+const STRINGS = {
+  HEADER_BACK: 'Tillbaka',
+  HEADER_TITLE: 'Produktdetalj',
+  ERROR_TITLE: 'Fel',
+  ERROR_MESSAGE: 'Kunde inte hitta produkten',
+  ERROR_BUTTON: 'Gå tillbaka',
+  SHARE_BUTTON: 'Dela',
+  FAVORITE_BUTTON: 'Favorit',
+  UNFAVORITE_BUTTON: 'Ta bort favorit',
+  DELETE_BUTTON: 'Ta bort',
+  DELETE_TITLE: 'Ta bort produkt',
+  DELETE_MESSAGE: 'Är du säker på att du vill ta bort denna produkt från historiken?',
+  DELETE_CANCEL: 'Avbryt',
+  DELETE_CONFIRM: 'Ta bort',
+  SHARE_TITLE: 'Se vad jag hittade med KoaLens!',
+  SHARE_ERROR: 'Kunde inte dela produkten',
+  SECTION_ANALYSIS: 'Analys',
+  SECTION_INGREDIENTS: 'Ingredienser',
+  VEGAN_INGREDIENTS: 'Veganska ingredienser',
+  NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
+  WATCH_INGREDIENTS: 'Ingredienser att se upp med',
+  UNKNOWN_INGREDIENTS: 'Okända ingredienser',
+  VEGAN_RESULT: 'Vegansk',
+  NON_VEGAN_RESULT: 'Inte vegansk',
+  CONFIDENCE: 'Säkerhet',
+  ANALYSIS_DATE: 'Analyserad',
+  NO_INGREDIENTS: 'Inga ingredienser av denna typ hittades',
+  EMPTY_REASONING: 'Ingen analysgrund tillgänglig'
+};
+
+// Sektion-rubrik komponent
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <StyledView className="border-b border-gray-200 pb-2 mb-4">
+    <StyledText className="text-text-primary font-sans-bold text-lg">
+      {title}
+    </StyledText>
   </StyledView>
 );
 
-export default function ProductDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { refreshUsageLimit } = useUsageLimit();
-  
-  const product = useStore(useCallback(
-    (state) => state.products.find((p) => p.id === id),
-    [id]
-  ));
-  
-  const toggleFavorite = useStore((state) => state.toggleFavorite);
-  const removeProduct = useStore((state) => state.removeProduct);
-  
-  // Logga skärmvisning när komponenten monteras
-  useEffect(() => {
-    if (product) {
-      logScreenView('ProductDetail');
-      
-      // Uppdatera användningsgränsen när vi visar produktdetaljer
-      refreshUsageLimit().catch(err => 
-        console.error('Failed to refresh usage in detail view:', err)
-      );
-      
-      // Logga produktdetaljer
-      logEvent('view_product_details', {
-        is_vegan: product.isVegan,
-        is_favorite: product.isFavorite,
-        confidence: Math.round(product.confidence * 100),
-        non_vegan_ingredients_count: product.nonVeganIngredients.length,
-        watched_ingredients_count: product.watchedIngredientsFound.length,
-        total_ingredients: product.allIngredients.length
-      });
-    }
-  }, [product, refreshUsageLimit]);
-
-  if (!product) {
-    return (
-      <StyledView className="flex-1 justify-center items-center bg-background-main">
-        <StyledText className="text-text-primary font-sans">
-          Produkten hittades inte
-        </StyledText>
-      </StyledView>
-    );
-  }
-
-  const handleShare = async () => {
-    try {
-      const message = `
-KoaLens Analys
-${product.isVegan ? '✓ Produkten är vegansk' : '✗ Produkten är inte vegansk'}
-Säkerhet: ${Math.round(product.confidence * 100)}%
-
-${product.nonVeganIngredients.length > 0 ? `Ej veganska ingredienser:\n${product.nonVeganIngredients.join(', ')}\n` : ''}
-${product.watchedIngredientsFound.length > 0 ? `\nBevakade ingredienser:\n${product.watchedIngredientsFound.map(ing => `${ing.name} - ${ing.description}`).join('\n')}\n` : ''}
-Ingredienslista:
-${product.allIngredients.join(', ')}
-
-Analys:
-${product.reasoning}`;
-
-      await Share.share({ message });
-      
-      // Logga delningshändelse
-      logEvent(Events.SHARE_RESULT, {
-        is_vegan: product.isVegan,
-        confidence: Math.round(product.confidence * 100),
-        content_length: message.length
-      });
-      
-    } catch (error) {
-      console.error('Error sharing product:', error);
-      
-      // Logga delningsfel
-      logEvent('share_error', {
-        error_message: error instanceof Error ? error.message : 'Unknown error'
-      });
+// Ingrediens-lista komponent
+const IngredientList: React.FC<{
+  title: string;
+  ingredients: string[];
+  type: 'vegan' | 'non-vegan' | 'watch' | 'unknown';
+}> = ({ title, ingredients, type }) => {
+  // Färgkodning för olika typer av ingredienser
+  const getTypeColor = () => {
+    switch (type) {
+      case 'vegan': return 'bg-status-success';
+      case 'non-vegan': return 'bg-status-error';
+      case 'watch': return 'bg-status-warning';
+      case 'unknown': return 'bg-gray-400';
+      default: return 'bg-gray-400';
     }
   };
+  
+  if (ingredients.length === 0) {
+    return null;
+  }
+  
+  return (
+    <StyledView className="mb-6">
+      <StyledView className="flex-row items-center mb-2">
+        <StyledView className={`w-3 h-3 rounded-full mr-2 ${getTypeColor()}`} />
+        <StyledText className="text-text-primary font-sans-medium">
+          {title}
+        </StyledText>
+      </StyledView>
+      {ingredients.length === 0 ? (
+        <StyledText className="text-text-secondary font-sans-italic ml-5">
+          {STRINGS.NO_INGREDIENTS}
+        </StyledText>
+      ) : (
+        <StyledView className="ml-5">
+          {ingredients.map((ingredient, index) => (
+            <StyledText 
+              key={index} 
+              className="text-text-primary font-sans mb-1"
+            >
+              • {ingredient}
+            </StyledText>
+          ))}
+        </StyledView>
+      )}
+    </StyledView>
+  );
+};
 
+// Huvudkomponent för produktdetalj
+export default function ProductDetailScreen() {
+  // Hämta ID från URL-parametrar
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Hämta produktrelaterade funktioner från vår custom hook
+  const { 
+    getProductById, toggleFavorite, removeProduct
+  } = useProducts();
+  
+  // Ladda produktdata
+  const loadProduct = useCallback(async () => {
+    if (!id) {
+      console.error('ProductDetailScreen: Inget produkt-ID angivet');
+      setError('Inget produkt-ID angivet');
+      setLoading(false);
+      return;
+    }
+    
+    // Rensa bort eventuellt -new suffix från ID
+    const cleanId = id.toString().replace('-new', '');
+    console.log(`ProductDetailScreen: Försöker hämta produkt med ID: ${cleanId} (original ID: ${id})`);
+    
+    try {
+      setLoading(true);
+      const foundProduct = await getProductById(cleanId);
+      if (foundProduct) {
+        console.log(`ProductDetailScreen: Produkt hittad med ID ${cleanId}`);
+        setProduct(foundProduct);
+        setError(null);
+      } else {
+        console.error(`ProductDetailScreen: Produkt med ID ${cleanId} kunde inte hittas`);
+        setError('Produkten kunde inte hittas');
+      }
+    } catch (err) {
+      console.error(`ProductDetailScreen: Fel vid hämtning av produkt med ID ${cleanId}:`, err);
+      setError('Ett fel uppstod vid hämtning av produkten');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, getProductById]);
+  
+  // Ladda produkten när skärmen visas
+  useEffect(() => {
+    loadProduct();
+  }, [loadProduct]);
+  
+  // Hantera favorit-knapp
+  const handleToggleFavorite = async () => {
+    if (!product) return;
+    
+    try {
+      await toggleFavorite(product.id);
+      // Uppdatera lokala produktdata med nya favorit-statusen
+      setProduct(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          metadata: {
+            ...prev.metadata,
+            isFavorite: !prev.metadata.isFavorite
+          }
+        };
+      });
+    } catch (err) {
+      console.error('Fel vid växling av favoritstatus:', err);
+      Alert.alert('Fel', 'Kunde inte uppdatera favoritstatus');
+    }
+  };
+  
+  // Hantera borttagning
   const handleRemove = () => {
+    if (!product) return;
+    
     Alert.alert(
-      'Ta bort produkt',
-      'Är du säker på att du vill ta bort denna produkt från historiken?',
+      STRINGS.DELETE_TITLE,
+      STRINGS.DELETE_MESSAGE,
       [
         {
-          text: 'Avbryt',
+          text: STRINGS.DELETE_CANCEL,
           style: 'cancel'
         },
         {
-          text: 'Ta bort',
+          text: STRINGS.DELETE_CONFIRM,
           style: 'destructive',
-          onPress: () => {
-            // Logga borttagnigshändelse
-            logEvent(Events.DELETE_PRODUCT, {
-              is_vegan: product.isVegan,
-              is_favorite: product.isFavorite
-            });
-            
-            removeProduct(product.id);
-            router.back();
+          onPress: async () => {
+            try {
+              await removeProduct(product.id);
+              router.back();
+            } catch (err) {
+              console.error('Fel vid borttagning av produkt:', err);
+              Alert.alert('Fel', 'Kunde inte ta bort produkten');
+            }
           }
         }
       ]
     );
   };
-
-  const handleToggleFavorite = () => {
-    // Logga favoritändring
-    logEvent(Events.TOGGLE_FAVORITE, {
-      product_id: product.id,
-      is_vegan: product.isVegan,
-      previous_state: product.isFavorite ? 'favorite' : 'not_favorite',
-      new_state: product.isFavorite ? 'not_favorite' : 'favorite'
-    });
+  
+  // Dela produkt
+  const handleShare = async () => {
+    if (!product) return;
     
-    toggleFavorite(product.id);
+    try {
+      const result = product.analysis.isVegan 
+        ? `${STRINGS.VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`
+        : `${STRINGS.NON_VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`;
+      
+      const message = `${STRINGS.SHARE_TITLE}\n\nProdukt analyserad med KoaLens: ${result}\n\nLaddade ner KoaLens-appen för att analysera dina egna produkter!`;
+      
+      await Share.share({
+        message,
+        // På iOS kan vi ange både titel och meddelande
+        ...(Platform.OS === 'ios' ? { title: STRINGS.SHARE_TITLE } : {})
+      });
+    } catch (err) {
+      console.error('Fel vid delning:', err);
+      Alert.alert('Fel', STRINGS.SHARE_ERROR);
+    }
   };
-
+  
+  // Visa laddningsindikator
+  if (loading) {
+    return (
+      <StyledSafeAreaView className="flex-1 bg-background-main">
+        <StyledView className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#6366f1" />
+        </StyledView>
+      </StyledSafeAreaView>
+    );
+  }
+  
+  // Visa felmeddelande
+  if (error || !product) {
+    return (
+      <StyledSafeAreaView className="flex-1 bg-background-main">
+        <StyledView className="flex-1 justify-center items-center p-4">
+          <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+          <StyledText className="text-text-primary font-sans-medium text-lg mt-4 text-center">
+            {STRINGS.ERROR_TITLE}
+          </StyledText>
+          <StyledText className="text-text-secondary font-sans text-center mt-2 mb-4">
+            {error || STRINGS.ERROR_MESSAGE}
+          </StyledText>
+          <StyledPressable
+            onPress={() => router.back()}
+            className="bg-primary py-2 px-4 rounded"
+          >
+            <StyledText className="text-text-inverse font-sans">
+              {STRINGS.ERROR_BUTTON}
+            </StyledText>
+          </StyledPressable>
+        </StyledView>
+      </StyledSafeAreaView>
+    );
+  }
+  
+  // Formatterat datum
   const formattedDate = format(new Date(product.timestamp), 'PPP', {
     locale: sv,
   });
-
+  
+  // Huvudinnehåll
   return (
-    <StyledScrollView className="flex-1 bg-background-main">
-      {/* Produktbild */}
-      <StyledView className="w-full aspect-square bg-gray-900">
-        <StyledImage
-          source={{ uri: product.imageUri }}
-          className="w-full h-full"
-          resizeMode="contain"
-        />
-      </StyledView>
-
-      {/* Innehåll */}
-      <StyledView className="p-4">
-        {/* Status header */}
-        <StyledView className={`p-4 rounded-lg mb-6 ${
-          product.isVegan ? 'bg-status-success/20' : 'bg-status-error/20'
-        }`}>
-          <StyledView className="flex-row items-center justify-between">
-            <StyledView className="flex-row items-center">
-              <StyledView className={`w-3 h-3 rounded-full mr-2 ${
-                product.isVegan ? 'bg-status-success' : 'bg-status-error'
-              }`} />
-              <StyledText className="text-text-primary font-sans-medium text-xl">
-                {product.isVegan ? 'Vegansk' : 'Inte vegansk'}
-              </StyledText>
-            </StyledView>
-            <StyledPressable
-              onPress={handleToggleFavorite}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name={product.isFavorite ? 'star' : 'star-outline'}
-                size={24}
-                color={product.isFavorite ? '#ffd700' : '#ffffff'}
-              />
-            </StyledPressable>
-          </StyledView>
-          <StyledText className="text-text-secondary font-sans mt-2">
-            Skannad: {formattedDate}
-          </StyledText>
-          <StyledText className="text-text-primary font-sans mt-2">
-            Säkerhet: {Math.round(product.confidence * 100)}%
-          </StyledText>
-        </StyledView>
-
-        {/* Icke-veganska ingredienser */}
-        {!product.isVegan && product.nonVeganIngredients.length > 0 && (
-          <Section 
-            title="Ej veganska ingredienser"
-            icon="alert-circle-outline"
-            iconColor="#f44336"
-          >
-            {product.nonVeganIngredients.map((ingredient, index) => (
-              <StyledText key={index} className="text-status-error/90 font-sans">
-                • {ingredient}
-              </StyledText>
-            ))}
-          </Section>
-        )}
-
-        {/* Bevakade ingredienser */}
-        {product.watchedIngredientsFound.length > 0 && (
-          <Section 
-            title="Bevakade ingredienser"
-            icon="eye-outline"
-            iconColor="#ffd33d"
-          >
-            {product.watchedIngredientsFound.map((ingredient, index) => (
-              <StyledView key={index} className="mb-3 bg-background-light/30 rounded-lg p-3">
-                <StyledText className="text-primary font-sans-medium">
-                  • {ingredient.name}
-                </StyledText>
-                <StyledText className="text-text-secondary font-sans text-sm mt-1 ml-4">
-                  {ingredient.description}
-                </StyledText>
-              </StyledView>
-            ))}
-          </Section>
-        )}
-
-        {/* Alla ingredienser */}
-        <Section 
-          title="Ingredienslista"
-          icon="list-outline"
+    <StyledSafeAreaView className="flex-1 bg-background-main">
+      {/* Header */}
+      <StyledView className="px-4 py-2 flex-row items-center border-b border-gray-200">
+        <StyledPressable
+          onPress={() => router.back()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          {product.allIngredients.map((ingredient, index) => (
-            <StyledText key={index} className="text-text-primary font-sans">
-              • {ingredient}
-            </StyledText>
-          ))}
-        </Section>
-
-        {/* Analys */}
-        <Section 
-          title="Analys"
-          icon="analytics-outline"
-        >
-          <StyledText className="text-text-primary font-sans">
-            {product.reasoning}
-          </StyledText>
-        </Section>
-
-        {/* Knappar */}
-        <StyledView className="flex-row justify-between mt-4 gap-2">
+          <Ionicons name="chevron-back" size={24} color="#6366f1" />
+        </StyledPressable>
+        <StyledText className="text-text-primary font-sans-medium ml-2 flex-1">
+          {STRINGS.HEADER_TITLE}
+        </StyledText>
+        
+        {/* Åtgärdsknappar */}
+        <StyledView className="flex-row">
           <StyledPressable
             onPress={handleShare}
-            className="flex-1 bg-primary py-3 rounded-lg items-center active:opacity-80"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            className="mr-4"
           >
-            <StyledText className="text-text-inverse font-sans-medium">
-              Dela
-            </StyledText>
+            <Ionicons name="share-outline" size={24} color="#6366f1" />
+          </StyledPressable>
+          <StyledPressable
+            onPress={handleToggleFavorite}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            className="mr-4"
+          >
+            <Ionicons
+              name={product.metadata.isFavorite ? "star" : "star-outline"}
+              size={24}
+              color={product.metadata.isFavorite ? "#ffd700" : "#6366f1"}
+            />
           </StyledPressable>
           <StyledPressable
             onPress={handleRemove}
-            className="flex-1 bg-status-error py-3 rounded-lg items-center active:opacity-80"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <StyledText className="text-text-primary font-sans-medium">
-              Ta bort
-            </StyledText>
+            <Ionicons name="trash-outline" size={24} color="#ef4444" />
           </StyledPressable>
         </StyledView>
       </StyledView>
-    </StyledScrollView>
+      
+      <StyledScrollView className="flex-1">
+        {/* Produktbild */}
+        {product.metadata?.imageUri && (
+          <StyledImage
+            source={{ uri: product.metadata.imageUri }}
+            className="w-full h-48"
+            resizeMode="cover"
+          />
+        )}
+        
+        {/* Innehåll */}
+        <StyledView className="p-4">
+          {/* Resultat */}
+          <StyledView className="items-center mb-6">
+            <StyledView 
+              className={`py-2 px-4 rounded-full mb-4 ${
+                product.analysis.isVegan 
+                  ? 'bg-status-success/20' 
+                  : 'bg-status-error/20'
+              }`}
+            >
+              <StyledText className={`font-sans-bold text-lg ${
+                product.analysis.isVegan 
+                  ? 'text-status-success' 
+                  : 'text-status-error'
+              }`}>
+                {product.analysis.isVegan 
+                  ? STRINGS.VEGAN_RESULT 
+                  : STRINGS.NON_VEGAN_RESULT}
+              </StyledText>
+            </StyledView>
+            
+            <StyledView className="flex-row items-center mb-2">
+              <Ionicons name="shield-checkmark-outline" size={16} color="#9ca3af" />
+              <StyledText className="text-text-secondary font-sans ml-1">
+                {STRINGS.CONFIDENCE}: {Math.round(product.analysis.confidence * 100)}%
+              </StyledText>
+            </StyledView>
+            
+            <StyledView className="flex-row items-center">
+              <Ionicons name="calendar-outline" size={16} color="#9ca3af" />
+              <StyledText className="text-text-secondary font-sans ml-1">
+                {STRINGS.ANALYSIS_DATE}: {formattedDate}
+              </StyledText>
+            </StyledView>
+          </StyledView>
+          
+          {/* Analys */}
+          <StyledView className="mb-8">
+            <SectionHeader title={STRINGS.SECTION_ANALYSIS} />
+            {product.analysis.reasoning ? (
+              <StyledText className="text-text-primary font-sans">
+                {product.analysis.reasoning}
+              </StyledText>
+            ) : (
+              <StyledText className="text-text-secondary font-sans-italic">
+                {STRINGS.EMPTY_REASONING}
+              </StyledText>
+            )}
+          </StyledView>
+          
+          {/* Ingredienser */}
+          <StyledView>
+            <SectionHeader title={STRINGS.SECTION_INGREDIENTS} />
+            
+            <IngredientList
+              title={STRINGS.VEGAN_INGREDIENTS}
+              ingredients={product.ingredients.filter(
+                ing => !product.analysis.watchedIngredients.some(w => w.name === ing && w.reason === 'non-vegan') &&
+                       !product.analysis.watchedIngredients.some(w => w.name === ing)
+              )}
+              type="vegan"
+            />
+            
+            <IngredientList
+              title={STRINGS.NON_VEGAN_INGREDIENTS}
+              ingredients={product.analysis.watchedIngredients
+                .filter(w => w.reason === 'non-vegan')
+                .map(w => w.name)}
+              type="non-vegan"
+            />
+            
+            <IngredientList
+              title={STRINGS.WATCH_INGREDIENTS}
+              ingredients={product.analysis.watchedIngredients
+                .filter(w => w.reason !== 'non-vegan')
+                .map(w => w.name)}
+              type="watch"
+            />
+            
+            <IngredientList
+              title={STRINGS.UNKNOWN_INGREDIENTS}
+              ingredients={[]} // Vi har inte unknown i vår nuvarande modell
+              type="unknown"
+            />
+          </StyledView>
+          
+          {/* Utrymme i botten */}
+          <StyledView className="h-24" />
+        </StyledView>
+      </StyledScrollView>
+    </StyledSafeAreaView>
   );
-}
+} 

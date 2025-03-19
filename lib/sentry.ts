@@ -108,4 +108,24 @@ const getUserId = (): string | null => {
   }
 };
 
+// Använd strukturerad loggning för olika områden
+export const logCategories = {
+  AUTH: 'auth',
+  PRODUCTS: 'products',
+  ANALYSIS: 'analysis',
+  NAVIGATION: 'navigation'
+};
+
+// Förbättrad loggningsfunktion för produktrelaterade operationer
+export function logProductOperation(operation: string, details: any) {
+  console.log(`[Product:${operation}]`, details);
+  addBreadcrumb(`Product operation: ${operation}`, 'products', details);
+}
+
+// Förbättrad loggningsfunktion för analysrelaterade operationer
+export function logAnalysisOperation(operation: string, details: any) {
+  console.log(`[Analysis:${operation}]`, details);
+  addBreadcrumb(`Analysis operation: ${operation}`, 'analysis', details);
+}
+
 export { Severity };

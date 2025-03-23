@@ -62,5 +62,31 @@ export const useUpdateUserProfile = () => {
     }
   }, [user]);
   
-  return { updateUserProfile, updateAvatar };
+  // Funktion för att bara uppdatera vegan status
+  const updateVeganStatus = useCallback(async (status: VeganStatus) => {
+    if (!user) return false;
+    
+    try {
+      console.log('useUpdateUserProfile: Updating vegan status to', status);
+      // Uppdatera endast vegan status metadata
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          vegan_status: status,
+          avatar_update: true // Add flag to prevent navigation
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating vegan status:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Exception updating vegan status:', error);
+      return false;
+    }
+  }, [user]);
+  
+  return { updateUserProfile, updateAvatar, updateVeganStatus };
 };

@@ -25,6 +25,7 @@ interface PersistedState {
   veganStatus?: StoreState['veganStatus'];
   usageLimit?: StoreState['usageLimit'];
   userId?: StoreState['userId'];
+  counters?: StoreState['counters'];
 }
 
 // Helper för typkonvertering mellan Product och ScannedProduct
@@ -45,6 +46,8 @@ export const useStore = create<StoreState>()(
       ...createUsageLimitSlice(...a),
       ...createUserSlice(...a),
       ...createProductSlice(...a),
+      // Initiera counters med ett tomt objekt
+      counters: {},
     } as unknown as StoreState), // Använd en dubbelkonvertering för att kringgå typkonflikten
     {
       name: 'koalens-storage',
@@ -62,7 +65,8 @@ export const useStore = create<StoreState>()(
           ...state.usageLimit,
           loading: false
         },
-        userId: state.userId
+        userId: state.userId,
+        counters: state.counters
       }),
       version: STORE_VERSION,
       migrate: (persistedState: unknown, version: number) => {

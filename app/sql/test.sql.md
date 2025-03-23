@@ -1,9 +1,0 @@
-| table_name       |
-| ---------------- |
-| profiles         |
-| scan_history     |
-| user_usage       |
-| audit_logs       |
-| scanned_products |
-| feedback         |
-| app_feedback     |

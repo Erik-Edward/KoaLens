@@ -1,7 +1,7 @@
 // components/UsageLimitIndicator.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { useUsageLimit } from '@/hooks/useUsageLimit';
+import { useCounter } from '@/hooks/useCounter';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -13,7 +13,17 @@ interface UsageLimitIndicatorProps {
 }
 
 export function UsageLimitIndicator({ compact = false }: UsageLimitIndicatorProps) {
-  const { remaining, analysesLimit, isLoading, isPremium, analysesUsed, refreshUsageLimit } = useUsageLimit();
+  const { 
+    remaining, 
+    limit: analysesLimit, 
+    value: analysesUsed, 
+    loading: isLoading,
+    fetchCounter 
+  } = useCounter('analysis_count');
+
+  // Kontrollera om användaren är premium (kan anpassas efter din apps logik)
+  const isPremium = analysesLimit === Infinity || analysesLimit === 999999;
+  
   const [refreshKey, setRefreshKey] = useState(0);
   
   useEffect(() => {
@@ -22,7 +32,7 @@ export function UsageLimitIndicator({ compact = false }: UsageLimitIndicatorProp
       analysesLimit 
     });
     
-    refreshUsageLimit().then(() => {
+    fetchCounter().then(() => {
       setRefreshKey(prev => prev + 1);
     });
   }, []);
@@ -81,7 +91,7 @@ export function UsageLimitIndicator({ compact = false }: UsageLimitIndicatorProp
         color={iconColors[status]} 
       />
       <StyledText className={`${statusColors[status]} ${compact ? "text-xs" : "text-base"} font-sans-medium`}>
-        {remaining} / {analysesLimit} analyser kvar
+        {remaining} / {analysesLimit}
       </StyledText>
     </StyledView>
   );

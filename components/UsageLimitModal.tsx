@@ -3,7 +3,7 @@ import React from 'react';
 import { Modal, View, Text, Pressable } from 'react-native';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
-import { useUsageLimit } from '@/hooks/useUsageLimit';
+import { useCounter } from '@/hooks/useCounter';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -15,7 +15,7 @@ interface UsageLimitModalProps {
 }
 
 export function UsageLimitModal({ visible, onClose }: UsageLimitModalProps) {
-  const { analysesUsed, analysesLimit } = useUsageLimit();
+  const { value: analysesUsed, limit: analysesLimit } = useCounter('analysis_count');
   
   return (
     <Modal

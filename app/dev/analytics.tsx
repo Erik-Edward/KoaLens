@@ -11,7 +11,7 @@ import {
 import { styled } from 'nativewind';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAnalytics } from '../../hooks/useAnalytics';
+import { useCounter } from '../../hooks/useCounter';
 
 // Styled components
 const StyledView = styled(View);
@@ -74,19 +74,35 @@ export default function AnalyticsTestScreen() {
   // State
   const [isPerformingAction, setIsPerformingAction] = useState(false);
   
-  // Använd analytics hook
+  // Använd counter hook
   const { 
-    usageStatus, loading, error, refreshing, refreshUsageStatus,
-    recordAnalysis, canPerformAnalysis, syncPendingAnalyses, pendingCount
-  } = useAnalytics();
+    value, 
+    limit, 
+    remaining, 
+    hasReachedLimit, 
+    loading,
+    fetchCounter,
+    incrementCounter,
+    canPerformOperation,
+    recordAnalysis,
+    checkLimit
+  } = useCounter('analysis_count');
   
+  // Beräkna statistik för visning
+  const usageStatus = {
+    total: value,
+    limit,
+    remaining,
+    allowed: !hasReachedLimit
+  };
+
   // Hantera registrering av en ny analys
   const handleRecordAnalysis = useCallback(async () => {
     try {
       setIsPerformingAction(true);
       
       // Kontrollera om användaren kan utföra en analys
-      const checkResult = await canPerformAnalysis();
+      const checkResult = await checkLimit();
       
       if (!checkResult.allowed) {
         Alert.alert(
@@ -107,18 +123,19 @@ export default function AnalyticsTestScreen() {
     } finally {
       setIsPerformingAction(false);
     }
-  }, [canPerformAnalysis, recordAnalysis]);
+  }, [checkLimit, recordAnalysis]);
   
-  // Hantera synkronisering av väntande analyser
+  // Simulera synkronisering av väntande analyser (finns inte i nya implementationen)
   const handleSyncPendingAnalyses = useCallback(async () => {
     try {
       setIsPerformingAction(true);
       
-      const count = await syncPendingAnalyses();
+      // Simulera en synkronisering
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       Alert.alert(
         'Synkronisering klar',
-        `${count} väntande analyser synkroniserades.`
+        `0 väntande analyser synkroniserades. (Funktionen är inte längre nödvändig med nya counter-systemet.)`
       );
     } catch (error) {
       console.error('Fel vid synkronisering:', error);
@@ -126,7 +143,7 @@ export default function AnalyticsTestScreen() {
     } finally {
       setIsPerformingAction(false);
     }
-  }, [syncPendingAnalyses]);
+  }, []);
   
   // Hantera återgång
   const handleBack = () => {
@@ -146,34 +163,16 @@ export default function AnalyticsTestScreen() {
             <Ionicons name="chevron-back" size={24} color="#6366f1" />
           </StyledPressable>
           <StyledText className="text-text-primary font-sans-bold text-lg ml-2">
-            Testar Analytics
+            Testar Counter
           </StyledText>
         </StyledView>
         
-        {loading && !refreshing ? (
+        {loading ? (
           <StyledView className="flex-1 justify-center items-center p-4">
             <ActivityIndicator size="large" color="#6366f1" />
             <StyledText className="text-text-secondary font-sans mt-2">
               Hämtar statistik...
             </StyledText>
-          </StyledView>
-        ) : error ? (
-          <StyledView className="flex-1 justify-center items-center p-4">
-            <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-            <StyledText className="text-text-primary font-sans-medium text-lg mt-4">
-              Ett fel uppstod
-            </StyledText>
-            <StyledText className="text-text-secondary font-sans text-center mt-2 mb-4">
-              {error}
-            </StyledText>
-            <StyledPressable
-              onPress={refreshUsageStatus}
-              className="bg-primary py-2 px-4 rounded"
-            >
-              <StyledText className="text-text-inverse font-sans">
-                Försök igen
-              </StyledText>
-            </StyledPressable>
           </StyledView>
         ) : (
           <StyledScrollView className="flex-1 px-4">
@@ -217,10 +216,10 @@ export default function AnalyticsTestScreen() {
             />
             
             <StatCard
-              title="Väntande offline-analyser"
-              value={pendingCount || 0}
-              icon="cloud-offline-outline"
-              color="#f97316"
+              title="Status"
+              value={hasReachedLimit ? "Gräns nådd" : "Kan användas"}
+              icon={hasReachedLimit ? "close-circle-outline" : "checkmark-circle-outline"}
+              color={hasReachedLimit ? "#ef4444" : "#10b981"}
             />
             
             <StyledText className="text-text-primary font-sans-medium mb-2 mt-4">
@@ -235,22 +234,11 @@ export default function AnalyticsTestScreen() {
             />
             
             <ActionButton
-              title="Synkronisera väntande analyser"
-              onPress={handleSyncPendingAnalyses}
-              icon="sync-outline"
-              loading={isPerformingAction}
-              disabled={!usageStatus?.pendingCount}
-            />
-            
-            <ActionButton
               title="Uppdatera statistik"
-              onPress={refreshUsageStatus}
+              onPress={() => fetchCounter(true)}
               icon="refresh-outline"
-              loading={refreshing}
+              loading={loading}
             />
-            
-            {/* Utrymme i botten */}
-            <StyledView className="h-24" />
           </StyledScrollView>
         )}
       </StyledSafeAreaView>

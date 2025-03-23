@@ -7,6 +7,8 @@ import { getUserId } from '../stores/adapter';
 import * as FileSystem from 'expo-file-system';
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
+import { useStore } from '@/stores/useStore';
+import { WatchedIngredient as UserWatchedIngredient } from '@/types/settingsTypes';
 
 // Simulerad data (ersätt med faktisk API-anrop i produktion)
 const mockVeganIngredients = [
@@ -389,7 +391,34 @@ export class AnalysisService {
       index === self.findIndex(i => i.name === item.name)
     );
     
-    // Klassificera produkten som vegansk eller inte
+    // Lägg till bevakade ingredienser från användarinställningar
+    const { preferences } = useStore.getState();
+    const watchedIngredients = preferences?.watchedIngredients || {};
+    const watchedFoundFromSettings: WatchedIngredient[] = [];
+    
+    // Gå igenom alla ingredienser och leta efter matchningar mot användarens bevakade ingredienser
+    normalizedIngredients.forEach((ingredient) => {
+      Object.entries(watchedIngredients).forEach(([key, watched]) => {
+        // Kontrollera att watched är definierad och enabled är true
+        if (watched && watched.enabled && ingredient.includes(key.toLowerCase())) {
+          watchedFoundFromSettings.push({
+            name: watched.name || key,
+            description: watched.description || '',
+            reason: 'watched'  // Anger att detta är en bevakad ingrediens, inte nödvändigtvis icke-vegansk
+          });
+        }
+      });
+    });
+    
+    // Kombinera icke-veganska ingredienser med bevakade ingredienser
+    const allWatchedIngredients = [...uniqueNonVegan, ...watchedFoundFromSettings];
+    
+    // Ta bort eventuella dupliceringar
+    const finalWatchedIngredients = allWatchedIngredients.filter((item, index, self) => 
+      index === self.findIndex(i => i.name === item.name)
+    );
+    
+    // Klassificera produkten som vegansk eller inte (baserat på icke-veganska ingredienser, inte bevakade)
     const nonVeganCount = uniqueNonVegan.filter(i => i.reason === 'non-vegan').length;
     const maybeNonVeganCount = uniqueNonVegan.filter(i => i.reason === 'maybe-non-vegan').length;
     
@@ -429,7 +458,7 @@ export class AnalysisService {
     return {
       isVegan,
       confidence,
-      watchedIngredients: uniqueNonVegan,
+      watchedIngredients: finalWatchedIngredients,
       reasoning
     };
   }

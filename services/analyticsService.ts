@@ -38,7 +38,7 @@ const STORAGE_KEYS = {
 };
 
 // Default analysgräns per månad
-const DEFAULT_MONTHLY_LIMIT = 5;
+const DEFAULT_MONTHLY_LIMIT = 15;
 
 export class AnalyticsService {
   private static instance: AnalyticsService;

@@ -6,7 +6,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, Text, Image, ScrollView, ActivityIndicator,
-  Pressable, SafeAreaView, Alert, Share, Platform 
+  Pressable, SafeAreaView, Alert, Share, Platform, StatusBar 
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { styled } from 'nativewind';
@@ -27,7 +27,7 @@ const StyledImage = styled(Image);
 // Hårdkodade strings för skärmen
 const STRINGS = {
   HEADER_BACK: 'Tillbaka',
-  HEADER_TITLE: 'Produktdetalj',
+  HEADER_TITLE: 'Historik',
   ERROR_TITLE: 'Fel',
   ERROR_MESSAGE: 'Kunde inte hitta produkten',
   ERROR_BUTTON: 'Gå tillbaka',
@@ -45,7 +45,7 @@ const STRINGS = {
   SECTION_INGREDIENTS: 'Ingredienser',
   VEGAN_INGREDIENTS: 'Veganska ingredienser',
   NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
-  WATCH_INGREDIENTS: 'Ingredienser att se upp med',
+  WATCH_INGREDIENTS: 'Bevakade ingredienser',
   UNKNOWN_INGREDIENTS: 'Okända ingredienser',
   VEGAN_RESULT: 'Vegansk',
   NON_VEGAN_RESULT: 'Inte vegansk',
@@ -280,44 +280,55 @@ export default function ProductDetailScreen() {
   
   // Huvudinnehåll
   return (
-    <StyledSafeAreaView className="flex-1 bg-background-main">
-      {/* Header */}
-      <StyledView className="px-4 py-2 flex-row items-center border-b border-gray-200">
+    <StyledSafeAreaView 
+      className="flex-1 bg-background-main"
+      style={{ 
+        // På Android behöver vi manuellt lägga till utrymme för StatusBar
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+      }}
+    >
+      {/* Status Bar */}
+      <StatusBar barStyle="light-content" backgroundColor="#25292e" />
+      
+      {/* Header - lägre marginal eftersom vi nu hanterar statusbar separat */}
+      <StyledView className="px-4 py-4 flex-row items-center border-b border-gray-700/50">
         <StyledPressable
           onPress={() => router.back()}
+          className="p-2 rounded-full bg-background-light/30"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color="#6366f1" />
+          <Ionicons name="chevron-back" size={22} color="#6366f1" />
         </StyledPressable>
         <StyledText className="text-text-primary font-sans-medium ml-2 flex-1">
-          {STRINGS.HEADER_TITLE}
+          Historik
         </StyledText>
         
         {/* Åtgärdsknappar */}
-        <StyledView className="flex-row">
+        <StyledView className="flex-row gap-2">
           <StyledPressable
             onPress={handleShare}
+            className="p-2 rounded-full bg-background-light/30"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            className="mr-4"
           >
-            <Ionicons name="share-outline" size={24} color="#6366f1" />
+            <Ionicons name="share-outline" size={22} color="#6366f1" />
           </StyledPressable>
           <StyledPressable
             onPress={handleToggleFavorite}
+            className="p-2 rounded-full bg-background-light/30"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            className="mr-4"
           >
             <Ionicons
               name={product.metadata.isFavorite ? "star" : "star-outline"}
-              size={24}
+              size={22}
               color={product.metadata.isFavorite ? "#ffd700" : "#6366f1"}
             />
           </StyledPressable>
           <StyledPressable
             onPress={handleRemove}
+            className="p-2 rounded-full bg-background-light/30"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="trash-outline" size={24} color="#ef4444" />
+            <Ionicons name="trash-outline" size={22} color="#ef4444" />
           </StyledPressable>
         </StyledView>
       </StyledView>

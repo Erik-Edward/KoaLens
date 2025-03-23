@@ -25,7 +25,7 @@ export default function TestResultScreen() {
     // Kort fördröjning för att simulera laddning
     const timer = setTimeout(() => {
       router.replace({
-        pathname: '/(tabs)/(scan)/result-new',
+        pathname: '/(tabs)/(scan)/result',
         params: { imageUri: DEMO_IMAGE_URI }
       });
     }, 500);

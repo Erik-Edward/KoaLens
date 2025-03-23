@@ -5,12 +5,19 @@
 
 import { StateCreator } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Product, NewProduct, convertFromLegacyProduct } from '@/models/productModel';
-import { StoreState } from '../types';
+import { Product, NewProduct, convertFromLegacyProduct, convertToLegacyProduct } from '@/models/productModel';
+import { StoreState, ScannedProduct, MixedProductArray } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { productsToScannedProducts, scannedProductsToProducts } from '../adapter';
 
 // Konstant för AsyncStorage nyckel
 const PRODUCTS_STORAGE_KEY = '@koalens:products';
+
+// Define a compatible store type for our slice
+// This matches the type in useStore.ts
+type CompatibleStore = Omit<StoreState, 'products'> & {
+  products: (Product | ScannedProduct)[];
+};
 
 // Interface för product slice
 export interface ProductSlice {
@@ -47,10 +54,19 @@ export const createProductSlice: StateCreator<
   // Hämta alla produkter
   getProducts: async () => {
     try {
-      return get().products;
+      // Use the compatible store type cast
+      const compatibleStore = get() as unknown as CompatibleStore;
+      
+      // Filter products that have the required fields for Product type
+      return compatibleStore.products.filter(p => 
+        p && typeof p === 'object' && 
+        'ingredients' in p && 
+        'analysis' in p && 
+        'metadata' in p
+      ) as Product[];
     } catch (error) {
       console.error('Fel vid hämtning av produkter:', error);
-      set({ productsError: 'Kunde inte hämta produkter' });
+      (set as any)({ productsError: 'Kunde inte hämta produkter' });
       return [];
     }
   },
@@ -58,11 +74,21 @@ export const createProductSlice: StateCreator<
   // Hämta produkt med ID
   getProductById: async (id: string) => {
     try {
-      const products = get().products;
+      // Use the compatible store type cast
+      const compatibleStore = get() as unknown as CompatibleStore;
+      
+      // Filter products that have the required fields for Product type
+      const products = compatibleStore.products.filter(p => 
+        p && typeof p === 'object' && 
+        'ingredients' in p && 
+        'analysis' in p && 
+        'metadata' in p
+      ) as Product[];
+      
       return products.find(product => product.id === id) || null;
     } catch (error) {
       console.error(`Fel vid hämtning av produkt med ID ${id}:`, error);
-      set({ productsError: `Kunde inte hämta produkt med ID ${id}` });
+      (set as any)({ productsError: `Kunde inte hämta produkt med ID ${id}` });
       return null;
     }
   },
@@ -70,7 +96,17 @@ export const createProductSlice: StateCreator<
   // Hämta produkter för specifik användare
   getProductsByUserId: async (userId?: string) => {
     try {
-      const products = get().products;
+      // Use the compatible store type cast
+      const compatibleStore = get() as unknown as CompatibleStore;
+      
+      // Filter products that have the required fields for Product type
+      const products = compatibleStore.products.filter(p => 
+        p && typeof p === 'object' && 
+        'ingredients' in p && 
+        'analysis' in p && 
+        'metadata' in p
+      ) as Product[];
+      
       const effectiveUserId = userId || await get().getUserId();
       
       // Utvecklingsläge: Visa alla produkter om DEV_SHOW_ALL_PRODUCTS är true
@@ -79,41 +115,59 @@ export const createProductSlice: StateCreator<
       }
       
       // Filtrera på användar-ID
-      return products.filter(product => 
-        product.metadata.userId === effectiveUserId || !product.metadata.userId
-      );
+      if (effectiveUserId) {
+        return products.filter(product => 
+          product.metadata && product.metadata.userId === effectiveUserId
+        );
+      }
+      
+      return products;
     } catch (error) {
-      console.error('Fel vid hämtning av användarprodukter:', error);
-      set({ productsError: 'Kunde inte hämta användarprodukter' });
+      console.error('Fel vid hämtning av produkter för användare:', error);
+      (set as any)({ productsError: 'Kunde inte hämta produkter för användaren' });
       return [];
     }
   },
   
-  // Lägg till ny produkt
-  addProduct: async (newProduct: NewProduct) => {
+  // Lägg till en ny produkt
+  addProduct: async (productData: NewProduct) => {
     try {
-      // Skapa en ny produkt med genererat ID
-      const userId = await get().getUserId();
+      (set as any)({ isProductsLoading: true });
+      
       const product: Product = {
+        ...productData,
         id: uuidv4(),
-        ...newProduct,
-        timestamp: newProduct.timestamp || new Date().toISOString(),
+        timestamp: new Date().toISOString(),
         metadata: {
-          ...newProduct.metadata,
-          userId,
-          scanDate: newProduct.metadata.scanDate || new Date().toISOString()
+          ...productData.metadata,
+          scanDate: productData.metadata?.scanDate || new Date().toISOString(),
         }
       };
       
-      // Uppdatera state
-      set(state => ({ 
-        products: [...state.products, product] 
-      }));
+      // Use the compatible store type cast for the update
+      const compatibleStore = get() as unknown as CompatibleStore;
+      (set as any)({ 
+        products: [...compatibleStore.products, product] as MixedProductArray,
+        isProductsLoading: false 
+      });
+      
+      // Spara till AsyncStorage
+      try {
+        const existingData = await AsyncStorage.getItem(PRODUCTS_STORAGE_KEY);
+        const existingProducts: Product[] = existingData ? JSON.parse(existingData) : [];
+        const updatedProducts = [...existingProducts, product];
+        await AsyncStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(updatedProducts));
+      } catch (storageError) {
+        console.error('Fel vid lagring av produkt:', storageError);
+      }
       
       return product;
     } catch (error) {
       console.error('Fel vid tillägg av produkt:', error);
-      set({ productsError: 'Kunde inte lägga till produkt' });
+      (set as any)({
+        productsError: 'Kunde inte lägga till produkt',
+        isProductsLoading: false
+      });
       throw error;
     }
   },
@@ -128,11 +182,12 @@ export const createProductSlice: StateCreator<
       }
       
       // Uppdatera state
-      set(state => ({
-        products: state.products.map(product => 
+      const compatibleStore = get() as unknown as CompatibleStore;
+      (set as any)({
+        products: compatibleStore.products.map(product => 
           product.id === updatedProduct.id ? updatedProduct : product
-        )
-      }));
+        ) as MixedProductArray
+      });
       
       return updatedProduct;
     } catch (error) {
@@ -152,9 +207,10 @@ export const createProductSlice: StateCreator<
       }
       
       // Uppdatera state
-      set(state => ({
-        products: state.products.filter(product => product.id !== id)
-      }));
+      const compatibleStore = get() as unknown as CompatibleStore;
+      (set as any)({
+        products: compatibleStore.products.filter(product => product.id !== id) as MixedProductArray
+      });
     } catch (error) {
       console.error(`Fel vid borttagning av produkt med ID ${id}:`, error);
       set({ productsError: `Kunde inte ta bort produkt med ID ${id}` });

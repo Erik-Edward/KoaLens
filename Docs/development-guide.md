@@ -154,7 +154,7 @@ Ett nytt bygge krävs när:
 3. Du ändrar plugins i app.json
 4. Du modifierar native-kod i Android eller iOS-mapparna
 
-I andra fall är det tillräckligt med EAS Update.
+I andra fall är det tillräckligt med et Det.
 
 ## Kodorganisation
 

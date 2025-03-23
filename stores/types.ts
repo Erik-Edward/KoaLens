@@ -8,6 +8,22 @@ import { UserSlice } from './slices/userSlice';
 import { ProductSlice } from './slices/productSlice';
 import type { Product } from '@/models/productModel';
 
+// Definiera CounterState-interface för använding i stores
+export interface CounterState {
+  value: number;
+  limit: number;
+  remaining: number;
+  hasReachedLimit: boolean;
+  lastChecked: string | null;
+  loading: boolean;
+}
+
+// Interface för CounterSlice i store
+export interface CounterSlice {
+  // Mappa counterName till counterState
+  counters?: Record<string, CounterState>;
+}
+
 // User interface för auth
 export interface User {
   id: string;
@@ -47,6 +63,9 @@ export interface ScannedProduct {
   userId?: string; // Användar-ID som äger produkten, optional för bakåtkompatibilitet
 }
 
+// Type för att hantera blandade produkttyper
+export type MixedProductArray = (Product | ScannedProduct)[];
+
 // Modifiera HistorySlice för att hantera bakåtkompatibiliteten mellan Product och ScannedProduct
 export interface HistorySlice {
   // Använd en kombination av typerna för att lösa typkompatibiliteten
@@ -83,13 +102,19 @@ export interface AnalyticsSlice {
 }
 
 // Kombinerad store-typ som innehåller alla slices
-export type StoreState = AuthSlice & 
+export type StoreState = Omit<
+  AuthSlice & 
   SettingsSlice & 
-  HistorySlice & 
+  Omit<HistorySlice, 'products'> & 
   OnboardingSlice &
   ImportedAvatarSlice &
   VeganStatusSlice &
   UsageLimitSlice &
   UserSlice &
-  ProductSlice &
-  AnalyticsSlice;
+  Omit<ProductSlice, 'products'> &
+  AnalyticsSlice &
+  CounterSlice, 
+  'products'
+> & {
+  products: MixedProductArray;
+};

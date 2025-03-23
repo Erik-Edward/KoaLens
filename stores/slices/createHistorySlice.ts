@@ -112,16 +112,27 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
 
   // Nya implementationer som använder adapter-funktioner
   getUserProducts: () => {
-    // Produkter kommer från produktslice
-    const products = get().getProducts();
-    if (!Array.isArray(products)) {
-      // Om getProducts inte returnerarar array, försök med async-funktionen
-      console.log('Using async method to get products');
+    try {
+      // Produkter kommer från produktslice
+      const products = get().getProducts();
+      if (!Array.isArray(products)) {
+        // Om getProducts inte returnerarar array, försök med async-funktionen
+        console.log('Using async method to get products');
+        return [];
+      }
+      
+      // Kontrollera om products är en Promise (async funktion)
+      if (products instanceof Promise) {
+        console.log('Products is a Promise, cannot convert directly');
+        return [];
+      }
+      
+      // Konvertera till ScannedProduct format
+      return productsToScannedProducts(products);
+    } catch (error) {
+      console.error('Error in getUserProducts:', error);
       return [];
     }
-    
-    // Konvertera till ScannedProduct format
-    return productsToScannedProducts(products);
   },
 
   addProduct: (productData) => {
@@ -132,7 +143,14 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
 
     try {
       const product = createValidProduct(productData);
-      set(state => ({ products: [...state.products, product] }));
+      
+      // Get the mixed products array from the store
+      const compatibleStore = get() as unknown as { products: (ScannedProduct | Product)[] };
+      
+      // Update products using any to bypass type checking limitations
+      (set as any)((state: any) => ({ 
+        products: [...compatibleStore.products, product] 
+      }));
       
       // Försök uppdatera även i nya systemet
       adapter.addProduct(product).catch(error => {
@@ -145,8 +163,12 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
   },
 
   removeProduct: (id) => {
-    set(state => ({
-      products: state.products.filter(p => p.id !== id),
+    // Get the mixed products array from the store
+    const compatibleStore = get() as unknown as { products: (ScannedProduct | Product)[] };
+    
+    // Update products using any to bypass type checking limitations
+    (set as any)((state: any) => ({
+      products: compatibleStore.products.filter(p => p.id !== id),
     }));
     
     // Försök radera även i nya systemet
@@ -156,10 +178,30 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
   },
 
   toggleFavorite: (id) => {
-    set(state => ({
-      products: state.products.map(p =>
-        p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
-      ),
+    // Get the mixed products array from the store
+    const compatibleStore = get() as unknown as { products: (ScannedProduct | Product)[] };
+    
+    // Update products using any to bypass type checking limitations
+    (set as any)((state: any) => ({
+      products: compatibleStore.products.map(p => {
+        if (p.id === id) {
+          // Handle both ScannedProduct and Product types
+          if ('isFavorite' in p) {
+            // It's a ScannedProduct
+            return { ...p, isFavorite: !p.isFavorite };
+          } else if (p.metadata && typeof p.metadata === 'object') {
+            // It's a Product
+            return {
+              ...p,
+              metadata: {
+                ...p.metadata,
+                isFavorite: !p.metadata.isFavorite
+              }
+            };
+          }
+        }
+        return p;
+      }),
     }));
     
     // Försök uppdatera även i nya systemet
@@ -177,7 +219,11 @@ export const createHistorySlice: StateCreator<StoreState, [], [], HistorySlice> 
     
     set(state => {
       const filtered = state.products.filter(p => {
-        const shouldKeep = !!p.userId;
+        // Check for userId in both ScannedProduct and Product types
+        const shouldKeep = 
+          ('userId' in p && !!p.userId) || 
+          ('metadata' in p && p.metadata && typeof p.metadata === 'object' && 'userId' in p.metadata && !!p.metadata.userId);
+        
         if (!shouldKeep) count++;
         return shouldKeep;
       });

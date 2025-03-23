@@ -99,11 +99,38 @@ export const getUserId = getCurrentUserId;
 /**
  * Konverterar en lista med Product-objekt till ScannedProduct-objekt
  */
-export function productsToScannedProducts(products: Product[]): ScannedProduct[] {
-  return products.map(product => {
+export function productsToScannedProducts(products: Product[] | Promise<Product[]>): ScannedProduct[] {
+  // Om products är en Promise, returnera tom array
+  if (products instanceof Promise) {
+    console.log('Cannot convert Promise<Product[]> to ScannedProduct[]');
+    return [];
+  }
+  
+  // Filtrera bort eventuella null/undefined poster
+  const validProducts = products.filter(p => p != null);
+  
+  return validProducts.map(product => {
     try {
       const legacyProduct = convertToLegacyProduct(product);
-      return legacyProduct as ScannedProduct;
+      return {
+        id: legacyProduct.id || '',
+        timestamp: legacyProduct.timestamp || '',
+        imageUri: legacyProduct.imageUri || '',
+        isVegan: typeof legacyProduct.isVegan === 'boolean' ? legacyProduct.isVegan : false,
+        confidence: typeof legacyProduct.confidence === 'number' ? legacyProduct.confidence : 0,
+        nonVeganIngredients: Array.isArray(legacyProduct.nonVeganIngredients) 
+          ? legacyProduct.nonVeganIngredients 
+          : [],
+        allIngredients: Array.isArray(legacyProduct.allIngredients) 
+          ? legacyProduct.allIngredients 
+          : [],
+        reasoning: legacyProduct.reasoning || '',
+        isFavorite: legacyProduct.isFavorite || false,
+        watchedIngredientsFound: Array.isArray(legacyProduct.watchedIngredientsFound) 
+          ? legacyProduct.watchedIngredientsFound 
+          : [],
+        userId: legacyProduct.userId
+      };
     } catch (error) {
       console.error('Error converting Product to ScannedProduct:', error);
       // Returnera ett säkert fallback-objekt vid fel
@@ -127,8 +154,17 @@ export function productsToScannedProducts(products: Product[]): ScannedProduct[]
 /**
  * Konverterar en lista med ScannedProduct-objekt till Product-objekt
  */
-export function scannedProductsToProducts(scannedProducts: ScannedProduct[]): Product[] {
-  return scannedProducts.map(scannedProduct => {
+export function scannedProductsToProducts(scannedProducts: ScannedProduct[] | Promise<ScannedProduct[]>): Product[] {
+  // Om scannedProducts är en Promise, returnera tom array
+  if (scannedProducts instanceof Promise) {
+    console.log('Cannot convert Promise<ScannedProduct[]> to Product[]');
+    return [];
+  }
+  
+  // Filtrera bort eventuella null/undefined poster
+  const validProducts = scannedProducts.filter(p => p != null);
+  
+  return validProducts.map(scannedProduct => {
     try {
       return convertFromLegacyProduct(scannedProduct);
     } catch (error) {
@@ -137,17 +173,23 @@ export function scannedProductsToProducts(scannedProducts: ScannedProduct[]): Pr
       return {
         id: scannedProduct.id,
         timestamp: scannedProduct.timestamp,
-        ingredients: scannedProduct.allIngredients,
+        ingredients: Array.isArray(scannedProduct.allIngredients) 
+          ? scannedProduct.allIngredients 
+          : [],
         analysis: {
-          isVegan: scannedProduct.isVegan,
-          confidence: scannedProduct.confidence,
+          isVegan: typeof scannedProduct.isVegan === 'boolean' 
+            ? scannedProduct.isVegan 
+            : false,
+          confidence: typeof scannedProduct.confidence === 'number' 
+            ? scannedProduct.confidence 
+            : 0,
           watchedIngredients: [],
           reasoning: scannedProduct.reasoning
         },
         metadata: {
           userId: scannedProduct.userId,
           scanDate: scannedProduct.timestamp,
-          isFavorite: scannedProduct.isFavorite,
+          isFavorite: !!scannedProduct.isFavorite,
           isSavedToHistory: true,
           imageUri: scannedProduct.imageUri
         }

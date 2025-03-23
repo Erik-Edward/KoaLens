@@ -23,19 +23,26 @@ export const createVeganStatusSlice: StateCreator<
   [],
   [],
   VeganStatusSlice
-> = (set) => ({
+> = (set, get) => ({
   veganStatus: initialState,
   
   setVeganStatus: async (status) => {
-    set((state) => ({
-      veganStatus: {
-        ...state.veganStatus,
-        status
-      }
-    }));
+    console.log('VeganStatusSlice: Setting vegan status from', get().veganStatus.status, 'to', status);
+    set((state) => {
+      const newState = {
+        veganStatus: {
+          ...state.veganStatus,
+          status
+        }
+      };
+      console.log('VeganStatusSlice: New state created:', newState.veganStatus);
+      return newState;
+    });
+    console.log('VeganStatusSlice: Status after update:', get().veganStatus.status);
   },
 
   resetVeganStatus: async () => {
+    console.log('VeganStatusSlice: Resetting vegan status');
     set({ veganStatus: initialState });
   }
 });

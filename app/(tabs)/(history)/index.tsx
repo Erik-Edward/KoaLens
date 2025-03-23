@@ -7,7 +7,8 @@ import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ScannedProduct, StoreState } from '@/stores/types';
+import { ScannedProduct, StoreState, MixedProductArray } from '@/stores/types';
+import { Product } from '@/models/productModel';
 import { useNavigation } from '@react-navigation/native';
 import { Redirect, usePathname, useRouter } from 'expo-router';
 import { shouldUseModernUI, getUseNewUI, getUIPreferences, UIVersion } from '../../../constants/uiPreferences';
@@ -23,6 +24,86 @@ const StyledPressable = styled(Pressable);
 
 // Förhindra autohide av splash screen vid appens boot
 SplashScreen.preventAutoHideAsync();
+
+// Type guard to check if a product is a ScannedProduct
+function isScannedProduct(product: ScannedProduct | Product): product is ScannedProduct {
+  return 'isVegan' in product && 
+         'imageUri' in product && 
+         'nonVeganIngredients' in product && 
+         'allIngredients' in product;
+}
+
+// Type guard to check if a product is a Product
+function isProduct(product: ScannedProduct | Product): product is Product {
+  return 'ingredients' in product && 
+         'analysis' in product && 
+         'metadata' in product;
+}
+
+// Helper function to get userId from either product type
+function getUserId(product: ScannedProduct | Product): string | undefined {
+  if (isScannedProduct(product)) {
+    return product.userId;
+  } else if (isProduct(product)) {
+    return product.metadata.userId;
+  }
+  return undefined;
+}
+
+// Helper function to get isVegan status from either product type
+function getIsVegan(product: ScannedProduct | Product): boolean {
+  if (isScannedProduct(product)) {
+    return product.isVegan;
+  } else if (isProduct(product)) {
+    return product.analysis.isVegan;
+  }
+  return false;
+}
+
+// Helper function to get isFavorite status from either product type
+function getIsFavorite(product: ScannedProduct | Product): boolean {
+  if (isScannedProduct(product)) {
+    return product.isFavorite;
+  } else if (isProduct(product)) {
+    return product.metadata.isFavorite;
+  }
+  return false;
+}
+
+// Helper function to get ingredients from either product type
+function getIngredients(product: ScannedProduct | Product): string[] {
+  if (isScannedProduct(product)) {
+    return product.allIngredients;
+  } else if (isProduct(product)) {
+    return product.ingredients;
+  }
+  return [];
+}
+
+// Helper function to convert mixed product to ScannedProduct format for ProductCard
+function toScannedProduct(product: ScannedProduct | Product): ScannedProduct {
+  if (isScannedProduct(product)) {
+    return product;
+  } else if (isProduct(product)) {
+    return {
+      id: product.id,
+      timestamp: product.timestamp,
+      imageUri: product.metadata.imageUri || '',
+      isVegan: product.analysis.isVegan,
+      confidence: product.analysis.confidence,
+      nonVeganIngredients: product.analysis.watchedIngredients
+        .filter(i => i.reason === 'non-vegan')
+        .map(i => i.name),
+      allIngredients: product.ingredients,
+      reasoning: product.analysis.reasoning || '',
+      isFavorite: product.metadata.isFavorite,
+      watchedIngredientsFound: [], // Default empty array
+      userId: product.metadata.userId
+    };
+  }
+  // This case should never happen if the type guards are working correctly
+  throw new Error('Invalid product type');
+}
 
 /**
  * Historik-router
@@ -82,10 +163,10 @@ export function HistoryScreen() {
     // Logga alla produkter för debugging
     console.log('DEBUG: Alla produkter i store:', 
       allStoredProducts.map(p => ({ 
-        id: p.id, 
-        userId: p.userId,
-        isFavorite: p.isFavorite,
-        isVegan: p.isVegan,
+        id: p.id,
+        userId: getUserId(p),
+        isFavorite: getIsFavorite(p),
+        isVegan: getIsVegan(p),
         timestamp: p.timestamp
       }))
     );
@@ -103,9 +184,9 @@ export function HistoryScreen() {
         allStoredProducts.length, 'produkter i store - möjlig användarfiltrering');
         
       // Check vilka produkter som filtreras bort pga användare
-      const productsWithoutUserId = allStoredProducts.filter(p => !p.userId);
+      const productsWithoutUserId = allStoredProducts.filter(p => !getUserId(p));
       const productsWithDifferentUserId = allStoredProducts.filter(p => 
-        p.userId && currentUser && p.userId !== currentUser.id);
+        getUserId(p) && currentUser && getUserId(p) !== currentUser.id);
       
       console.log('Produkter utan användar-ID:', productsWithoutUserId.length);
       console.log('Produkter med annat användar-ID:', productsWithDifferentUserId.length);
@@ -136,8 +217,8 @@ export function HistoryScreen() {
     
     // Statistik om produkterna
     const totalProducts = userProducts.length;
-    const veganProducts = userProducts.filter((p: ScannedProduct) => p.isVegan).length;
-    const favorites = userProducts.filter((p: ScannedProduct) => p.isFavorite).length;
+    const veganProducts = userProducts.filter(p => getIsVegan(p)).length;
+    const favorites = userProducts.filter(p => getIsFavorite(p)).length;
     
     console.log(`Historievy: ${totalProducts} produkter totalt, ${veganProducts} veganska, ${favorites} favoriter`);
   }, [userProducts]);
@@ -145,15 +226,16 @@ export function HistoryScreen() {
   // Filtrera produkterna baserat på sökning och favoriter
   const filteredProducts = useMemo(() => {
     return userProducts
-      .filter((product: ScannedProduct) => {
+      .filter((product) => {
         // Ändra sökning till att matcha antingen ingredienser eller ID om produktnamn saknas
+        const ingredientsList = getIngredients(product);
         const matchesSearch = searchQuery === '' || 
-          (product.allIngredients && product.allIngredients.join(' ').toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (ingredientsList && ingredientsList.join(' ').toLowerCase().includes(searchQuery.toLowerCase())) ||
           (product.id && product.id.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesFavorite = !filterFavorites || product.isFavorite;
+        const matchesFavorite = !filterFavorites || getIsFavorite(product);
         return matchesSearch && matchesFavorite;
       })
-      .sort((a: ScannedProduct, b: ScannedProduct) => {
+      .sort((a, b) => {
         // Säkrare jämförelse för timestamp som kan vara string eller saknas
         const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
         const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
@@ -252,7 +334,7 @@ export function HistoryScreen() {
       
       // Spara original-funktionen i en ref för återställning senare
       const getAllProductsOverride = () => {
-        return useStore.getState().products;
+        return useStore.getState().products as unknown as ScannedProduct[];
       };
       
       // Logga för att verifiera
@@ -329,7 +411,7 @@ export function HistoryScreen() {
             {filteredProducts.map((product) => (
               <ProductCard 
                 key={product.id} 
-                product={product}
+                product={toScannedProduct(product)}
               />
             ))}
           </StyledView>

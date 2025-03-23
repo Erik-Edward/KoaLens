@@ -21,15 +21,7 @@ const HistoryLayout: FC = () => {
       <Stack.Screen
         name="[id]"
         options={{
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#1a1d20'
-          },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: {
-            fontFamily: 'PlusJakartaSans-Medium'
-          },
-          title: 'Detaljer'
+          headerShown: false
         }}
       />
     </Stack>

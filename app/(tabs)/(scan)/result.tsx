@@ -12,8 +12,7 @@ import { styled } from 'nativewind';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../../../hooks/useProducts';
-import { useAnalytics } from '../../../hooks/useAnalytics';
-import { useUsageLimit } from '@/hooks/useUsageLimit';
+import { useCounter } from '../../../hooks/useCounter';
 import { Product } from '../../../models/productModel';
 import * as Clipboard from 'expo-clipboard';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -51,7 +50,7 @@ const STRINGS = {
   SECTION_REASONING: 'Analys',
   VEGAN_INGREDIENTS: 'Veganska ingredienser',
   NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
-  WATCH_INGREDIENTS: 'Ingredienser att se upp med',
+  WATCH_INGREDIENTS: 'Bevakade ingredienser',
   UNKNOWN_INGREDIENTS: 'Okända ingredienser',
   VEGAN_RESULT: 'Vegansk',
   NON_VEGAN_RESULT: 'Inte vegansk',
@@ -236,10 +235,13 @@ export default function ScanResultScreen() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
   
-  // Hämta produkthook och analytics
+  // Hämta produkthook och counter
   const { saveToHistory, toggleFavorite } = useProducts();
-  const { canPerformAnalysis, recordAnalysis } = useAnalytics();
-  const { hasReachedLimit, refreshUsageLimit, forceUpdate } = useUsageLimit();
+  const { 
+    checkLimit, 
+    recordAnalysis, 
+    hasReachedLimit 
+  } = useCounter('analysis_count');
   
   useEffect(() => {
     if (analyzed) return;
@@ -248,6 +250,30 @@ export default function ScanResultScreen() {
       try {
         setLoading(true);
         setError(null);
+        
+        // Kontrollera om användaren har nått sin analysgräns
+        try {
+          const usageCheck = await checkLimit();
+          if (!usageCheck?.allowed) {
+            // Visa varningsmeddelande och återvänd till föregående skärm
+            Alert.alert(
+              "Analysgräns nådd",
+              "Du har använt alla dina analyser för denna period. Försök igen senare eller uppgradera till premium för fler analyser.",
+              [
+                { 
+                  text: "OK", 
+                  onPress: () => router.back() 
+                }
+              ]
+            );
+            // Avbryt analysen här
+            setLoading(false);
+            setAnalyzed(true);
+            return;
+          }
+        } catch (usageError) {
+          console.warn('Kunde inte kontrollera användningsgräns, fortsätter ändå:', usageError);
+        }
         
         if (!params.ingredients) {
           throw new Error('Inga ingredienser hittades att analysera');
@@ -311,20 +337,26 @@ export default function ScanResultScreen() {
         // Försök registrera analys i statistik men fånga fel och fortsätt
         let analyticsResult = false;
         try {
-          // Kontrollera om användaren kan utföra analys, men fortsätt även om det inte går
+          // Kontrollera om användaren kan utföra analys, men fortsätt endast om den är tillåten
+          let canProceed = true;
           try {
-            const usageCheck = await canPerformAnalysis();
+            const usageCheck = await checkLimit();
             if (!usageCheck?.allowed) {
-              console.warn('Användaren har nått sin analysgräns, men fortsätter ändå:', usageCheck?.reason);
+              console.warn('Användaren har nått sin analysgräns:', usageCheck?.reason);
+              canProceed = false;
             }
           } catch (usageError) {
             console.warn('Kunde inte kontrollera användningsgräns, fortsätter ändå:', usageError);
           }
           
-          // Försök registrera analysen, ignorera fel
-          console.log('Registrerar analys i användarstatistik...');
-          analyticsResult = await recordAnalysis();
-          console.log('Analys registrerad i användarstatistik, resultat:', analyticsResult);
+          // Registrera analysen endast om användaren inte har nått sin gräns
+          if (canProceed) {
+            console.log('Registrerar analys i användarstatistik...');
+            analyticsResult = await recordAnalysis();
+            console.log('Analys registrerad i användarstatistik, resultat:', analyticsResult);
+          } else {
+            console.log('Analys registreras inte eftersom användaren har nått sin gräns');
+          }
           
           // Vänta längre tid för att ge backend tid att uppdatera
           console.log('Väntar på att backend ska uppdatera användaranalytik...');
@@ -332,14 +364,14 @@ export default function ScanResultScreen() {
           
           // Tvinga uppdatering av användningsgränsen med vår nya forceUpdate-funktion
           console.log('Tvingar fram uppdatering av användningsgränser från servern...');
-          const updateSuccess = await forceUpdate();
+          const updateSuccess = await checkLimit();
           console.log('Uppdatering av användningsgränser:', updateSuccess ? 'lyckades' : 'misslyckades');
           
           // Om första försöket misslyckades, försök igen efter lite längre väntan
           if (!updateSuccess) {
             console.log('Första uppdateringsförsöket misslyckades, väntar längre och försöker igen...');
             await new Promise(resolve => setTimeout(resolve, 2000));
-            const secondAttempt = await forceUpdate();
+            const secondAttempt = await checkLimit();
             console.log('Andra uppdateringsförsöket:', secondAttempt ? 'lyckades' : 'misslyckades');
           }
           
@@ -596,15 +628,33 @@ export default function ScanResultScreen() {
             </StyledText>
           ) : (
             <StyledView>
+              {/* Vanliga ingredienser */}
               {product.ingredients.map((ingredient, index) => {
                 // Hitta om ingrediensen är flaggad
                 const watchedIngredient = product.analysis.watchedIngredients.find(
-                  w => w.name.toLowerCase() === ingredient.toLowerCase()
+                  w => {
+                    // Kolla för exakt matchning först
+                    if (w.name.toLowerCase() === ingredient.toLowerCase()) return true;
+                    
+                    // Sedan kolla för en delmatchning (om ingredient innehåller w.name eller tvärtom)
+                    if (ingredient.toLowerCase().includes(w.name.toLowerCase()) || 
+                        w.name.toLowerCase().includes(ingredient.toLowerCase())) {
+                      return true;
+                    }
+                    
+                    return false;
+                  }
                 );
                 
                 let status: 'neutral' | 'warning' | 'danger' = 'neutral';
                 if (watchedIngredient) {
-                  status = watchedIngredient.reason === 'non-vegan' ? 'danger' : 'warning';
+                  if (watchedIngredient.reason === 'non-vegan') {
+                    status = 'danger';
+                  } else if (watchedIngredient.reason === 'maybe-non-vegan') {
+                    status = 'warning';
+                  } else if (watchedIngredient.reason === 'watched') {
+                    status = 'warning';
+                  }
                 }
                 
                 return (
@@ -616,6 +666,35 @@ export default function ScanResultScreen() {
                   />
                 );
               })}
+
+              {/* Bevakade ingredienser section - visas bara om det finns några */}
+              {product.analysis.watchedIngredients.some(w => w.reason === 'watched') && (
+                <>
+                  <StyledView className="mt-6 mb-2">
+                    <StyledText className="text-lg font-sans-bold text-text-primary">
+                      Bevakade ingredienser
+                    </StyledText>
+                  </StyledView>
+                  
+                  {product.analysis.watchedIngredients
+                    .filter(w => w.reason === 'watched')
+                    .map((watchedItem, index) => {
+                      const matchedIngredient = product.ingredients.find(
+                        ing => ing.toLowerCase().includes(watchedItem.name.toLowerCase()) || 
+                              watchedItem.name.toLowerCase().includes(ing.toLowerCase())
+                      );
+                      
+                      return (
+                        <IngredientItem 
+                          key={`watched-${index}`}
+                          name={matchedIngredient || watchedItem.name}
+                          status="warning"
+                          description={watchedItem.description}
+                        />
+                      );
+                    })}
+                </>
+              )}
             </StyledView>
           )}
         </StyledView>

@@ -1,5 +1,5 @@
 // app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende och test-knapp
-import { FC, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert, Modal } from 'react-native';
 import { router, useNavigation, usePathname, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { styled } from 'nativewind';
 import { CameraGuide } from '@/components/CameraGuide';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUsageLimit } from '@/hooks/useUsageLimit';
+import { useCounter } from '@/hooks/useCounter';
 import { UsageLimitIndicator } from '@/components/UsageLimitIndicator';
 import { UsageLimitModal } from '@/components/UsageLimitModal';
 import { useAuth } from '@/providers/AuthProvider';
@@ -23,14 +23,14 @@ const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledAnimatedView = styled(Animated.View);
 
-const ScanScreen: FC = () => {
+const ScanScreen: React.FC = () => {
   const [showGuide, setShowGuide] = useState(false);
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [debugMode] = useState(false);
   const [networkError, setNetworkError] = useState(false);
-  const { hasReachedLimit, refreshUsageLimit } = useUsageLimit();
+  const { hasReachedLimit, fetchCounter } = useCounter();
   const { width, height } = useWindowDimensions();
   const { user } = useAuth();
   const navigation = useNavigation();
@@ -42,10 +42,45 @@ const ScanScreen: FC = () => {
   // Get camera permission status directly in the scan tab
   const { hasPermission, requestPermission } = useCameraPermission();
   
+  // New animation values
+  // Get device dimensions for responsive sizing
+  const buttonSize = Math.min(width, height) * 0.28;
+  const innerButtonSize = buttonSize * 0.9;
+  
   // Animation values
-  const pulseAnimation = useRef(new Animated.Value(1)).current;
-  const floatAnimation = useRef(new Animated.Value(0)).current;
-  const innerGlowAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(0)).current;
+  const glowAnimation = useRef(new Animated.Value(0)).current;
+  const shimmerAnimation = useRef(new Animated.Value(0)).current;
+  const accentRingAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Interpolations for animations
+  const pulseInterpolation = pulseAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.05]
+  });
+  
+  const glowOpacity = glowAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 0.9]
+  });
+  
+  const shimmerTranslateX = shimmerAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-buttonSize, buttonSize]
+  });
+  
+  const accentOpacity = accentRingAnimation.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.6, 1, 0.6]
+  });
+  
+  const accentScale = accentRingAnimation.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.05, 1]
+  });
+  
+  // Add state for tips accordion
+  const [showTips, setShowTips] = useState(false);
 
   // Function to clear any camera safety timeouts
   const clearCameraSafetyTimeout = useCallback(() => {
@@ -65,31 +100,8 @@ const ScanScreen: FC = () => {
     
     console.log('Resetting scan screen state, current pathname:', pathname);
     
-    // Ensure animations are running
-    if (startAnimations) {
-      startAnimations();
-    }
-    
-    // Forcera uppdatering av användardata med en fördröjning för att ge backend tid att reagera
-    console.log('Forcerar uppdatering av användningsgränser med fördröjning...');
-    setTimeout(() => {
-      refreshUsageLimit()
-        .then(() => {
-          console.log('Användargränser uppdaterade framgångsrikt efter delay');
-          
-          // Kontrollera den nuvarande användargränsen
-          const currentUsageLimit = useStore.getState().usageLimit;
-          console.log('Aktuell användargräns:', {
-            total: currentUsageLimit.total,
-            limit: currentUsageLimit.limit,
-            remaining: currentUsageLimit.remaining
-          });
-        })
-        .catch(err => {
-          console.error('Failed to refresh usage in scan view:', err);
-          setNetworkError(true);
-        });
-    }, 1500); // 1.5 sekunder bör vara tillräckligt för att backend ska ha uppdaterat databasen
+    // OBS: Vi ska inte anropa fetchCounter här direkt, eftersom det kan leda till oändliga uppdateringar
+    // Istället förlitar vi oss på useEffect-hooken nedan för att hantera counter uppdateringar
     
     // Make sure we're on the right UI state - hide ALL modals
     setShowGuide(false);
@@ -108,7 +120,9 @@ const ScanScreen: FC = () => {
       console.log('Detected we are on a sub-route, forcing navigation to main scan screen');
       router.replace('/(tabs)/(scan)');
     }
-  }, [refreshUsageLimit, pathname, clearCameraSafetyTimeout, router, setNetworkError]);
+    
+    console.log('Screen state reset completed');
+  }, [pathname, clearCameraSafetyTimeout, router, setNetworkError]);
 
   // Global function to clear ALL app navigation locks and states but WITHOUT any navigation
   const forceResetAllAppState = useCallback(async () => {
@@ -233,71 +247,68 @@ const ScanScreen: FC = () => {
     };
   }, [navigation, pathname, resetScreenState, clearCameraSafetyTimeout, forceResetAllAppState]);
 
-  // Start all animations
+  // Function to start all animations
   const startAnimations = () => {
-    // Stop any running animations first
-    pulseAnimation.stopAnimation();
-    floatAnimation.stopAnimation();
-    innerGlowAnimation.stopAnimation();
-    
     // Reset animation values
-    pulseAnimation.setValue(1);
-    floatAnimation.setValue(0);
-    innerGlowAnimation.setValue(0);
+    pulseAnimation.setValue(0);
+    glowAnimation.setValue(0);
+    shimmerAnimation.setValue(0);
+    accentRingAnimation.setValue(0);
     
-    // Restart animations
-    // Pulsating animation for the scan button
+    // Pulse animation for button
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnimation, {
-          toValue: 1.05,
-          duration: 1800,
+          toValue: 1,
+          duration: 2000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnimation, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Floating animation for the scan button
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnimation, {
-          toValue: -6,
-          duration: 2200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnimation, {
           toValue: 0,
-          duration: 2200,
+          duration: 2000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
-        }),
+        })
       ])
     ).start();
     
-    // Inner glow animation
+    // Glow animation
     Animated.loop(
       Animated.sequence([
-        Animated.timing(innerGlowAnimation, {
+        Animated.timing(glowAnimation, {
           toValue: 1,
-          duration: 2000,
+          duration: 1500,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
-        Animated.timing(innerGlowAnimation, {
+        Animated.timing(glowAnimation, {
           toValue: 0,
-          duration: 2000,
+          duration: 1500,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
+          useNativeDriver: true,
+        })
       ])
+    ).start();
+    
+    // Shimmer effect animation
+    Animated.loop(
+      Animated.timing(shimmerAnimation, {
+        toValue: 1,
+        duration: 3000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+    
+    // Accent ring animation
+    Animated.loop(
+      Animated.timing(accentRingAnimation, {
+        toValue: 1,
+        duration: 2500,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      })
     ).start();
   };
 
@@ -312,35 +323,59 @@ const ScanScreen: FC = () => {
     logScreenView('ScanScreen');
     
     // Refresh usage limit when we open the screen
-    refreshUsageLimit().catch(err => {
-      console.error('Failed to refresh usage in scan view:', err);
-      setNetworkError(true);
-    });
-  }, [refreshUsageLimit]);
+    // Använd en timeout för att undvika för många samtidiga anrop
+    const timerId = setTimeout(() => {
+      if (isScreenMounted.current) {
+        console.log('Scheduled fetchCounter is executing...');
+        fetchCounter().catch(err => {
+          console.error('Failed to refresh usage in scan view:', err);
+          setNetworkError(true);
+        });
+      }
+    }, 1000);
+    
+    // Cleanup: avbryt timer om komponenten avmonteras innan timeoutens slut
+    return () => clearTimeout(timerId);
+  }, []); // Ta bort fetchCounter från beroendearrayen
 
   // Test function for usage API
   const testUsageLimitAPI = async () => {
-    if (!user?.id) {
-      Alert.alert('Ingen användare', 'Du måste vara inloggad för att testa');
-      return;
-    }
-    
     try {
-      const result = await testUsageAPI(user.id);
-      showTestResult(result);
+      if (networkError) {
+        setNetworkError(false);
+      }
+      
+      // Kontrollera användar-ID
+      if (!user?.id) {
+        Alert.alert('Ingen användare', 'Du måste vara inloggad för att testa');
+        return;
+      }
+      
+      // Kör testet
+      const testResult = await testUsageAPI(user.id);
+      
+      // Visa resultatet
+      await showTestResult(testResult);
       
       // Uppdatera UI efter test
       try {
-        await refreshUsageLimit();
+        // Undvik direkt anrop här, vi använder en timeout istället
+        console.log('Test avklarat, uppdatera räknare med timeout');
+        setTimeout(() => {
+          if (isScreenMounted.current) {
+            fetchCounter().catch(err => {
+              console.warn('Test update counter failed:', err);
+            });
+          }
+        }, 1000);
         setNetworkError(false); // Clear any network error on success
       } catch (error) {
         console.error('Failed to refresh usage after test:', error);
-        setNetworkError(true);
       }
-    } catch (error) {
-      console.error('Test execution error:', error);
-      Alert.alert('Testfel', String(error));
-      setNetworkError(true);
+      
+    } catch (err) {
+      console.error('Usage API test failed:', err);
+      Alert.alert('Test Failed', 'API test failed: ' + String(err));
     }
   };
 
@@ -413,80 +448,86 @@ const ScanScreen: FC = () => {
     // We no longer need a safety timeout as it's causing navigation issues
   }, [router, user]);
 
+  // Handle camera button press
   const handleScanPress = async () => {
-    // Clear any existing safety timeouts in memory
-    clearCameraSafetyTimeout();
-    
-    // Ge direkt haptisk feedback
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    // Check platform first - quick return for web
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        "Kameran ej tillgänglig", 
-        "Kamerafunktionen är endast tillgänglig på fysiska enheter.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-    
-    // Kontrollera användningsgräns innan vi fortsätter
     try {
-      // Använd variabeln från useUsageLimit-hooken
+      // Hantera analysgräns-kontroll
       if (hasReachedLimit) {
+        console.log('Användare har nått analysgränsen, visar modal');
         setShowUsageLimitModal(true);
-        // Logga händelse
-        logEvent('usage_limit_reached', {
-          source: 'scan_button'
-        });
         return;
       }
       
+      // Säkerställ att appen har kameratillstånd
+      if (!hasPermission) {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          // På mobila enheter, försök begära tillstånd
+          console.log('Begär kameratillstånd...');
+          setIsRequestingPermission(true);
+          const permissionResult = await requestPermission();
+          setIsRequestingPermission(false);
+          
+          if (!permissionResult) {
+            console.log('Kameratillstånd nekades, visar modal');
+            setShowPermissionModal(true);
+            return;
+          }
+        } else {
+          // På webben eller andra plattformar, visa en annan typ av feedback
+          console.log('Plattformen stöder inte kamera eller saknar tillstånd');
+          Alert.alert('Kameratillstånd krävs', 'Du behöver ge tillstånd för kameraåtkomst för att skanna produkter.');
+          return;
+        }
+      }
+      
+      // Logga event
+      logEvent(Events.SCAN_STARTED);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
       // Uppdatera användningsgräns i bakgrunden utan att blockera
-      refreshUsageLimit().catch(err => {
-        console.warn('Background usage refresh failed');
-        // Fortsätt med kameranavigering trots fel
-      });
+      // Vi använder en timeout för att undvika för många anrop
+      if (isScreenMounted.current) {
+        setTimeout(() => {
+          fetchCounter().catch(err => {
+            console.warn('Background usage refresh failed');
+            // Fortsätt med kameranavigering trots fel
+          });
+        }, 500);
+      }
+      
+      // Navigera till kameravyn
+      navigateToCamera();
     } catch (error) {
-      // Fortsätt med kameranavigering trots fel med användningsgränskontrollen
-      console.warn('Usage check failed but proceeding with camera');
+      console.error('Usage check failed but proceeding with camera:', error);
     }
-    
-    // Kontrollera kameratillstånd innan navigering
-    if (!hasPermission) {
-      // Visa tillståndsmodal istället för att navigera
-      setShowPermissionModal(true);
-      return;
-    }
-    
-    // Om vi kommer hit har tillstånd beviljats, navigera till kameran
-    navigateToCamera();
   };
 
   const handleShowGuide = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowGuide(true);
+    try {
+      // Add haptic feedback
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      console.log('Showing camera guide from button press');
+      // Set state to show guide
+      setShowGuide(true);
+    } catch (error) {
+      console.error('Error showing guide:', error);
+      // Still try to show the guide even if haptics fail
+      setShowGuide(true);
+    }
   };
-
-  // Calculate button size based on screen dimensions
-  const buttonSize = Math.min(width, height) * 0.28;
-  const innerButtonSize = buttonSize * 0.9;
 
   // Animation styles
   const scanButtonAnimatedStyle = {
-    transform: [
-      { scale: pulseAnimation },
-      { translateY: floatAnimation }
-    ]
+    transform: [{ scale: pulseInterpolation }]
   };
   
-  // Inner glow animated style
+  // Inner glow animated style - simplified
   const innerGlowStyle = {
-    opacity: innerGlowAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.5, 0.9]
-    })
+    opacity: glowOpacity
   };
+  
+  // Shimmer animation interpolation
+  const shimmerInterpolation = shimmerTranslateX;
 
   // Add the permission request modal
   const renderPermissionModal = () => {
@@ -539,6 +580,7 @@ const ScanScreen: FC = () => {
       className="flex-1 bg-background-main"
       accessibilityLabel="Skanna produkt skärm"
     >
+      {/* Debug mode button */}
       {debugMode && (
         <View 
           style={{
@@ -573,242 +615,243 @@ const ScanScreen: FC = () => {
           </Pressable>
         </View>
       )}
-      {showGuide ? (
-        <CameraGuide onClose={() => setShowGuide(false)} isTransparent={false} />
-      ) : (
-        <StyledView 
-          className="flex-1 justify-between items-center px-4 pb-8"
-          accessibilityLabel="Skanna produkt skärm"
-        >
-          {/* Title Section */}
-          <StyledView className="w-full items-center mt-12 mb-4">
-            <UsageLimitIndicator />
-            <StyledText className="text-text-primary font-sans-bold text-2xl text-center mb-2">
-              KoaLens
-            </StyledText>
-            <StyledText className="text-text-secondary font-sans text-base text-center">
-              Skanna ingredienser för att kontrollera om produkten är vegansk!
-            </StyledText>
-            
-            {/* Network Error UI */}
-            {networkError && (
-              <StyledView className="bg-status-error/20 p-4 rounded-lg mt-4 w-full">
-                <StyledText className="text-status-error font-sans-medium text-center">
-                  Kunde inte ansluta till servern. Vänligen kontrollera din internetanslutning.
-                </StyledText>
-                <StyledPressable 
-                  onPress={() => { 
-                    setNetworkError(false); 
-                    refreshUsageLimit().catch(err => setNetworkError(true)); 
-                  }}
-                  className="bg-primary mt-2 py-2 rounded-lg"
-                >
-                  <StyledText className="text-text-inverse font-sans text-center">
-                    Försök igen
-                  </StyledText>
-                </StyledPressable>
-              </StyledView>
-            )}
-          </StyledView>
 
-          {/* Main Scan Button - Enhanced with better animations and gradient */}
-          <StyledView className="flex-1 justify-center items-center">
-            <StyledAnimatedView 
-              style={[
-                scanButtonAnimatedStyle,
-                {
-                  width: buttonSize,
-                  height: buttonSize,
-                  borderRadius: buttonSize / 2,
-                }
-              ]}
-              className="items-center justify-center shadow-xl"
-            >
+      {/* Main content */}
+      <StyledView 
+        style={{display: showGuide ? 'none' : 'flex'}}
+        className="flex-1 justify-between items-center px-4 pb-8"
+        accessibilityLabel="Skanna produkt skärm"
+      >
+        {/* Analysis Counter Section - Redesigned */}
+        <StyledView className="w-full items-center mt-16 mb-6">
+          {/* Heading for analysis counter */}
+          <StyledText className="text-text-primary font-sans-medium text-base mb-2">
+            Analyser kvar denna månad
+          </StyledText>
+          {/* Modern Analysis Counter */}
+          <StyledView className="bg-background-light/15 py-2.5 px-6 rounded-full shadow-md border border-gray-700/20 flex-row items-center space-x-2">
+            <Ionicons name="analytics-outline" size={16} color="#ffd33d" />
+            <StyledText className="text-primary font-sans-medium text-sm tracking-wide">
+              {useCounter().remaining} / {useCounter().limit}
+            </StyledText>
+          </StyledView>
+          
+          {/* Network Error UI */}
+          {networkError && (
+            <StyledView className="bg-status-error/20 p-4 rounded-lg mt-4 w-full">
+              <StyledText className="text-status-error font-sans-medium text-center">
+                Kunde inte ansluta till servern. Vänligen kontrollera din internetanslutning.
+              </StyledText>
               <StyledPressable 
-                onPress={handleScanPress}
-                className="items-center justify-center active:opacity-90"
-                style={{
-                  width: buttonSize,
-                  height: buttonSize,
-                  borderRadius: buttonSize / 2,
-                  overflow: 'hidden'
+                onPress={() => { 
+                  setNetworkError(false); 
+                  setTimeout(() => {
+                    if (isScreenMounted.current) {
+                      fetchCounter().catch(err => setNetworkError(true)); 
+                    }
+                  }, 1000);
                 }}
-                accessibilityLabel="Öppna kamera för att skanna ingredienslista"
-                accessibilityRole="button"
+                className="bg-primary mt-2 py-2 rounded-lg"
               >
-                {/* Outer gradient */}
+                <StyledText className="text-text-inverse font-sans text-center">
+                  Försök igen
+                </StyledText>
+              </StyledPressable>
+            </StyledView>
+          )}
+        </StyledView>
+
+        {/* Main Scan Button */}
+        <StyledView className="flex-1 justify-center items-center">
+          {/* Outer glow container */}
+          <StyledAnimatedView 
+            style={[
+              scanButtonAnimatedStyle,
+              {
+                width: buttonSize * 1.2,
+                height: buttonSize * 1.2,
+                borderRadius: buttonSize * 0.6,
+                backgroundColor: 'rgba(255, 211, 61, 0.05)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }
+            ]}
+          >
+            {/* Pulsing accent ring */}
+            <StyledAnimatedView
+              style={{
+                position: 'absolute',
+                width: buttonSize * 1.1,
+                height: buttonSize * 1.1,
+                borderRadius: buttonSize * 0.55,
+                borderWidth: 2,
+                borderColor: '#ffd33d',
+                opacity: accentOpacity,
+                transform: [{ scale: accentScale }]
+              }}
+            />
+            
+            {/* Outer glow effect */}
+            <StyledAnimatedView
+              style={{
+                position: 'absolute',
+                width: buttonSize * 1.15,
+                height: buttonSize * 1.15,
+                borderRadius: buttonSize * 0.575,
+                backgroundColor: 'transparent',
+                shadowColor: "#ffd33d",
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: glowOpacity,
+                shadowRadius: 15,
+                elevation: 5,
+              }}
+            />
+            
+            {/* Main button with elegant design */}
+            <StyledPressable 
+              onPress={handleScanPress}
+              className="items-center justify-center active:opacity-70 overflow-hidden"
+              style={{
+                width: buttonSize,
+                height: buttonSize,
+                borderRadius: buttonSize / 2,
+                backgroundColor: '#ffd33d',
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+                elevation: 7,
+              }}
+              accessibilityLabel="Öppna kamera för att skanna ingredienslista"
+              accessibilityRole="button"
+            >
+              {/* Frosted glass effect */}
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: buttonSize / 2,
+                }}
+              />
+              
+              {/* Shimmer effect overlay */}
+              <StyledAnimatedView
+                style={{
+                  position: 'absolute',
+                  width: buttonSize / 2,
+                  height: '100%',
+                  opacity: 0.6,
+                  backgroundColor: 'transparent',
+                  transform: [{ translateX: shimmerTranslateX }]
+                }}
+              >
                 <LinearGradient
-                  colors={['#ffe066', '#ffd33d', '#ffc107']}
+                  colors={['transparent', 'rgba(255, 255, 255, 0.8)', 'transparent']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
                   style={{
-                    position: 'absolute',
                     width: '100%',
                     height: '100%',
-                    borderRadius: buttonSize / 2,
                   }}
                 />
-                
-                {/* Inner shadow overlay */}
-                <StyledView 
-                  className="absolute inset-0 justify-center items-center"
-                  style={{
-                    borderRadius: buttonSize / 2,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: 0.27,
-                    shadowRadius: 4.65,
-                    elevation: 6
-                  }}
-                />
-                
-                {/* Inner button with glowing effect */}
-                <StyledView 
-                  style={{
-                    width: innerButtonSize,
-                    height: innerButtonSize,
-                    borderRadius: innerButtonSize / 2,
-                    borderWidth: 2,
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  }}
-                  className="bg-primary justify-center items-center overflow-hidden"
-                >
-                  {/* Animated inner glow */}
-                  <StyledAnimatedView 
-                    style={[
-                      innerGlowStyle,
-                      {
-                        position: 'absolute',
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: innerButtonSize / 2,
-                      }
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0)']}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                      }}
-                    />
-                  </StyledAnimatedView>
-                  
-                  {/* Camera icon */}
-                  <Ionicons 
-                    name="camera-outline" 
-                    size={buttonSize * 0.36}
-                    color="#ffffff"
-                  />
-                </StyledView>
-              </StyledPressable>
-            </StyledAnimatedView>
-            
-            {/* Scan Caption */}
-            <StyledView className="mt-8 mb-4 bg-background-light/30 backdrop-blur-sm rounded-xl px-8 py-5 max-w-xs shadow-lg">
-              <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  borderRadius: 8
-                }}
-              />
-              <StyledText 
-                className="text-text-primary font-sans-medium text-center text-base leading-relaxed"
-                accessibilityRole="text"
-              >
-                Skanna en ingredienslista
-              </StyledText>
-            </StyledView>
-          </StyledView>
+              </StyledAnimatedView>
+              
+              {/* Camera icon */}
+              <Ionicons name="camera" size={buttonSize * 0.4} color="#000" />
+            </StyledPressable>
+          </StyledAnimatedView>
+          
+          {/* Small descriptive text below button with enhanced styling */}
+          <StyledText className="text-text-secondary text-sm mt-5 font-sans-medium opacity-80">
+            Tryck för att skanna
+          </StyledText>
+        </StyledView>
 
-          {/* Bottom Instructions */}
-          <StyledView className="w-full max-w-md px-4">
-            {/* Instruction card with improved gradient */}
-            <StyledView className="bg-background-light/20 rounded-lg overflow-hidden mb-4">
-              <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(58,63,68,0.3)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  borderRadius: 8
-                }}
-              />
-              <StyledView className="p-5">
+        {/* Bottom Instructions */}
+        <StyledView className="w-full max-w-md px-4 mt-10 mb-2">
+          {/* Instruction card - Collapsible */}
+          <StyledPressable 
+            onPress={() => setShowTips(!showTips)}
+            className="bg-background-light/10 rounded-lg overflow-hidden mb-4 border border-gray-700/20"
+          >
+            <StyledView className="p-4 flex-row justify-between items-center">
+              <StyledView className="flex-row items-center">
+                <Ionicons 
+                  name="information-circle-outline" 
+                  size={18} 
+                  color="#ffd33d" 
+                />
                 <StyledText 
-                  className="text-text-primary font-sans-medium text-base text-center mb-1"
+                  className="text-text-primary font-sans-medium text-base ml-2"
                 >
                   Tips för bättre resultat
                 </StyledText>
+              </StyledView>
+              <Ionicons 
+                name={showTips ? "chevron-up" : "chevron-down"} 
+                size={20} 
+                color="#ffd33d"
+              />
+            </StyledView>
+            
+            {showTips && (
+              <StyledView className="px-4 pb-4">
                 <StyledText 
-                  className="text-text-secondary font-sans text-sm text-center"
+                  className="text-text-secondary font-sans text-sm leading-5"
                 >
                   Håll telefonen stilla och se till att ingredienslistan är väl belyst och tydligt synlig
                 </StyledText>
               </StyledView>
-            </StyledView>
-            
-            {/* Guide button with improved style */}
-            <StyledPressable 
-              onPress={handleShowGuide}
-              className="flex-row justify-center items-center py-3 rounded-lg active:opacity-70 overflow-hidden"
-              accessibilityLabel="Visa guide för skanning"
-              accessibilityRole="button"
-            >
-              <LinearGradient
-                colors={['rgba(255,211,61,0.2)', 'rgba(255,211,61,0.1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  borderRadius: 8
-                }}
-              />
-              <Ionicons 
-                name="help-circle-outline" 
-                size={20} 
-                color="#ffd33d"
-              />
-              <StyledText className="text-primary font-sans-medium text-sm ml-2">
-                Visa guide för skanning
-              </StyledText>
-            </StyledPressable>
-            
-            {/* Test button - only shown in development mode */}
-            {__DEV__ && (
-              <StyledView className="mt-4">
-                <StyledPressable 
-                  onPress={testUsageLimitAPI}
-                  className="bg-status-error px-4 py-3 rounded-lg active:opacity-80"
-                >
-                  <StyledText className="text-white font-sans-medium text-center">
-                    Testa användningsgräns API
-                  </StyledText>
-                </StyledPressable>
-              </StyledView>
             )}
-          </StyledView>
-          <UsageLimitModal 
-            visible={showUsageLimitModal} 
-            onClose={() => setShowUsageLimitModal(false)} 
-          />
+          </StyledPressable>
+          
+          {/* Guide button with improved style */}
+          <StyledPressable 
+            onPress={handleShowGuide}
+            className="flex-row justify-center items-center py-3 px-4 rounded-lg bg-background-light/10 active:opacity-70 border border-gray-700/20"
+            accessibilityLabel="Visa guide för skanning"
+            accessibilityRole="button"
+          >
+            <Ionicons 
+              name="help-circle-outline" 
+              size={20} 
+              color="#ffd33d"
+            />
+            <StyledText className="text-primary font-sans-medium ml-2">
+              Visa guide för skanning
+            </StyledText>
+          </StyledPressable>
+          
+          {/* Test button - only shown in development mode */}
+          {__DEV__ && (
+            <StyledView className="mt-4">
+              <StyledPressable 
+                onPress={testUsageLimitAPI}
+                className="bg-status-error px-4 py-3 rounded-lg active:opacity-80"
+              >
+                <StyledText className="text-white font-sans-medium text-center">
+                  Testa användningsgräns API
+                </StyledText>
+              </StyledPressable>
+            </StyledView>
+          )}
         </StyledView>
+      </StyledView>
+
+      {/* Camera Guide - displayed as overlay */}
+      {showGuide && (
+        <CameraGuide onClose={() => setShowGuide(false)} isTransparent={false} />
       )}
+      
+      {/* Usage Limit Modal */}
+      <UsageLimitModal 
+        visible={showUsageLimitModal} 
+        onClose={() => setShowUsageLimitModal(false)} 
+      />
       
       {/* Camera permission modal */}
       {renderPermissionModal()}

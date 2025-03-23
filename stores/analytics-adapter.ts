@@ -1,10 +1,9 @@
 /**
- * Adapter för att låta gamla useStore använda nya analytics
+ * Adapter för att låta gamla useStore använda nya counter
  * Detta är ett övergångslager som kommer tas bort när migrationen är klar
  */
 
-import { AnalyticsService } from '@/services/analyticsService';
-import { useAnalytics } from '@/hooks/useAnalytics';
+import { useCounter } from '@/hooks/useCounter';
 import { createStore } from 'zustand';
 
 // Interface för status (måste matcha gamla interfacet)
@@ -21,9 +20,6 @@ interface AnalyticsStatus {
   }[];
 }
 
-// Skapa en singleton-instans för analytics
-const analyticsService = AnalyticsService.getInstance();
-
 // Skapa ett litet lokalt store för cache
 const analyticsCache = createStore<{
   usageStatus: any;
@@ -33,6 +29,39 @@ const analyticsCache = createStore<{
   setUsageStatus: (status) => set({ usageStatus: status })
 }));
 
+// Hjälpfunktion för att anropa backend API direkt
+const fetchCounter = async (userId: string, counterName: string = 'analysis_count') => {
+  try {
+    const BACKEND_URL = 'https://koalens-backend.fly.dev';
+    const response = await fetch(`${BACKEND_URL}/api/counters/${userId}/${counterName}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching counter:', error);
+    return null;
+  }
+};
+
+// Hjälpfunktion för att inkrementera counter direkt
+const incrementCounter = async (userId: string, counterName: string = 'analysis_count', increment: number = 1) => {
+  try {
+    const BACKEND_URL = 'https://koalens-backend.fly.dev';
+    const response = await fetch(
+      `${BACKEND_URL}/api/counters/${userId}/${counterName}/increment`, 
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ increment })
+      }
+    );
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error incrementing counter:', error);
+    return null;
+  }
+};
+
 /**
  * Initialisera analytics för en användare
  */
@@ -40,8 +69,19 @@ export async function initializeAnalytics(userId: string): Promise<boolean> {
   try {
     if (!userId) return false;
     
-    // Använd canPerformAnalysis för att initiera och få status
-    const status = await analyticsService.canPerformAnalysis(userId);
+    // Hämta counter status
+    const counterData = await fetchCounter(userId);
+    
+    if (!counterData) return false;
+    
+    // Konvertera counter format till analytics format
+    const status = {
+      allowed: !counterData.has_reached_limit,
+      reason: counterData.has_reached_limit ? 'Limit reached' : '',
+      remaining: counterData.remaining,
+      total: counterData.value,
+      limit: counterData.limit
+    };
     
     // Spara i cachen
     analyticsCache.getState().setUsageStatus(status);
@@ -77,18 +117,32 @@ export async function canPerformAnalysis(userId: string): Promise<{
     }
     
     // Om inget i cache, hämta ny status
-    const status = await analyticsService.canPerformAnalysis(userId);
+    const counterData = await fetchCounter(userId);
+    
+    if (!counterData) {
+      // Returnera default-värden
+      return {
+        allowed: true,
+        reason: 'Kunde inte hämta data',
+        remaining: 5,
+        total: 0,
+        limit: 5
+      };
+    }
+    
+    // Konvertera counter format till analytics format
+    const status = {
+      allowed: !counterData.has_reached_limit,
+      reason: counterData.has_reached_limit ? 'Limit reached' : '',
+      remaining: counterData.remaining,
+      total: counterData.value,
+      limit: counterData.limit
+    };
     
     // Spara i cachen
     analyticsCache.getState().setUsageStatus(status);
     
-    return {
-      allowed: status.allowed,
-      reason: status.reason,
-      remaining: status.remaining,
-      total: status.total,
-      limit: status.limit
-    };
+    return status;
   } catch (error) {
     console.error('Fel vid kontroll av analysgräns via adapter:', error);
     
@@ -96,9 +150,9 @@ export async function canPerformAnalysis(userId: string): Promise<{
     return {
       allowed: true,
       reason: 'Fel vid kontroll',
-      remaining: 99,
+      remaining: 5,
       total: 0,
-      limit: 100
+      limit: 5
     };
   }
 }
@@ -108,23 +162,20 @@ export async function canPerformAnalysis(userId: string): Promise<{
  */
 export async function recordAnalysis(userId: string): Promise<boolean> {
   try {
-    const result = await analyticsService.recordAnalysis(userId);
+    const result = await incrementCounter(userId);
+    
+    if (!result) return false;
     
     // Uppdatera cachat status
-    if (result.success) {
-      const oldStatus = analyticsCache.getState().usageStatus;
-      
-      if (oldStatus) {
-        analyticsCache.getState().setUsageStatus({
-          ...oldStatus,
-          total: result.currentCount,
-          remaining: result.remaining,
-          allowed: result.remaining > 0
-        });
-      }
-    }
+    analyticsCache.getState().setUsageStatus({
+      allowed: !result.has_reached_limit,
+      reason: result.has_reached_limit ? 'Limit reached' : '',
+      remaining: result.remaining,
+      total: result.value,
+      limit: result.limit
+    });
     
-    return result.success;
+    return true;
   } catch (error) {
     console.error('Fel vid registrering av analys via adapter:', error);
     return false;
@@ -133,10 +184,14 @@ export async function recordAnalysis(userId: string): Promise<boolean> {
 
 /**
  * Registrera en väntande analys för offline-användning
+ * I det nya systemet behövs inte denna funktion, vi ökar direkt
  */
 export function recordPendingAnalysis(userId: string): boolean {
   try {
-    analyticsService.recordOfflineAnalysis(userId);
+    // Direkt ökning om möjligt, annars ignorera
+    if (navigator.onLine) {
+      incrementCounter(userId).catch(console.error);
+    }
     return true;
   } catch (error) {
     console.error('Fel vid registrering av väntande analys via adapter:', error);
@@ -146,18 +201,27 @@ export function recordPendingAnalysis(userId: string): boolean {
 
 /**
  * Synkronisera väntande analyser
+ * I det nya systemet behövs inte denna funktion
  */
 export async function syncPendingAnalyses(userId: string): Promise<boolean> {
   try {
-    await analyticsService.syncPendingAnalyses();
+    // Vi behöver bara uppdatera status nu
+    const counterData = await fetchCounter(userId);
     
-    // Uppdatera cache efter synkronisering
-    const newStatus = await analyticsService.canPerformAnalysis(userId);
-    analyticsCache.getState().setUsageStatus(newStatus);
+    if (counterData) {
+      // Uppdatera cache efter synkronisering
+      analyticsCache.getState().setUsageStatus({
+        allowed: !counterData.has_reached_limit,
+        reason: counterData.has_reached_limit ? 'Limit reached' : '',
+        remaining: counterData.remaining,
+        total: counterData.value,
+        limit: counterData.limit
+      });
+    }
     
     return true;
   } catch (error) {
-    console.error('Fel vid synkronisering av väntande analyser via adapter:', error);
+    console.error('Fel vid synkronisering via adapter:', error);
     return false;
   }
 } 

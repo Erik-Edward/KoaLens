@@ -6,6 +6,7 @@ import { sv } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { Product } from '@/models/productModel';
+import { HISTORY_HEADER_COLOR } from '@/app/(tabs)/(history)/history';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -65,17 +66,22 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
   return (
     <StyledPressable
       onPress={handlePress}
-      className="bg-background-light/30 rounded-lg p-4 mb-4"
+      className="bg-[#232A35]/40 rounded-xl p-4 mb-4 border border-[#232A35]/60"
       style={({ pressed }) => ({
         opacity: pressed ? 0.7 : 1,
-        transform: [{ scale: pressed ? 0.98 : 1 }]
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
       })}
     >
       <StyledView className="flex-row">
         {/* Product Image */}
         <StyledImage
           source={{ uri: product.metadata.imageUri }}
-          className="w-16 h-16 rounded-lg bg-background-dark"
+          className="w-16 h-16 rounded-lg bg-background-dark border border-[#ffffff]/10"
         />
 
         {/* Product Information */}
@@ -86,7 +92,7 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
             <StyledView className="flex-row items-center">
               <StyledView
                 className={`w-3 h-3 rounded-full mr-2 ${
-                  isVegan ? 'bg-status-success' : 'bg-status-error'
+                  isVegan ? 'bg-[#4CAF50]' : 'bg-[#ff6b6b]'
                 }`}
               />
               <StyledText className="text-text-primary font-sans-medium text-base">
@@ -104,7 +110,7 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
                 <Ionicons
                   name={product.metadata.isFavorite ? 'star' : 'star-outline'}
                   size={24}
-                  color={product.metadata.isFavorite ? '#ffd700' : '#ffffff'}
+                  color={product.metadata.isFavorite ? '#ffcc00' : '#ffffff'}
                 />
               </StyledPressable>
               
@@ -133,7 +139,7 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
           {!isVegan && nonVeganIngredients.length > 0 && (
             <StyledText 
               numberOfLines={2}
-              className="text-status-error/90 font-sans text-sm mt-1"
+              className="text-[#ff6b6b]/90 font-sans text-sm mt-1"
             >
               Innehåller: {nonVeganIngredients.join(', ')}
             </StyledText>
@@ -142,7 +148,7 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
           {/* Confidence */}
           <StyledView className="flex-row items-center mt-1">
             <StyledText className="text-text-secondary font-sans text-sm">
-              Konfidensgrad: {Math.round(product.analysis.confidence * 100)}%
+              Konfidensgrad: <StyledText className="text-[#ffcc00]">{Math.round(product.analysis.confidence * 100)}%</StyledText>
             </StyledText>
           </StyledView>
         </StyledView>

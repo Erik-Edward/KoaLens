@@ -16,8 +16,8 @@ export default function TabLayout() {
     if (Platform.OS === 'android') {
       const setupNavigationBar = async () => {
         try {
-          await NavigationBar.setBackgroundColorAsync(theme.colors.background.dark);
-          await NavigationBar.setBorderColorAsync(theme.colors.background.dark);
+          await NavigationBar.setBackgroundColorAsync('#121212');
+          await NavigationBar.setBorderColorAsync('#2a2a2a');
           await NavigationBar.setButtonStyleAsync('light');
         } catch (error) {
           console.log('Error setting navigation bar:', error);
@@ -32,11 +32,14 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: '#4ECDC4',
+        tabBarInactiveTintColor: '#8A8A8A',
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e5e7eb',
+          backgroundColor: '#121212',
+          borderTopColor: '#2a2a2a',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
       }}
     >
@@ -68,6 +71,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="(enumbers)"
+        options={{
+          title: 'E-nr',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="search-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="(profile)"
         options={{
           title: 'Profil',
@@ -82,7 +94,8 @@ export default function TabLayout() {
           title: 'Utveckling',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="code-outline" color={color} size={size} />
-          )
+          ),
+          href: null, // Dölj denna tab i produktion
         }}
       />
     </Tabs>

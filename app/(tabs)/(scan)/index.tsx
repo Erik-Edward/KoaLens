@@ -1,6 +1,7 @@
 // app/(tabs)/(scan)/index.tsx - Förbättrad design med konsekvent utseende och test-knapp
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert, Modal } from 'react-native';
+import { View, Text, Pressable, SafeAreaView, useWindowDimensions, Animated, Easing, Platform, Alert, Modal, StatusBar } from 'react-native';
+import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { router, useNavigation, usePathname, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
@@ -17,10 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCameraPermission } from '@/lib/visionCameraWrapper';
 import { useStore } from '@/stores/useStore';
 
+// Färgkonstanter för Skanna-sidan
+export const SCAN_HEADER_COLOR = '#232A35';
+
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
+const StyledRNSafeAreaView = styled(RNSafeAreaView);
 const StyledAnimatedView = styled(Animated.View);
 
 const ScanScreen: React.FC = () => {
@@ -38,6 +43,27 @@ const ScanScreen: React.FC = () => {
   const segments = useSegments();
   const isScreenMounted = useRef(true);
   const safetyTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  
+  // StatusBar hantering - återställs när skärmen lämnas
+  useEffect(() => {
+    // Sätt StatusBar för denna skärm
+    if (Platform.OS === 'android') {
+      StatusBar.setBarStyle('light-content');
+      StatusBar.setBackgroundColor(SCAN_HEADER_COLOR);
+    }
+    
+    // Lyssna på när denna skärm får fokus för att återställa StatusBar
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      if (Platform.OS === 'android') {
+        StatusBar.setBarStyle('light-content');
+        StatusBar.setBackgroundColor(SCAN_HEADER_COLOR);
+      }
+    });
+    
+    return () => {
+      unsubscribeFocus();
+    };
+  }, [navigation]);
   
   // Get camera permission status directly in the scan tab
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -576,16 +602,45 @@ const ScanScreen: React.FC = () => {
   };
 
   return (
-    <StyledSafeAreaView 
-      className="flex-1 bg-background-main"
-      accessibilityLabel="Skanna produkt skärm"
-    >
+    <StyledView className="flex-1 bg-[#121212]">
+      {/* Header som täcker hela statusfältsområdet */}
+      <StyledView 
+        className="bg-[#232A35] absolute top-0 left-0 right-0 rounded-b-xl" 
+        style={{ 
+          height: Platform.OS === 'ios' ? 120 : 100,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 6,
+          elevation: 4
+        }} 
+      />
+      
+      {/* Header innehåll med SafeAreaView för korrekt padding */}
+      <StyledRNSafeAreaView className="bg-[#232A35] rounded-b-xl" edges={['top']}>
+        <StyledView className="px-6 pb-4">
+          <StyledText className="text-white text-2xl font-bold mb-1">Skanna</StyledText>
+          <StyledText className="text-white/90 text-base">Skanna en produkt för att analysera</StyledText>
+        </StyledView>
+      </StyledRNSafeAreaView>
+      
+      {/* Extra utrymme efter headern för att ge plats till innehållet */}
+      <StyledView className="h-6" />
+
+      {networkError && (
+        <StyledView className="absolute top-0 left-0 right-0 bg-status-error py-2 px-4 z-50 mt-36">
+          <StyledText className="text-white text-center font-sans-medium">
+            Ingen internetanslutning. Vissa funktioner kan vara begränsade.
+          </StyledText>
+        </StyledView>
+      )}
+
       {/* Debug mode button */}
       {debugMode && (
         <View 
           style={{
             position: 'absolute',
-            top: 100,
+            top: 140,
             left: 0,
             right: 0,
             zIndex: 9999,
@@ -617,21 +672,20 @@ const ScanScreen: React.FC = () => {
       )}
 
       {/* Main content */}
-      <StyledView 
+      <StyledSafeAreaView 
         style={{display: showGuide ? 'none' : 'flex'}}
-        className="flex-1 justify-between items-center px-4 pb-8"
-        accessibilityLabel="Skanna produkt skärm"
+        className="flex-1 justify-between items-center px-4 pb-8 pt-2"
       >
         {/* Analysis Counter Section - Redesigned */}
-        <StyledView className="w-full items-center mt-16 mb-6">
+        <StyledView className="w-full items-center mb-0">
           {/* Heading for analysis counter */}
           <StyledText className="text-text-primary font-sans-medium text-base mb-2">
-            Analyser kvar denna månad
+            Analyser kvar denna månaden
           </StyledText>
           {/* Modern Analysis Counter */}
           <StyledView className="bg-background-light/15 py-2.5 px-6 rounded-full shadow-md border border-gray-700/20 flex-row items-center space-x-2">
-            <Ionicons name="analytics-outline" size={16} color="#ffd33d" />
-            <StyledText className="text-primary font-sans-medium text-sm tracking-wide">
+            <Ionicons name="analytics-outline" size={16} color="#4ECDC4" />
+            <StyledText className="text-[#4ECDC4] font-sans-medium text-sm tracking-wide">
               {useCounter().remaining} / {useCounter().limit}
             </StyledText>
           </StyledView>
@@ -685,7 +739,7 @@ const ScanScreen: React.FC = () => {
                 height: buttonSize * 1.1,
                 borderRadius: buttonSize * 0.55,
                 borderWidth: 2,
-                borderColor: '#ffd33d',
+                borderColor: '#4ECDC4',
                 opacity: accentOpacity,
                 transform: [{ scale: accentScale }]
               }}
@@ -699,7 +753,7 @@ const ScanScreen: React.FC = () => {
                 height: buttonSize * 1.15,
                 borderRadius: buttonSize * 0.575,
                 backgroundColor: 'transparent',
-                shadowColor: "#ffd33d",
+                shadowColor: "#4ECDC4",
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: glowOpacity,
                 shadowRadius: 15,
@@ -715,7 +769,7 @@ const ScanScreen: React.FC = () => {
                 width: buttonSize,
                 height: buttonSize,
                 borderRadius: buttonSize / 2,
-                backgroundColor: '#ffd33d',
+                backgroundColor: '#4ECDC4',
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 3 },
                 shadowOpacity: 0.2,
@@ -783,7 +837,7 @@ const ScanScreen: React.FC = () => {
                 <Ionicons 
                   name="information-circle-outline" 
                   size={18} 
-                  color="#ffd33d" 
+                  color="#4ECDC4" 
                 />
                 <StyledText 
                   className="text-text-primary font-sans-medium text-base ml-2"
@@ -794,7 +848,7 @@ const ScanScreen: React.FC = () => {
               <Ionicons 
                 name={showTips ? "chevron-up" : "chevron-down"} 
                 size={20} 
-                color="#ffd33d"
+                color="#4ECDC4"
               />
             </StyledView>
             
@@ -819,9 +873,9 @@ const ScanScreen: React.FC = () => {
             <Ionicons 
               name="help-circle-outline" 
               size={20} 
-              color="#ffd33d"
+              color="#4ECDC4"
             />
-            <StyledText className="text-primary font-sans-medium ml-2">
+            <StyledText className="text-[#4ECDC4] font-sans-medium ml-2">
               Visa guide för skanning
             </StyledText>
           </StyledPressable>
@@ -840,7 +894,7 @@ const ScanScreen: React.FC = () => {
             </StyledView>
           )}
         </StyledView>
-      </StyledView>
+      </StyledSafeAreaView>
 
       {/* Camera Guide - displayed as overlay */}
       {showGuide && (
@@ -855,7 +909,7 @@ const ScanScreen: React.FC = () => {
       
       {/* Camera permission modal */}
       {renderPermissionModal()}
-    </StyledSafeAreaView>
+    </StyledView>
   );
 };
 

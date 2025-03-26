@@ -124,9 +124,9 @@ export async function canPerformAnalysis(userId: string): Promise<{
       return {
         allowed: true,
         reason: 'Kunde inte hämta data',
-        remaining: 5,
+        remaining: 15,
         total: 0,
-        limit: 5
+        limit: 15
       };
     }
     
@@ -150,9 +150,9 @@ export async function canPerformAnalysis(userId: string): Promise<{
     return {
       allowed: true,
       reason: 'Fel vid kontroll',
-      remaining: 5,
+      remaining: 15,
       total: 0,
-      limit: 5
+      limit: 15
     };
   }
 }

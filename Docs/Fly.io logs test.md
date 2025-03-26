@@ -1,496 +1,206 @@
-2025-03-20 13:52:31.562	
-]
-2025-03-20 13:52:31.562	
+		2025-03-26 14:21:01.138	
 }
-2025-03-20 13:52:31.562	
-last_updated: '2025-03-20T12:52:31.524+00:00'
-2025-03-20 13:52:31.562	
-is_premium: false,
-2025-03-20 13:52:31.562	
-analyses_limit: 2,
-2025-03-20 13:52:31.562	
-analyses_used: 0,
-2025-03-20 13:52:31.562	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:31.562	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:31.562	
-{
-2025-03-20 13:52:31.562	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:31.524	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:31.524	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:31.514	
-]
-2025-03-20 13:52:31.514	
-}
-2025-03-20 13:52:31.514	
-last_updated: '2025-03-20T12:52:31.445+00:00'
-2025-03-20 13:52:31.514	
-is_premium: false,
-2025-03-20 13:52:31.514	
-analyses_limit: 2,
-2025-03-20 13:52:31.514	
-analyses_used: 0,
-2025-03-20 13:52:31.514	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:31.514	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:31.514	
-{
-2025-03-20 13:52:31.514	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:31.445	
-[SUPABASE REQUEST] UPSERT USER: Starting
+2025-03-26 14:21:01.138	
+has_reached_limit: false
+2025-03-26 14:21:01.138	
+reset_frequency: 'monthly',
 
 
-2025-03-20 13:52:31.445	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:30.141	
-]
-2025-03-20 13:52:30.141	
+2025-03-26 14:21:01.138	
+counter_name: 'analysis_count',
+2025-03-26 14:21:01.138	
+next_reset: '2025-04-26T13:20:18.953265+00:00',
+2025-03-26 14:21:01.138	
+last_reset: '2025-03-26T13:20:18.953265+00:00',
+2025-03-26 14:21:01.138	
+is_limited: true,
+2025-03-26 14:21:01.138	
+counter_id: '3f1102f5-6213-4bc8-b27c-cf0d70920ffd',
+2025-03-26 14:21:01.138	
+remaining: 4,
+2025-03-26 14:21:01.138	
+user_id: 'fb0ed9d7-2b26-44c0-bfa3-7104ff986bde',
+2025-03-26 14:21:01.138	
+value: 1,
+2025-03-26 14:21:01.138	
+limit: 5,
+2025-03-26 14:21:01.138	
+Räknare ökad: {
+2025-03-26 14:21:01.029	
+Ökar räknare "analysis_count" för användare: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde
+2025-03-26 14:21:00.337	
 }
-2025-03-20 13:52:30.141	
-last_updated: '2025-03-20T12:52:30.099+00:00'
-2025-03-20 13:52:30.141	
-is_premium: false,
-2025-03-20 13:52:30.141	
-analyses_limit: 2,
-2025-03-20 13:52:30.141	
-analyses_used: 0,
-2025-03-20 13:52:30.141	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:30.141	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:30.141	
-{
-2025-03-20 13:52:30.141	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:30.099	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:30.099	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:30.057	
-]
-2025-03-20 13:52:30.057	
-}
-2025-03-20 13:52:30.057	
-last_updated: '2025-03-20T12:52:30.01+00:00'
-2025-03-20 13:52:30.057	
-is_premium: false,
-2025-03-20 13:52:30.057	
-analyses_limit: 2,
-2025-03-20 13:52:30.057	
-analyses_used: 0,
-2025-03-20 13:52:30.057	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:30.057	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:30.057	
-{
-2025-03-20 13:52:30.057	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:30.057	
-]
-2025-03-20 13:52:30.057	
-}
-2025-03-20 13:52:30.057	
-last_updated: '2025-03-20T12:52:29.996+00:00'
-2025-03-20 13:52:30.057	
-is_premium: false,
-2025-03-20 13:52:30.057	
-analyses_limit: 2,
-2025-03-20 13:52:30.057	
-analyses_used: 0,
-2025-03-20 13:52:30.057	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:30.057	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:30.057	
-{
-2025-03-20 13:52:30.057	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:30.044	
-}
-2025-03-20 13:52:30.044	
-usageInfo: { analysesUsed: 1, analysesLimit: 2, remaining: 1 }
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
+usageInfo: { analysesUsed: 1, analysesLimit: 999, remaining: 998 }
+2025-03-26 14:21:00.337	
 usageUpdated: true,
-2025-03-20 13:52:30.044	
-'Alla ingredienser bedöms som veganska.',
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
+'Varning: Möjliga läsfel i ingredienslistan detekterade. Resultatet kan vara mindre tillförlitligt.',
+2025-03-26 14:21:00.337	
 '\n' +
-2025-03-20 13:52:30.044	
-reasoning: 'Produkten är vegansk baserat på de listade ingredienserna som endast innehåller majs, palmolja och salt. Palmolja är markerad som hållbarhetscertifierad och ekologisk. Alla synliga ingredienser är växtbaserade.\n' +
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
+reasoning: 'Produkten innehåller endast majskorn (86%), palmolja (som är märkt som hållbarhetscertifierad) och salt (1,8%). Alla dessa ingredienser är växtbaserade eller mineraler och innehåller inga animaliska produkter. På bilden framgår också att palmolja är märkt som ekologisk ingrediens. Det nämns att majsen har ursprung i Frankrike.\n' +
+2025-03-26 14:21:00.337	
 nonVeganIngredients: [],
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
 allIngredients: [ 'Majskorn 86%', 'palmolja', 'salt 1,8%' ],
-2025-03-20 13:52:30.044	
-confidence: 0.95,
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
+confidence: 0.5,
+2025-03-26 14:21:00.337	
 isVegan: true,
-2025-03-20 13:52:30.044	
+2025-03-26 14:21:00.337	
 Sending final result: {
-2025-03-20 13:52:30.044	
-Analysis count incremented: { analysesUsed: 1, analysesLimit: 2 }
-2025-03-20 13:52:30.043	
-Användningsgräns uppdaterad: { userId: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77', used: 1, limit: 2 }
-2025-03-20 13:52:30.043	
+2025-03-26 14:21:00.336	
+Analysis count incremented: { analysesUsed: 1, analysesLimit: 999 }
+2025-03-26 14:21:00.336	
+NEUTRALISERAD: Simulerar ökning av analysräknare för användare: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde
+2025-03-26 14:21:00.336	
+Incrementing analysis count for user: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde
+2025-03-26 14:21:00.336	
 }
-2025-03-20 13:52:30.043	
-last_updated: '2025-03-20T12:52:29.977+00:00'
-2025-03-20 13:52:30.043	
-is_premium: false,
-2025-03-20 13:52:30.043	
-analyses_limit: 2,
-2025-03-20 13:52:30.043	
-analyses_used: 1,
-2025-03-20 13:52:30.043	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:30.043	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:30.043	
-[SUPABASE REQUEST] INCREMENT COUNTER: SUCCESS {
-2025-03-20 13:52:30.010	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:30.009	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:29.996	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:29.996	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:29.977	
-[SUPABASE REQUEST] INCREMENT COUNTER: Starting
-2025-03-20 13:52:29.977	
-Nuvarande analysräknare: 0
-2025-03-20 13:52:29.977	
-]
-2025-03-20 13:52:29.977	
-}
-2025-03-20 13:52:29.977	
-last_updated: '2025-03-20T12:52:29.9+00:00'
-2025-03-20 13:52:29.977	
-is_premium: false,
-2025-03-20 13:52:29.977	
-analyses_limit: 2,
-2025-03-20 13:52:29.977	
-analyses_used: 0,
-2025-03-20 13:52:29.977	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:29.977	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:29.977	
-{
-2025-03-20 13:52:29.977	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:29.902	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:29.902	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:29.902	
-*** FÖRSÖKER ÖKA ANALYSRÄKNAREN FÖR ANVÄNDARE: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:29.902	
-Incrementing analysis count for user: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:29.902	
-}
-2025-03-20 13:52:29.902	
+2025-03-26 14:21:00.336	
 debug: { fuzzyMatches: [ [Object] ] }
-2025-03-20 13:52:29.902	
-reasoning: 'Alla ingredienser bedöms som veganska.',
-2025-03-20 13:52:29.902	
+2025-03-26 14:21:00.336	
+reasoning: 'Varning: Möjliga läsfel i ingredienslistan detekterade. Resultatet kan vara mindre tillförlitligt.',
+2025-03-26 14:21:00.336	
 uncertainIngredients: [],
-2025-03-20 13:52:29.902	
+2025-03-26 14:21:00.336	
 nonVeganIngredients: [],
-2025-03-20 13:52:29.902	
-confidence: 1,
-2025-03-20 13:52:29.902	
+2025-03-26 14:21:00.336	
+confidence: 0.5,
+2025-03-26 14:21:00.336	
 isVegan: true,
-2025-03-20 13:52:29.902	
+2025-03-26 14:21:00.336	
 Local validation result: {
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
 }
-2025-03-20 13:52:29.895	
-reasoning: 'Produkten är vegansk baserat på de listade ingredienserna som endast innehåller majs, palmolja och salt. Palmolja är markerad som hållbarhetscertifierad och ekologisk. Alla synliga ingredienser är växtbaserade.'
-2025-03-20 13:52:29.895	
-nonVeganIngredients: [],
-2025-03-20 13:52:29.895	
-ingredientList: [ 'Majskorn 86%', 'palmolja', 'salt 1,8%' ],
-2025-03-20 13:52:29.895	
-productName: 'Majsprodukt',
-2025-03-20 13:52:29.895	
-confidence: 0.95,
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
+imageQualityIssues: []
+2025-03-26 14:21:00.335	
+reasoning: 'Produkten innehåller endast majskorn (86%), palmolja (som är märkt som hållbarhetscertifierad) och salt (1,8%). Alla dessa ingredienser är växtbaserade eller mineraler och innehåller inga animaliska produkter. På bilden framgår också att palmolja är märkt som ekologisk ingrediens. Det nämns att majsen har ursprung i Frankrike.',
+2025-03-26 14:21:00.335	
+confidence: 0.98,
+2025-03-26 14:21:00.335	
 isVegan: true,
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
+nonVeganIngredients: [],
+2025-03-26 14:21:00.335	
+ingredientList: [ 'Majskorn 86%', 'palmolja', 'salt 1,8%' ],
+2025-03-26 14:21:00.335	
 Parsed Claude result: {
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
+Produkten är vegansk eftersom den endast innehåller växtbaserade ingredienser (majskorn och palmolja) samt salt, som är ett mineral. Det finns inga animaliska ingredienser i produkten enligt den synliga ingrediensförteckningen. Bildens kvalitet är tillräckligt god för att göra denna bedömning med hög säkerhet.
+2025-03-26 14:21:00.335	
+```
+2025-03-26 14:21:00.335	
 }
-2025-03-20 13:52:29.895	
-"reasoning": "Produkten är vegansk baserat på de listade ingredienserna som endast innehåller majs, palmolja och salt. Palmolja är markerad som hållbarhetscertifierad och ekologisk. Alla synliga ingredienser är växtbaserade."
-2025-03-20 13:52:29.895	
-"nonVeganIngredients": [],
-2025-03-20 13:52:29.895	
-"ingredientList": ["Majskorn 86%", "palmolja", "salt 1,8%"],
-2025-03-20 13:52:29.895	
-"productName": "Majsprodukt",
-2025-03-20 13:52:29.895	
-"confidence": 0.95,
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
+"imageQualityIssues": []
+2025-03-26 14:21:00.335	
+"reasoning": "Produkten innehåller endast majskorn (86%), palmolja (som är märkt som hållbarhetscertifierad) och salt (1,8%). Alla dessa ingredienser är växtbaserade eller mineraler och innehåller inga animaliska produkter. På bilden framgår också att palmolja är märkt som ekologisk ingrediens. Det nämns att majsen har ursprung i Frankrike.",
+2025-03-26 14:21:00.335	
+"confidence": 0.98,
+2025-03-26 14:21:00.335	
 "isVegan": true,
-2025-03-20 13:52:29.895	
-Raw response from Claude: {
-2025-03-20 13:52:29.895	
+2025-03-26 14:21:00.335	
+"nonVeganIngredients": [],
+2025-03-26 14:21:00.335	
+"ingredientList": ["Majskorn 86%", "palmolja", "salt 1,8%"],
+2025-03-26 14:21:00.335	
+{
+2025-03-26 14:21:00.335	
+```json
+2025-03-26 14:21:00.335	
+Raw response from Claude: Jag ska analysera ingrediensförteckningen på bilden och bedöma om produkten är vegansk.
+2025-03-26 14:21:00.335	
 Received response from Claude
-2025-03-20 13:52:25.029	
+2025-03-26 14:20:54.437	
 Sending request to Claude...
-2025-03-20 13:52:25.029	
+2025-03-26 14:20:54.437	
 Using prompt for uncropped image
-2025-03-20 13:52:25.029	
-Compressed image size: 0.03MB
-2025-03-20 13:52:25.029	
-Final base64 size: 0.03MB
-2025-03-20 13:52:25.029	
-First compression size: 0.03MB
-2025-03-20 13:52:24.814	
+2025-03-26 14:20:54.437	
+Compressed image size: 0.23MB
+2025-03-26 14:20:54.437	
+Compression ratio: 16.4%
+2025-03-26 14:20:54.437	
+Final base64 size: 0.23MB
+2025-03-26 14:20:54.436	
+First compression size: 0.23MB
+2025-03-26 14:20:53.289	
 Compressing image...
-2025-03-20 13:52:24.814	
-Initial image size: 1.49MB
-2025-03-20 13:52:24.813	
+2025-03-26 14:20:53.289	
+Initial image size: 1.39MB
+2025-03-26 14:20:53.289	
 Processing image... { isCropped: undefined, hasUserId: true }
-2025-03-20 13:52:24.812	
+2025-03-26 14:20:53.289	
 }
-2025-03-20 13:52:24.812	
+2025-03-26 14:20:53.289	
 isPremium: false
-2025-03-20 13:52:24.812	
+2025-03-26 14:20:53.289	
 hasRemainingAnalyses: true,
-2025-03-20 13:52:24.812	
-analysesLimit: 2,
-2025-03-20 13:52:24.812	
+2025-03-26 14:20:53.289	
+analysesLimit: 999,
+2025-03-26 14:20:53.289	
 analysesUsed: 0,
-2025-03-20 13:52:24.812	
-userId: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:24.812	
+2025-03-26 14:20:53.289	
+userId: 'fb0ed9d7-2b26-44c0-bfa3-7104ff986bde',
+2025-03-26 14:20:53.289	
 User limit check result: {
-2025-03-20 13:52:24.812	
-]
-2025-03-20 13:52:24.812	
-}
-2025-03-20 13:52:24.812	
-last_updated: '2025-03-20T12:52:24.587+00:00'
-2025-03-20 13:52:24.812	
-is_premium: false,
-2025-03-20 13:52:24.812	
-analyses_limit: 2,
-2025-03-20 13:52:24.812	
-analyses_used: 0,
-2025-03-20 13:52:24.812	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:24.812	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:24.812	
-{
-2025-03-20 13:52:24.812	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:24.804	
-]
-2025-03-20 13:52:24.804	
-}
-2025-03-20 13:52:24.804	
-last_updated: '2025-03-20T12:52:24.731+00:00'
-2025-03-20 13:52:24.804	
-is_premium: false,
-2025-03-20 13:52:24.804	
-analyses_limit: 2,
-2025-03-20 13:52:24.804	
-analyses_used: 0,
-2025-03-20 13:52:24.804	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:24.804	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:24.804	
-{
-2025-03-20 13:52:24.804	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:24.731	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:24.730	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:24.587	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:24.587	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:24.586	
-Checking usage limit for user: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:24.586	
+2025-03-26 14:20:53.289	
+NEUTRALISERAD: Kontrollerar användargräns för användare: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde
+2025-03-26 14:20:53.289	
+Checking usage limit for user: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde
+2025-03-26 14:20:53.288	
 Received analyze request
-2025-03-20 13:52:07.553	
-]
-2025-03-20 13:52:07.553	
+2025-03-26 14:20:18.978	
 }
-2025-03-20 13:52:07.553	
-last_updated: '2025-03-20T12:52:07.5+00:00'
-2025-03-20 13:52:07.553	
-is_premium: false,
-2025-03-20 13:52:07.553	
-analyses_limit: 2,
-2025-03-20 13:52:07.553	
-analyses_used: 0,
-2025-03-20 13:52:07.553	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:07.553	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:07.553	
-{
-2025-03-20 13:52:07.553	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:07.500	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:07.500	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:05.784	
-]
-2025-03-20 13:52:05.784	
+2025-03-26 14:20:18.978	
+has_reached_limit: false
+2025-03-26 14:20:18.978	
+reset_frequency: 'monthly',
+2025-03-26 14:20:18.978	
+counter_name: 'analysis_count',
+2025-03-26 14:20:18.978	
+next_reset: '2025-04-26T13:20:18.953265+00:00',
+2025-03-26 14:20:18.978	
+last_reset: '2025-03-26T13:20:18.953265+00:00',
+2025-03-26 14:20:18.978	
+is_limited: true,
+2025-03-26 14:20:18.978	
+counter_id: '3f1102f5-6213-4bc8-b27c-cf0d70920ffd',
+2025-03-26 14:20:18.978	
+remaining: 5,
+2025-03-26 14:20:18.978	
+user_id: 'fb0ed9d7-2b26-44c0-bfa3-7104ff986bde',
+2025-03-26 14:20:18.978	
+value: 0,
+2025-03-26 14:20:18.978	
+limit: 5,
+2025-03-26 14:20:18.978	
+Räknarinformation hämtad: {
+2025-03-26 14:20:18.978	
 }
-2025-03-20 13:52:05.784	
-last_updated: '2025-03-20T12:52:05.739+00:00'
-2025-03-20 13:52:05.784	
-is_premium: false,
-2025-03-20 13:52:05.784	
-analyses_limit: 2,
-2025-03-20 13:52:05.784	
-analyses_used: 0,
-2025-03-20 13:52:05.784	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:05.784	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:05.784	
-{
-2025-03-20 13:52:05.784	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:05.739	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:05.739	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:05.560	
-]
-2025-03-20 13:52:05.560	
+2025-03-26 14:20:18.978	
+message: 'duplicate key value violates unique constraint "user_counters_user_id_counter_name_key"'
+2025-03-26 14:20:18.978	
+hint: null,
+2025-03-26 14:20:18.978	
+details: 'Key (user_id, counter_name)=(fb0ed9d7-2b26-44c0-bfa3-7104ff986bde, analysis_count) already exists.',
+2025-03-26 14:20:18.978	
+code: '23505',
+2025-03-26 14:20:18.978	
+Error in getCounter: {
+2025-03-26 14:20:18.978	
 }
-2025-03-20 13:52:05.560	
-last_updated: '2025-03-20T12:52:05.507+00:00'
-2025-03-20 13:52:05.560	
-is_premium: false,
-2025-03-20 13:52:05.560	
-analyses_limit: 2,
-2025-03-20 13:52:05.560	
-analyses_used: 0,
-2025-03-20 13:52:05.560	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:05.560	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:05.560	
-{
-2025-03-20 13:52:05.560	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:05.508	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:05.508	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:05.102	
-]
-2025-03-20 13:52:05.102	
-}
-2025-03-20 13:52:05.102	
-last_updated: '2025-03-20T12:52:05.046+00:00'
-2025-03-20 13:52:05.102	
-is_premium: false,
-2025-03-20 13:52:05.102	
-analyses_limit: 2,
-2025-03-20 13:52:05.102	
-analyses_used: 0,
-2025-03-20 13:52:05.102	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:05.102	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:05.102	
-{
-2025-03-20 13:52:05.102	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:05.046	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:05.046	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:04.667	
-]
-2025-03-20 13:52:04.667	
-}
-2025-03-20 13:52:04.667	
-last_updated: '2025-03-20T12:52:04.621+00:00'
-2025-03-20 13:52:04.667	
-is_premium: false,
-2025-03-20 13:52:04.667	
-analyses_limit: 2,
-2025-03-20 13:52:04.667	
-analyses_used: 0,
-2025-03-20 13:52:04.667	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:04.667	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:04.667	
-{
-2025-03-20 13:52:04.667	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:04.621	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:04.621	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:03.324	
-]
-2025-03-20 13:52:03.324	
-}
-2025-03-20 13:52:03.324	
-last_updated: '2025-03-20T12:52:03.212+00:00'
-2025-03-20 13:52:03.324	
-is_premium: false,
-2025-03-20 13:52:03.324	
-analyses_limit: 2,
-2025-03-20 13:52:03.324	
-analyses_used: 0,
-2025-03-20 13:52:03.324	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:03.324	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:03.324	
-{
-2025-03-20 13:52:03.324	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:03.301	
-]
-2025-03-20 13:52:03.301	
-}
-2025-03-20 13:52:03.301	
-last_updated: '2025-03-20T12:52:03.191+00:00'
-2025-03-20 13:52:03.301	
-is_premium: false,
-2025-03-20 13:52:03.301	
-analyses_limit: 2,
-2025-03-20 13:52:03.301	
-analyses_used: 0,
-2025-03-20 13:52:03.301	
-user_id: 'aad2ef5d-99ed-4cc1-9c69-5d16d9216d77',
-2025-03-20 13:52:03.301	
-id: '8868dd3c-d0ff-4fca-8508-18b74f8ff1a5',
-2025-03-20 13:52:03.301	
-{
-2025-03-20 13:52:03.301	
-[SUPABASE REQUEST] UPSERT USER: SUCCESS [
-2025-03-20 13:52:03.213	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:03.212	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
-2025-03-20 13:52:03.191	
-[SUPABASE REQUEST] UPSERT USER: Starting
-2025-03-20 13:52:03.191	
-Hämtar användardata för: aad2ef5d-99ed-4cc1-9c69-5d16d9216d77
+2025-03-26 14:20:18.978	
+message: 'duplicate key value violates unique constraint "user_counters_user_id_counter_name_key"'
+2025-03-26 14:20:18.978	
+hint: null,
+2025-03-26 14:20:18.978	
+details: 'Key (user_id, counter_name)=(fb0ed9d7-2b26-44c0-bfa3-7104ff986bde, analysis_count) already exists.',
+2025-03-26 14:20:18.978	
+code: '23505',
+2025-03-26 14:20:18.978	
+Fel vid hämtning av räknare: {
+2025-03-26 14:20:18.849	
+Hämtar räknare "analysis_count" för användare: fb0ed9d7-2b26-44c0-bfa3-7104ff986bde

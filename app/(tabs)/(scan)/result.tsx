@@ -16,6 +16,8 @@ import { useCounter } from '../../../hooks/useCounter';
 import { Product } from '../../../models/productModel';
 import * as Clipboard from 'expo-clipboard';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { getUserId } from '@/stores/adapter';
 import { AnalysisService } from '@/services/analysisService';
 import { v4 as uuidv4 } from 'uuid';
@@ -60,7 +62,12 @@ const STRINGS = {
   USAGE_LIMIT_OK: 'OK',
   NO_INGREDIENTS: 'Inga ingredienser hittades',
   NO_INGREDIENTS_DESCRIPTION: 'Vi kunde inte hitta några ingredienser i bilden. Försök igen med en tydligare bild.',
-  NO_REASONING: 'Ingen analysgrund tillgänglig'
+  NO_REASONING: 'Ingen analysgrund tillgänglig',
+  SHARE_BUTTON: 'Dela',
+  SHARE_TITLE: 'Dela resultat',
+  SHARE_SUCCESS: 'Delat',
+  SHARE_ERROR: 'Kunde inte dela',
+  SHARE_CANCEL: 'Avbryt'
 };
 
 // Sektion-rubrik komponent
@@ -165,12 +172,14 @@ function AnalysisControls({
   isAlreadySaved,
   onFavoriteToggle,
   isFavorite,
+  onShare,
   onNew
 }: { 
   onSaveToHistory: () => void;
   isAlreadySaved: boolean;
   onFavoriteToggle: () => void;
   isFavorite: boolean;
+  onShare: () => void;
   onNew: () => void;
 }) {
   return (
@@ -186,6 +195,17 @@ function AnalysisControls({
       </StyledPressable>
       
       <StyledView className="flex-row">
+        <StyledPressable
+          onPress={onShare}
+          className="flex-row items-center justify-center py-2 px-4 rounded-md mr-2 bg-background-light"
+        >
+          <Ionicons 
+            name="share-outline" 
+            size={18} 
+            color="#6b7280" 
+          />
+        </StyledPressable>
+        
         <StyledPressable
           onPress={onFavoriteToggle}
           className={`flex-row items-center justify-center py-2 px-4 rounded-md mr-2 ${
@@ -505,6 +525,54 @@ export default function ScanResultScreen() {
     }
   };
   
+  // Hanterare för att dela analys
+  const handleShareResult = async () => {
+    if (!product) return;
+    
+    try {
+      // Förbered text för delning
+      const veganStatus = product.analysis.isVegan ? 'Vegansk' : 'Ej vegansk';
+      const resultText = `KoaLens analys: ${veganStatus} (${Math.round(product.analysis.confidence * 100)}% säkerhet)\n\nIngredienser: ${product.ingredients.join(', ')}\n\n${product.analysis.reasoning || ''}`;
+      
+      // Kontrollera om delning är tillgänglig på enheten
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert(
+          "Delning inte tillgänglig", 
+          "Delning är inte tillgänglig på din enhet"
+        );
+        return;
+      }
+      
+      if (product.metadata.imageUri) {
+        // Dela med bild
+        await Sharing.shareAsync(product.metadata.imageUri, {
+          mimeType: 'image/jpeg',
+          dialogTitle: 'Dela KoaLens-analys',
+          UTI: 'public.jpeg'
+        });
+      } else {
+        // Skapa en temporär textfil för att dela bara texten
+        const tempFilePath = FileSystem.documentDirectory + 'koalens_analys.txt';
+        await FileSystem.writeAsStringAsync(tempFilePath, resultText);
+        
+        await Sharing.shareAsync(tempFilePath, {
+          mimeType: 'text/plain',
+          dialogTitle: 'Dela KoaLens-analys',
+          UTI: 'public.plain-text'
+        });
+      }
+      
+    } catch (error) {
+      console.error('Fel vid delning av resultat:', error);
+      Alert.alert(
+        STRINGS.SHARE_ERROR,
+        "Det gick inte att dela analysresultatet. Försök igen.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+  
   // Hanterare för ny skanning
   const handleNewScan = () => {
     router.replace('/(tabs)/(scan)');
@@ -714,6 +782,7 @@ export default function ScanResultScreen() {
           isAlreadySaved={product.metadata.isSavedToHistory}
           onFavoriteToggle={handleToggleFavorite}
           isFavorite={product.metadata.isFavorite}
+          onShare={handleShareResult}
           onNew={handleNewScan}
         />
       )}

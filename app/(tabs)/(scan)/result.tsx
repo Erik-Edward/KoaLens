@@ -1,28 +1,33 @@
 /**
- * Resultatskärmen för scanning av produktingredienser
- * Använder produktmodellen och våra custom hooks
+ * Resultatskärm för KoaLens
+ * Visar analys av produktingredienser med fokus på säker textrendering
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  View, Text, ScrollView, ActivityIndicator, 
-  Image, Pressable, SafeAreaView, Alert, Platform 
+  View, 
+  Text, 
+  ScrollView, 
+  ActivityIndicator, 
+  Image, 
+  Pressable, 
+  SafeAreaView, 
+  Alert,
+  StyleSheet
 } from 'react-native';
 import { styled } from 'nativewind';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../../../hooks/useProducts';
 import { useCounter } from '../../../hooks/useCounter';
-import { Product } from '../../../models/productModel';
-import * as Clipboard from 'expo-clipboard';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { Product, ProductAnalysis } from '../../../models/productModel';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { getUserId } from '@/stores/adapter';
 import { AnalysisService } from '@/services/analysisService';
 import { v4 as uuidv4 } from 'uuid';
 import { ProductRepository } from '@/services/productRepository';
-import { useStore } from '@/stores/useStore';
+import { logScreenView } from '@/lib/analyticsWrapper';
 
 // Styled components
 const StyledView = styled(View);
@@ -32,566 +37,527 @@ const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledImage = styled(Image);
 
-// Hårdkodade strings för skärmen
-const STRINGS = {
-  HEADER_BACK: 'Tillbaka',
-  HEADER_TITLE: 'Resultat',
-  LOADING: 'Analyserar ingredienser...',
-  ERROR_TITLE: 'Analys misslyckades',
-  ERROR_MESSAGE: 'Kunde inte analysera ingredienserna. Försök igen.',
-  ERROR_RETRY: 'Försök igen',
-  ERROR_CANCEL: 'Avbryt',
-  RETRY_BUTTON: 'Ny analys',
-  SAVE_BUTTON: 'Spara i historik',
-  SAVED_SUCCESS: 'Sparad i historik',
-  SAVE_ERROR: 'Kunde inte spara',
-  COPY_BUTTON: 'Kopiera',
-  COPIED: 'Kopierat!',
-  SECTION_RESULT: 'Resultat',
-  SECTION_INGREDIENTS: 'Ingredienser',
-  SECTION_REASONING: 'Analys',
-  VEGAN_INGREDIENTS: 'Veganska ingredienser',
-  NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
-  WATCH_INGREDIENTS: 'Bevakade ingredienser',
-  UNKNOWN_INGREDIENTS: 'Okända ingredienser',
-  VEGAN_RESULT: 'Vegansk',
-  NON_VEGAN_RESULT: 'Inte vegansk',
-  CONFIDENCE: 'Säkerhet',
-  USAGE_LIMIT_TITLE: 'Analysgräns uppnådd',
-  USAGE_LIMIT_MESSAGE: 'Du har nått din månadskvot för analyser. Nya analyser blir tillgängliga nästa månad.',
-  USAGE_LIMIT_OK: 'OK',
-  NO_INGREDIENTS: 'Inga ingredienser hittades',
-  NO_INGREDIENTS_DESCRIPTION: 'Vi kunde inte hitta några ingredienser i bilden. Försök igen med en tydligare bild.',
-  NO_REASONING: 'Ingen analysgrund tillgänglig',
-  SHARE_BUTTON: 'Dela',
-  SHARE_TITLE: 'Dela resultat',
-  SHARE_SUCCESS: 'Delat',
-  SHARE_ERROR: 'Kunde inte dela',
-  SHARE_CANCEL: 'Avbryt'
-};
-
-// Sektion-rubrik komponent
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <StyledView className="border-b border-gray-200 pb-2 mb-4">
-    <StyledText className="text-text-primary font-sans-bold text-lg">
-      {title}
-    </StyledText>
-  </StyledView>
-);
-
-// Ingrediens-lista komponent
-const IngredientList: React.FC<{
-  title: string;
-  ingredients: string[];
-  type: 'vegan' | 'non-vegan' | 'watch' | 'unknown';
-}> = ({ title, ingredients, type }) => {
-  if (ingredients.length === 0) {
-    return null;
+/**
+ * SafeText-komponent för att säkert rendera text
+ * Garanterar att alla värden renderas inom Text-komponenter
+ */
+function SafeText({ 
+  value, 
+  fallback = "", 
+  style = {},
+  numberOfLines
+}: { 
+  value: any, 
+  fallback?: string, 
+  style?: any,
+  numberOfLines?: number
+}) {
+  let displayText = fallback;
+  
+  try {
+    if (value === null || value === undefined) {
+      displayText = fallback;
+    } else if (typeof value === "string") {
+      displayText = value;
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      displayText = String(value);
+    } else if (Array.isArray(value) || typeof value === "object") {
+      displayText = JSON.stringify(value);
+    } else {
+      displayText = String(value);
+    }
+  } catch (e) {
+    displayText = fallback;
   }
   
-  // Färgkodning för olika typer av ingredienser
-  const getTypeColor = () => {
-    switch (type) {
-      case 'vegan': return 'bg-status-success';
-      case 'non-vegan': return 'bg-status-error';
-      case 'watch': return 'bg-status-warning';
-      case 'unknown': return 'bg-gray-400';
-      default: return 'bg-gray-400';
-    }
-  };
-  
   return (
-    <StyledView className="mb-6">
-      <StyledView className="flex-row items-center mb-2">
-        <StyledView className={`w-3 h-3 rounded-full mr-2 ${getTypeColor()}`} />
-        <StyledText className="text-text-primary font-sans-medium">
-          {title}
-        </StyledText>
-      </StyledView>
-      <StyledView className="ml-5">
-        {ingredients.map((ingredient, index) => (
-          <StyledText 
-            key={index} 
-            className="text-text-primary font-sans mb-1"
-          >
-            • {ingredient}
-          </StyledText>
-        ))}
-      </StyledView>
-    </StyledView>
-  );
-};
-
-// Hjälpkomponent för ingredienser
-function IngredientItem({ name, status, description }: { 
-  name: string; 
-  status: 'neutral' | 'warning' | 'danger'; 
-  description?: string;
-}) {
-  const [showDescription, setShowDescription] = useState(false);
-  
-  const statusColors = {
-    neutral: 'bg-green-400',
-    warning: 'bg-yellow-400',
-    danger: 'bg-red-400'
-  };
-  
-  return (
-    <StyledView className="mb-2">
-      <StyledPressable 
-        onPress={() => description ? setShowDescription(!showDescription) : null}
-        className="flex-row items-center"
-      >
-        <StyledView className={`w-3 h-3 rounded-full mr-2 ${statusColors[status]}`} />
-        <StyledText className="text-text-primary font-sans flex-1">
-          {name}
-        </StyledText>
-        {description && (
-          <Ionicons 
-            name={showDescription ? "chevron-up" : "chevron-down"} 
-            size={16} 
-            color="#6b7280" 
-          />
-        )}
-      </StyledPressable>
-      
-      {showDescription && description && (
-        <StyledView className="mt-1 ml-5 p-2 bg-background-light rounded-md">
-          <StyledText className="text-text-secondary text-sm">
-            {description}
-          </StyledText>
-        </StyledView>
-      )}
-    </StyledView>
+    <StyledText style={style} numberOfLines={numberOfLines}>
+      {displayText}
+    </StyledText>
   );
 }
 
-// Analyskontroll
-function AnalysisControls({ 
-  onSaveToHistory, 
-  isAlreadySaved,
-  onFavoriteToggle,
-  isFavorite,
-  onShare,
-  onNew
-}: { 
-  onSaveToHistory: () => void;
-  isAlreadySaved: boolean;
-  onFavoriteToggle: () => void;
-  isFavorite: boolean;
-  onShare: () => void;
-  onNew: () => void;
-}) {
-  return (
-    <StyledView className="flex-row justify-between p-4">
-      <StyledPressable
-        onPress={onNew}
-        className="flex-row items-center justify-center bg-primary-main py-2 px-4 rounded-md"
-      >
-        <Ionicons name="camera-outline" size={18} color="white" />
-        <StyledText className="text-white font-sans-bold ml-2">
-          Ny skanning
-        </StyledText>
-      </StyledPressable>
-      
-      <StyledView className="flex-row">
-        <StyledPressable
-          onPress={onShare}
-          className="flex-row items-center justify-center py-2 px-4 rounded-md mr-2 bg-background-light"
-        >
-          <Ionicons 
-            name="share-outline" 
-            size={18} 
-            color="#6b7280" 
-          />
-        </StyledPressable>
-        
-        <StyledPressable
-          onPress={onFavoriteToggle}
-          className={`flex-row items-center justify-center py-2 px-4 rounded-md mr-2 ${
-            isFavorite ? 'bg-background-light' : 'bg-background-light'
-          }`}
-          disabled={!isAlreadySaved}
-        >
-          <Ionicons 
-            name={isFavorite ? "heart" : "heart-outline"} 
-            size={18} 
-            color={isFavorite ? "#ef4444" : "#6b7280"} 
-          />
-        </StyledPressable>
-        
-        <StyledPressable
-          onPress={onSaveToHistory}
-          className={`flex-row items-center justify-center py-2 px-4 rounded-md ${
-            isAlreadySaved ? 'bg-background-light' : 'bg-primary-main'
-          }`}
-          disabled={isAlreadySaved}
-        >
-          <Ionicons 
-            name="bookmark-outline" 
-            size={18} 
-            color={isAlreadySaved ? "#6b7280" : "white"} 
-          />
-          <StyledText 
-            className={`font-sans-bold ml-2 ${
-              isAlreadySaved ? 'text-text-primary' : 'text-white'
-            }`}
-          >
-            {isAlreadySaved ? "Sparad" : "Spara"}
-          </StyledText>
-        </StyledPressable>
-      </StyledView>
-    </StyledView>
-  );
-}
-
-// Huvudkomponent för resultatskärmen
-export default function ScanResultScreen() {
-  const params = useLocalSearchParams<{ ingredients: string; image?: string }>();
-  
+/**
+ * Huvudkomponent för resultatskärmen
+ */
+export default function ResultScreen() {
+  // Lokal state
+  const [isLoading, setIsLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("Förbereder analys...");
+  const [isSaved, setIsSaved] = useState(false);
   
-  // Hämta produkthook och counter
+  // Referenser
+  const photoPathRef = useRef<string | null>(null);
+  const hasInitializedRef = useRef(false);
+  
+  // Hämta URL-parametrar
+  const params = useLocalSearchParams();
+  console.log('RESULT SCREEN: Received params:', JSON.stringify(params, null, 2));
+  
+  const isDirectAnalysis = params.isDirectAnalysis === 'true';
+  
+  // Hooks
   const { saveToHistory, toggleFavorite } = useProducts();
-  const { 
-    checkLimit, 
-    recordAnalysis, 
-    hasReachedLimit 
-  } = useCounter('analysis_count');
   
+  // Använd en timer för att simulera analysframsteg
   useEffect(() => {
-    if (analyzed) return;
+    console.log('RESULT SCREEN: Loading state changed:', isLoading);
+    logScreenView('ResultScreen');
     
-    async function analyzeIngredients() {
+    if (!isLoading) return;
+    
+    const progressTimer = setInterval(() => {
+      setProgress(prev => {
+        const newProgress = Math.min(prev + 2, 99);
+        
+        // Uppdatera statustext baserat på framsteg
+        if (newProgress < 20) {
+          setStatusText("Förbereder analys...");
+        } else if (newProgress < 40) {
+          setStatusText("Optimerar bild...");
+        } else if (newProgress < 70) {
+          setStatusText("Analyserar ingredienser...");
+        } else if (newProgress < 90) {
+          setStatusText("Verifierar resultat...");
+        } else {
+          setStatusText("Nästan klar...");
+        }
+        
+        return newProgress;
+      });
+    }, 150);
+    
+    return () => clearInterval(progressTimer);
+  }, [isLoading]);
+  
+  // Hämta och behandla analysresultat från parametrarna
+  useEffect(() => {
+    // Förhindra dubbel initialisering
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+    
+    let isActive = true;
+    
+    console.log('RESULT SCREEN: Initializing screen...');
+    
+    const initScreen = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        console.log('RESULT SCREEN: Starting initialization');
         
-        // Kontrollera om användaren har nått sin analysgräns
-        try {
-          const usageCheck = await checkLimit();
-          if (!usageCheck?.allowed) {
-            // Visa varningsmeddelande och återvänd till föregående skärm
-            Alert.alert(
-              "Analysgräns nådd",
-              "Du har använt alla dina analyser för denna period. Försök igen senare eller uppgradera till premium för fler analyser.",
-              [
-                { 
-                  text: "OK", 
-                  onPress: () => router.back() 
-                }
-              ]
-            );
-            // Avbryt analysen här
-            setLoading(false);
-            setAnalyzed(true);
-            return;
-          }
-        } catch (usageError) {
-          console.warn('Kunde inte kontrollera användningsgräns, fortsätter ändå:', usageError);
+        // Spara fotosökväg om den finns
+        if (params.photoPath) {
+          photoPathRef.current = params.photoPath as string;
+          console.log('RESULT SCREEN: Photo path set:', photoPathRef.current);
         }
         
-        if (!params.ingredients) {
-          throw new Error('Inga ingredienser hittades att analysera');
-        }
+        // Hämta användar-ID
+        const userId = await getUserId();
+        console.log('RESULT SCREEN: User ID retrieved:', userId);
         
-        // Skapa ingredienslista
-        let ingredients: string[] = [];
-        try {
-          ingredients = JSON.parse(params.ingredients);
-          if (!Array.isArray(ingredients)) {
-            ingredients = [params.ingredients];
-          }
-        } catch (e) {
-          // Om JSON.parse misslyckas, använd ingredienserna som de är
-          ingredients = [params.ingredients];
-        }
-        
-        // Logga antal ingredienser
-        console.log(`Analyserar ${ingredients.length} ingredienser`);
-        
-        // Prioritera auth.user.id för att säkerställa att produkter kopplas till rätt användare
-        const authUser = useStore.getState().user;
-        const storeUserId = useStore.getState().userId;
-        
-        // Hämta effektivt användar-ID med prioritetsordning
-        let userId = authUser?.id;
-        
-        if (!userId) {
-          // Fallback till att hämta från getUserId
-          userId = await getUserId();
-          console.log('ScanResultScreen: Använder användar-ID från getUserId:', userId);
-          
-          // Sista utväg: använd storeUserId
-          if (!userId) {
-            userId = storeUserId || undefined;
-            console.log('ScanResultScreen: Använder användar-ID från store:', userId);
-          }
-        } else {
-          console.log('ScanResultScreen: Använder användar-ID från auth:', userId);
-        }
-        
-        // Validera att vi har giltigt användar-ID
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!userId || !uuidRegex.test(userId)) {
-          console.warn('Ogiltigt användar-ID upptäckt, genererar nytt ID för produkt:', userId);
-          userId = uuidv4();
-          console.log(`Genererat nytt användar-ID för analys: ${userId}`);
-        } else {
-          console.log(`Använder giltigt användar-ID för analys: ${userId}`);
-        }
-        
-        // Analysera ingredienserna
-        const analysisService = new AnalysisService();
-        const analysis = await analysisService.analyzeIngredients(ingredients);
-        
-        // Bekräfta att vi har analysresultat
-        if (!analysis) {
-          throw new Error('Analysen gav inget resultat');
-        }
-        
-        // Försök registrera analys i statistik men fånga fel och fortsätt
-        let analyticsResult = false;
-        try {
-          // Kontrollera om användaren kan utföra analys, men fortsätt endast om den är tillåten
-          let canProceed = true;
+        // Hantera analysresultat
+        if (params.analysisResult) {
           try {
-            const usageCheck = await checkLimit();
-            if (!usageCheck?.allowed) {
-              console.warn('Användaren har nått sin analysgräns:', usageCheck?.reason);
-              canProceed = false;
+            console.log('RESULT SCREEN: Found analysis result in params');
+            
+            // Hantera direktanalys
+            const rawData = params.analysisResult as string;
+            console.log('RESULT SCREEN: Raw data length:', rawData?.length || 0);
+            
+            let analysisResult: any = null;
+            
+            // Parseringförsök 1: Direktparsering av JSON
+            try {
+              console.log('RESULT SCREEN: Attempting to parse JSON directly');
+              analysisResult = JSON.parse(rawData);
+              console.log('RESULT SCREEN: JSON parsed successfully');
+            } catch (parseError) {
+              console.log('RESULT SCREEN: Initial parse failed, trying alternative methods');
+              // Parseringförsök 2: Hantera dubbel-stringifierad JSON
+              try {
+                const cleaned = rawData.replace(/^"|"$/g, '').replace(/\\"/g, '"');
+                analysisResult = JSON.parse(cleaned);
+                console.log('RESULT SCREEN: Parsed JSON from cleaned string');
+              } catch (innerError) {
+                // Behandla rådata som text om det innehåller vissa nyckelord
+                if (typeof rawData === 'string' && 
+                    (rawData.includes('The model is overloaded') || 
+                     rawData.includes('Error:') || 
+                     rawData.includes('Failed') || 
+                     rawData.includes('rate limit'))) {
+                  console.error('RESULT SCREEN: API error message detected in raw data');
+                  throw new Error(`API-tjänsten är överbelastad: ${rawData.substring(0, 100)}`);
+                }
+                
+                console.error('RESULT SCREEN: Failed to parse analysis result');
+                throw new Error('Kunde inte tolka analysresultatet');
+              }
             }
-          } catch (usageError) {
-            console.warn('Kunde inte kontrollera användningsgräns, fortsätter ändå:', usageError);
+            
+            // Skapa produktobjekt från analysresultatet
+            console.log('RESULT SCREEN: Creating product from analysis result');
+            const newProduct: Product = createProductFromAnalysis(
+              analysisResult, 
+              photoPathRef.current, 
+              userId || 'anonymous'
+            );
+            
+            if (isActive) {
+              console.log('RESULT SCREEN: Setting product and finishing loading');
+              setProduct(newProduct);
+              setIsLoading(false);
+              setProgress(100);
+            }
+          } catch (error) {
+            if (isActive) {
+              console.error('RESULT SCREEN: Error processing analysis result:', error);
+              setErrorMessage(`${error instanceof Error ? error.message : 'Ett okänt fel inträffade'}`);
+              setIsLoading(false);
+            }
           }
-          
-          // Registrera analysen endast om användaren inte har nått sin gräns
-          if (canProceed) {
-            console.log('Registrerar analys i användarstatistik...');
-            analyticsResult = await recordAnalysis();
-            console.log('Analys registrerad i användarstatistik, resultat:', analyticsResult);
-          } else {
-            console.log('Analys registreras inte eftersom användaren har nått sin gräns');
+        } else {
+          // Ingen analysdata tillgänglig
+          console.error('RESULT SCREEN: No analysis data available');
+          if (isActive) {
+            setErrorMessage('Ingen analysinformation tillgänglig');
+            setIsLoading(false);
           }
-          
-          // Vänta längre tid för att ge backend tid att uppdatera
-          console.log('Väntar på att backend ska uppdatera användaranalytik...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Tvinga uppdatering av användningsgränsen med vår nya forceUpdate-funktion
-          console.log('Tvingar fram uppdatering av användningsgränser från servern...');
-          const updateSuccess = await checkLimit();
-          console.log('Uppdatering av användningsgränser:', updateSuccess ? 'lyckades' : 'misslyckades');
-          
-          // Om första försöket misslyckades, försök igen efter lite längre väntan
-          if (!updateSuccess) {
-            console.log('Första uppdateringsförsöket misslyckades, väntar längre och försöker igen...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const secondAttempt = await checkLimit();
-            console.log('Andra uppdateringsförsöket:', secondAttempt ? 'lyckades' : 'misslyckades');
-          }
-          
-        } catch (analyticsError) {
-          console.warn('Kunde inte registrera analys i statistik, ignorerar:', analyticsError);
-          // Fortsätt även om vi inte kan registrera analysen
         }
-        
-        // Skapa ett korrekt UUID för produkten
-        const productId = uuidv4();
-        console.log(`Genererar nytt produkt-ID: ${productId}`);
-        
-        // Skapa en produktmodell
-        const newProduct: Product = {
-          id: productId,
-          timestamp: new Date().toISOString(),
-          ingredients: ingredients,
-          analysis: {
-            isVegan: analysis.isVegan,
-            confidence: analysis.confidence,
-            watchedIngredients: analysis.watchedIngredients,
-            reasoning: analysis.reasoning
-          },
-          metadata: {
-            scanDate: new Date().toISOString(),
-            isFavorite: false,
-            isSavedToHistory: false,
-            source: 'camera',
-            userId: userId
-          }
-        };
-        
-        // Lägg till bildsökväg om den finns
-        if (params.image) {
-          newProduct.metadata.imageUri = params.image;
-        }
-        
-        console.log('Produkt skapad med ID:', newProduct.id);
-        setProduct(newProduct);
-        setAnalyzed(true);
-        
       } catch (error) {
-        console.error('Fel vid ingrediensanalys:', error);
-        setError(error instanceof Error ? error : new Error(String(error)));
-        setAnalyzed(true);
-      } finally {
-        setLoading(false);
+        if (isActive) {
+          console.error('RESULT SCREEN: Fatal error during initialization:', error);
+          setErrorMessage(`${error instanceof Error ? error.message : 'Ett okänt fel inträffade'}`);
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    // Kör initScreen med en kort fördröjning för att säkerställa att parametrarna har laddats
+    setTimeout(() => {
+      initScreen().catch(error => {
+        console.error('RESULT SCREEN: Unhandled error in initScreen:', error);
+        setErrorMessage(`Oväntat fel: ${error instanceof Error ? error.message : 'Okänt fel'}`);
+        setIsLoading(false);
+      });
+    }, 100);
+    
+    return () => {
+      isActive = false;
+    };
+  }, [params]);
+  
+  // Funktion för att skapa ett produktobjekt från analysresultatet
+  const createProductFromAnalysis = (
+    analysisResult: any, 
+    photoPath: string | null | undefined,
+    userId: string
+  ): Product => {
+    console.log('RESULT SCREEN: Creating product with analysis result keys:', Object.keys(analysisResult || {}));
+    
+    // Basprodukt med standardvärden
+    const product: Product = {
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      ingredients: [],
+      metadata: {
+        scanDate: new Date().toISOString(),
+        croppedImageUri: photoPath || undefined,
+        isSavedToHistory: false,
+        isFavorite: false,
+        userId: userId
+      },
+      analysis: {
+        isVegan: false,
+        confidence: 0,
+        watchedIngredients: [],
+        reasoning: 'Ingen analysgrund tillgänglig'
+      }
+    };
+    
+    // Uppdatera med faktiska värden från analysresultatet
+    if (analysisResult) {
+      // Hantera isVegan på ett säkert sätt
+      if ('isVegan' in analysisResult) {
+        product.analysis.isVegan = analysisResult.isVegan === true;
+      }
+      
+      // Hantera confidence på ett säkert sätt
+      if ('confidence' in analysisResult) {
+        const confidenceValue = Number(analysisResult.confidence);
+        product.analysis.confidence = isNaN(confidenceValue) ? 0 : confidenceValue;
+      }
+      
+      // Hantera reasoning på ett säkert sätt
+      if ('reasoning' in analysisResult) {
+        if (typeof analysisResult.reasoning === 'string') {
+          product.analysis.reasoning = analysisResult.reasoning;
+        } else if (analysisResult.reasoning !== null && analysisResult.reasoning !== undefined) {
+          try {
+            product.analysis.reasoning = JSON.stringify(analysisResult.reasoning);
+          } catch (e) {
+            product.analysis.reasoning = 'Kunde inte konvertera analysgrund';
+          }
+        }
+      }
+      
+      // Hantera ingredienser på ett säkert sätt
+      if ('ingredientList' in analysisResult && Array.isArray(analysisResult.ingredientList)) {
+        product.ingredients = analysisResult.ingredientList
+          .filter((item: any) => item !== null && item !== undefined)
+          .map((item: any) => typeof item === 'string' ? item : String(item));
+      }
+      
+      // Hantera icke-veganska ingredienser
+      if ('nonVeganIngredients' in analysisResult && 
+          Array.isArray(analysisResult.nonVeganIngredients)) {
+        // Kopiera nonVeganIngredients direkt till produkten för enkel åtkomst senare
+        (product.analysis as any).nonVeganIngredients = analysisResult.nonVeganIngredients
+          .filter((item: any) => item !== null && item !== undefined)
+          .map((item: any) => typeof item === 'string' ? item : String(item));
+          
+        // Lägg till icke-veganska ingredienser i watchedIngredients
+        const nonVeganWatched = analysisResult.nonVeganIngredients
+          .filter((item: any) => item !== null && item !== undefined)
+          .map((item: any) => ({
+            name: typeof item === 'string' ? item : String(item),
+            reason: 'non-vegan',
+            description: 'Identifierad som icke-vegansk'
+          }));
+          
+        product.analysis.watchedIngredients = [
+          ...product.analysis.watchedIngredients,
+          ...nonVeganWatched
+        ];
+      }
+      
+      // Hantera bevakade ingredienser direkt från analysresultatet
+      if ('watchedIngredients' in analysisResult && 
+          Array.isArray(analysisResult.watchedIngredients)) {
+        const safeWatchedIngredients = analysisResult.watchedIngredients
+          .filter((item: any) => item !== null && item !== undefined && typeof item === 'object')
+          .map((item: any) => ({
+            name: typeof item.name === 'string' ? item.name : String(item.name || ''),
+            reason: typeof item.reason === 'string' ? item.reason : 'unknown',
+            description: item.description ? String(item.description) : undefined
+          }));
+          
+        // Kombinera med befintliga bevakade ingredienser
+        product.analysis.watchedIngredients = [
+          ...product.analysis.watchedIngredients,
+          ...safeWatchedIngredients
+        ];
       }
     }
     
-    analyzeIngredients();
-  }, [params.ingredients, params.image]);
+    return product;
+  };
   
-  // Hanterare för att gå tillbaka
+  // Hantera navigering tillbaka
   const handleBack = () => {
     router.back();
   };
   
-  // Hanterare för att spara till historik
+  // Hantera spara till historik
   const handleSaveToHistory = async () => {
     if (!product) return;
     
     try {
-      setSaveLoading(true);
+      setIsLoading(true);
       
-      // Uppdatera metadata för att markera som sparad
+      // Kopiera bilden till en permanent lagringsplats innan vi sparar
+      let permanentImageUri = product.metadata.croppedImageUri;
+      
+      if (permanentImageUri) {
+        try {
+          console.log('Kopierar bild till permanent lagring...');
+          // Skapa ett unikt filnamn baserat på produkt-ID
+          const timestamp = new Date().getTime();
+          const newFileName = `${product.id}_${timestamp}.jpg`;
+          const permanentDir = `${FileSystem.documentDirectory}images/`;
+          
+          // Skapa images-katalogen om den inte finns
+          const dirInfo = await FileSystem.getInfoAsync(permanentDir);
+          if (!dirInfo.exists) {
+            console.log('Skapar bildkatalog...');
+            await FileSystem.makeDirectoryAsync(permanentDir, { intermediates: true });
+          }
+          
+          const newUri = `${permanentDir}${newFileName}`;
+          console.log(`Kopierar från ${permanentImageUri} till ${newUri}`);
+          
+          // Kopiera bilden till den permanenta platsen
+          await FileSystem.copyAsync({
+            from: permanentImageUri,
+            to: newUri
+          });
+          
+          console.log('Bild kopierad till permanent lagring:', newUri);
+          permanentImageUri = newUri;
+        } catch (imgError) {
+          console.error('Fel vid kopiering av bild:', imgError);
+          // Om något går fel fortsätter vi ändå men utan bild
+          permanentImageUri = undefined;
+        }
+      }
+      
+      // Uppdatera metadata med den permanenta bildsökvägen
       const updatedProduct = {
         ...product,
         metadata: {
           ...product.metadata,
+          croppedImageUri: permanentImageUri,
           isSavedToHistory: true
         }
       };
       
-      console.log('Sparar produkt till historik:', updatedProduct.id);
-      const savedProduct = await saveToHistory(updatedProduct);
+      // Spara till historik
+      const repository = ProductRepository.getInstance();
+      await repository.updateProduct(updatedProduct);
       
-      // Uppdatera lokalt tillstånd
+      // Uppdatera lokalt produktobjekt
       setProduct(updatedProduct);
+      setIsSaved(true);
+      setIsLoading(false);
       
-      // Försök att göra en tvåvägssynkronisering med Supabase
-      if (updatedProduct.metadata.userId) {
-        try {
-          console.log("Utför tvåvägssynkronisering med Supabase för aktuell produkt...");
-          const productRepository = ProductRepository.getInstance();
-          await productRepository.syncProductsBidirectional(updatedProduct.metadata.userId);
-        } catch (syncError) {
-          console.warn("Kunde inte synkronisera med Supabase:", syncError);
-          // Produkten är fortfarande sparad lokalt så fortsätt
-        }
-      }
-      
-      // Visa bekräftelse
-      Alert.alert(
-        "Produkt sparad",
-        "Produkten har sparats i din historik. Du kan hitta den i Historik-fliken.",
-        [{ text: "OK" }]
-      );
+      console.log('Produkt sparad till historik med bildsökväg:', permanentImageUri);
+      Alert.alert("Sparad", "Produkten har sparats i din historik.");
     } catch (error) {
-      console.error('Fel vid sparande av produkt:', error);
-      Alert.alert(
-        "Kunde inte spara",
-        "Det gick inte att spara produkten. Försök igen.",
-        [{ text: "OK" }]
-      );
-    } finally {
-      setSaveLoading(false);
+      console.error('Kunde inte spara produkt:', error);
+      setIsLoading(false);
+      Alert.alert("Fel", "Kunde inte spara produkten. Försök igen.");
     }
   };
   
-  // Hanterare för att växla favoritstatus
+  // Hantera favorit-togglering
   const handleToggleFavorite = async () => {
     if (!product || !product.metadata.isSavedToHistory) return;
     
     try {
-      await toggleFavorite(product.id);
+      // Uppdatera UI omedelbart för bättre användarupplevelse
+      const updatedProduct = {
+        ...product,
+        metadata: {
+          ...product.metadata,
+          isFavorite: !product.metadata.isFavorite
+        }
+      };
       
-      // Uppdatera lokalt produktstate
-      setProduct(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          metadata: {
-            ...prev.metadata,
-            isFavorite: !prev.metadata.isFavorite
-          }
-        };
-      });
-    } catch (err) {
-      console.error('Fel vid ändring av favoritstatus:', err);
+      setProduct(updatedProduct);
+      
+      // Uppdatera i databasen
+      await toggleFavorite(product.id);
+    } catch (error) {
+      console.error('Kunde inte ändra favoritstatus:', error);
+      // Återställ UI om det misslyckas
+      setProduct(product);
     }
   };
   
-  // Hanterare för att dela analys
-  const handleShareResult = async () => {
+  // Hantera delning av resultat
+  const handleShare = async () => {
     if (!product) return;
     
     try {
       // Förbered text för delning
       const veganStatus = product.analysis.isVegan ? 'Vegansk' : 'Ej vegansk';
-      const resultText = `KoaLens analys: ${veganStatus} (${Math.round(product.analysis.confidence * 100)}% säkerhet)\n\nIngredienser: ${product.ingredients.join(', ')}\n\n${product.analysis.reasoning || ''}`;
+      const confidence = Math.round(product.analysis.confidence * 100);
+      const ingredients = product.ingredients.join(', ');
       
-      // Kontrollera om delning är tillgänglig på enheten
+      let reasoning = '';
+      if (typeof product.analysis.reasoning === 'string') {
+        reasoning = product.analysis.reasoning;
+      } else if (product.analysis.reasoning !== null && product.analysis.reasoning !== undefined) {
+        try {
+          reasoning = JSON.stringify(product.analysis.reasoning);
+        } catch (e) {
+          reasoning = 'Kunde inte konvertera analysgrund';
+        }
+      }
+      
+      const resultText = `KoaLens analys: ${veganStatus} (${confidence}% säkerhet)\n\nIngredienser: ${ingredients}\n\n${reasoning}`;
+      
+      // Kontrollera om delning är tillgänglig
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
-        Alert.alert(
-          "Delning inte tillgänglig", 
-          "Delning är inte tillgänglig på din enhet"
-        );
+        Alert.alert("Inte tillgänglig", "Delning är inte tillgänglig på din enhet");
         return;
       }
       
-      if (product.metadata.imageUri) {
-        // Dela med bild
-        await Sharing.shareAsync(product.metadata.imageUri, {
-          mimeType: 'image/jpeg',
-          dialogTitle: 'Dela KoaLens-analys',
-          UTI: 'public.jpeg'
-        });
+      // Dela med bild om tillgänglig, annars med text
+      if (product.metadata.croppedImageUri) {
+        try {
+          console.log('Delar bild:', product.metadata.croppedImageUri);
+          await Sharing.shareAsync(product.metadata.croppedImageUri, {
+            mimeType: 'image/jpeg',
+            dialogTitle: 'Dela KoaLens-analys'
+          });
+        } catch (shareError) {
+          console.error('Fel vid delning av bild:', shareError);
+          // Om bilddelning misslyckas, fallback till textdelning
+          const tempFilePath = `${FileSystem.documentDirectory}koalens_analys.txt`;
+          await FileSystem.writeAsStringAsync(tempFilePath, resultText);
+          
+          await Sharing.shareAsync(tempFilePath, {
+            mimeType: 'text/plain',
+            dialogTitle: 'Dela KoaLens-analys'
+          });
+        }
       } else {
-        // Skapa en temporär textfil för att dela bara texten
-        const tempFilePath = FileSystem.documentDirectory + 'koalens_analys.txt';
+        // Skapa en temporär textfil för delning
+        const tempFilePath = `${FileSystem.documentDirectory}koalens_analys.txt`;
         await FileSystem.writeAsStringAsync(tempFilePath, resultText);
         
         await Sharing.shareAsync(tempFilePath, {
           mimeType: 'text/plain',
-          dialogTitle: 'Dela KoaLens-analys',
-          UTI: 'public.plain-text'
+          dialogTitle: 'Dela KoaLens-analys'
         });
       }
-      
     } catch (error) {
-      console.error('Fel vid delning av resultat:', error);
-      Alert.alert(
-        STRINGS.SHARE_ERROR,
-        "Det gick inte att dela analysresultatet. Försök igen.",
-        [{ text: "OK" }]
-      );
+      console.error('Fel vid delning:', error);
+      Alert.alert("Fel", "Kunde inte dela analysen. Försök igen.");
     }
   };
   
-  // Hanterare för ny skanning
+  // Hantera ny skanning
   const handleNewScan = () => {
     router.replace('/(tabs)/(scan)');
   };
   
+  // ===== UI-rendering =====
+  
   // Visa laddningsskärm
-  if (loading) {
+  if (isLoading) {
     return (
       <StyledView className="flex-1 justify-center items-center bg-background-main">
-        <ActivityIndicator size="large" color="#6366f1" />
-        <StyledText className="mt-4 text-text-primary font-sans-medium">
-          Analyserar ingredienser...
-        </StyledText>
+        <StyledView className="w-64 items-center">
+          {/* Analysstatustext */}
+          <StyledText className="text-text-primary font-sans-medium text-center mb-4">
+            {statusText}
+          </StyledText>
+          
+          {/* Cirkulär framstegsindikator */}
+          <StyledView className="w-20 h-20 rounded-full border-4 border-primary-light justify-center items-center mb-4">
+            <StyledText className="text-primary-main font-sans-bold text-xl">
+              {progress}%
+            </StyledText>
+          </StyledView>
+          
+          {/* Linjär framstegsindikator */}
+          <StyledView className="w-full h-2 bg-gray-200 rounded-full">
+            <StyledView 
+              className="h-2 bg-primary-main rounded-full" 
+              style={{ width: `${progress}%` }} 
+            />
+          </StyledView>
+        </StyledView>
       </StyledView>
     );
   }
   
   // Visa felskärm
-  if (error || !product) {
+  if (errorMessage || !product) {
     return (
       <StyledSafeAreaView className="flex-1 bg-background-main">
         <StyledView className="flex-1 justify-center items-center p-4">
@@ -600,11 +566,12 @@ export default function ScanResultScreen() {
             Något gick fel
           </StyledText>
           <StyledText className="mt-2 text-text-secondary text-center font-sans">
-            {error?.message || 'Kunde inte analysera ingredienserna'}
+            {errorMessage || 'Kunde inte analysera ingredienserna'}
           </StyledText>
+          
           <StyledPressable 
             onPress={handleBack}
-            className="mt-4 bg-primary-main py-2 px-4 rounded-md"
+            className="mt-6 bg-primary-main py-2 px-4 rounded-md"
           >
             <StyledText className="text-white font-sans-bold">
               Tillbaka
@@ -615,29 +582,29 @@ export default function ScanResultScreen() {
     );
   }
   
-  // Rendera produktanalysresultat
+  // Visa analysresultat
   return (
     <StyledSafeAreaView className="flex-1 bg-background-main">
       {/* Header */}
-      <StyledView className="flex-row items-center justify-between p-4 border-b border-gray-200">
-        <StyledPressable 
-          onPress={handleBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#6b7280" />
+      <StyledView className="flex-row justify-between items-center p-4 border-b border-gray-200">
+        <StyledPressable onPress={handleBack} className="flex-row items-center">
+          <Ionicons name="chevron-back" size={24} color="#1f2937" />
+          <StyledText className="text-text-primary font-sans-medium ml-1">
+            Tillbaka
+          </StyledText>
         </StyledPressable>
-        
-        <StyledText className="text-lg font-sans-bold text-text-primary flex-1 ml-4">
-          Analysresultat
+        <StyledText className="text-text-primary font-sans-bold text-lg">
+          Resultat
         </StyledText>
+        <StyledView style={{ width: 70 }} />
       </StyledView>
       
       <StyledScrollView className="flex-1">
-        {/* Produktbild om den finns */}
-        {product.metadata.imageUri && (
+        {/* Produktbild */}
+        {product.metadata.croppedImageUri && (
           <StyledView className="w-full h-64 bg-black">
             <StyledImage 
-              source={{ uri: product.metadata.imageUri }} 
+              source={{ uri: product.metadata.croppedImageUri }} 
               className="w-full h-full" 
               resizeMode="contain"
             />
@@ -673,15 +640,18 @@ export default function ScanResultScreen() {
             Säkerhet: {Math.round(product.analysis.confidence * 100)}%
           </StyledText>
           
-          {product.analysis.reasoning && (
-            <StyledText 
-              className={`mt-2 ${
-                product.analysis.isVegan ? 'text-green-800' : 'text-red-800'
-              }`}
-            >
-              {product.analysis.reasoning}
-            </StyledText>
-          )}
+          {/* Analysgrund */}
+          <StyledView 
+            className={`mt-2 ${
+              product.analysis.isVegan ? 'bg-green-50' : 'bg-red-50'
+            } p-2 rounded-md`}
+          >
+            <SafeText 
+              value={product.analysis.reasoning} 
+              fallback="Ingen analysgrund tillgänglig"
+              style={{ color: product.analysis.isVegan ? '#166534' : '#991b1b' }}
+            />
+          </StyledView>
         </StyledView>
         
         {/* Ingredienslista */}
@@ -696,96 +666,128 @@ export default function ScanResultScreen() {
             </StyledText>
           ) : (
             <StyledView>
-              {/* Vanliga ingredienser */}
+              {/* Alla ingredienser */}
               {product.ingredients.map((ingredient, index) => {
-                // Hitta om ingrediensen är flaggad
-                const watchedIngredient = product.analysis.watchedIngredients.find(
-                  w => {
-                    // Kolla för exakt matchning först
-                    if (w.name.toLowerCase() === ingredient.toLowerCase()) return true;
-                    
-                    // Sedan kolla för en delmatchning (om ingredient innehåller w.name eller tvärtom)
-                    if (ingredient.toLowerCase().includes(w.name.toLowerCase()) || 
-                        w.name.toLowerCase().includes(ingredient.toLowerCase())) {
-                      return true;
-                    }
-                    
-                    return false;
-                  }
+                // Avgör om ingrediensen är icke-vegansk
+                const isNonVegan = product.analysis.watchedIngredients.some(
+                  w => w.name.toLowerCase() === ingredient.toLowerCase() && w.reason === 'non-vegan'
                 );
-                
-                let status: 'neutral' | 'warning' | 'danger' = 'neutral';
-                if (watchedIngredient) {
-                  if (watchedIngredient.reason === 'non-vegan') {
-                    status = 'danger';
-                  } else if (watchedIngredient.reason === 'maybe-non-vegan') {
-                    status = 'warning';
-                  } else if (watchedIngredient.reason === 'watched') {
-                    status = 'warning';
-                  }
-                }
                 
                 return (
-                  <IngredientItem 
-                    key={`${index}-${ingredient}`}
-                    name={ingredient}
-                    status={status}
-                    description={watchedIngredient?.description}
-                  />
+                  <StyledView 
+                    key={`ingredient-${index}`} 
+                    className={`mb-2 p-2 rounded-md ${isNonVegan ? 'bg-red-50' : 'bg-gray-50'}`}
+                  >
+                    <StyledView className="flex-row items-center">
+                      <StyledView 
+                        className={`w-3 h-3 rounded-full mr-2 ${isNonVegan ? 'bg-red-500' : 'bg-green-500'}`} 
+                      />
+                      <SafeText 
+                        value={ingredient}
+                        style={{ 
+                          fontSize: 16,
+                          color: isNonVegan ? '#991b1b' : '#1f2937'
+                        }}
+                      />
+                    </StyledView>
+                  </StyledView>
                 );
               })}
-
-              {/* Bevakade ingredienser section - visas bara om det finns några */}
-              {product.analysis.watchedIngredients.some(w => w.reason === 'watched') && (
-                <>
-                  <StyledView className="mt-6 mb-2">
-                    <StyledText className="text-lg font-sans-bold text-text-primary">
-                      Bevakade ingredienser
-                    </StyledText>
-                  </StyledView>
+              
+              {/* Icke-veganska ingredienser-sektion */}
+              {product.analysis.watchedIngredients.some(w => w.reason === 'non-vegan') && (
+                <StyledView className="mt-4">
+                  <StyledText className="text-lg font-sans-bold text-red-800 mb-2">
+                    Icke-veganska ingredienser
+                  </StyledText>
                   
                   {product.analysis.watchedIngredients
-                    .filter(w => w.reason === 'watched')
-                    .map((watchedItem, index) => {
-                      const matchedIngredient = product.ingredients.find(
-                        ing => ing.toLowerCase().includes(watchedItem.name.toLowerCase()) || 
-                              watchedItem.name.toLowerCase().includes(ing.toLowerCase())
-                      );
-                      
-                      return (
-                        <IngredientItem 
-                          key={`watched-${index}`}
-                          name={matchedIngredient || watchedItem.name}
-                          status="warning"
-                          description={watchedItem.description}
-                        />
-                      );
-                    })}
-                </>
+                    .filter(w => w.reason === 'non-vegan')
+                    .map((item, index) => (
+                      <StyledView key={`nonvegan-${index}`} className="mb-2">
+                        <StyledView className="flex-row items-center">
+                          <StyledView className="w-3 h-3 rounded-full mr-2 bg-red-500" />
+                          <SafeText 
+                            value={item.name}
+                            style={{ color: '#991b1b' }}
+                          />
+                        </StyledView>
+                        
+                        {item.description && (
+                          <StyledView className="ml-5 mt-1 p-2 bg-red-50 rounded">
+                            <SafeText 
+                              value={item.description}
+                              style={{ fontSize: 12, color: '#991b1b' }}
+                            />
+                          </StyledView>
+                        )}
+                      </StyledView>
+                    ))
+                  }
+                </StyledView>
               )}
             </StyledView>
           )}
         </StyledView>
         
-        {/* Tom vy i botten för att förhindra att innehåll döljs under kontrollerna */}
+        {/* Tomt utrymme i botten */}
         <StyledView className="h-24" />
       </StyledScrollView>
       
-      {/* Kontroller för att spara/favorit */}
-      {saveLoading ? (
-        <StyledView className="p-4">
-          <ActivityIndicator size="small" color="#6366f1" />
+      {/* Kontroller (spara, favorit, dela, ny skanning) */}
+      <StyledView className="flex-row justify-between p-4 border-t border-gray-200">
+        <StyledPressable
+          onPress={handleNewScan}
+          className="flex-row items-center justify-center bg-primary-main py-2 px-4 rounded-md"
+        >
+          <Ionicons name="camera-outline" size={18} color="white" />
+          <StyledText className="text-white font-sans-bold ml-2">
+            Ny skanning
+          </StyledText>
+        </StyledPressable>
+        
+        <StyledView className="flex-row">
+          <StyledPressable
+            onPress={handleShare}
+            className="flex-row items-center justify-center p-2 rounded-md mr-2 bg-background-light"
+          >
+            <Ionicons name="share-outline" size={18} color="#6b7280" />
+          </StyledPressable>
+          
+          <StyledPressable
+            onPress={handleToggleFavorite}
+            disabled={!product.metadata.isSavedToHistory}
+            className="flex-row items-center justify-center p-2 rounded-md mr-2 bg-background-light"
+          >
+            <Ionicons 
+              name={product.metadata.isFavorite ? "heart" : "heart-outline"} 
+              size={18} 
+              color={product.metadata.isFavorite ? "#ef4444" : "#6b7280"} 
+            />
+          </StyledPressable>
+          
+          <StyledPressable
+            onPress={handleSaveToHistory}
+            disabled={product.metadata.isSavedToHistory}
+            className={`flex-row items-center justify-center py-2 px-4 rounded-md ${
+              product.metadata.isSavedToHistory ? 'bg-background-light' : 'bg-primary-main'
+            }`}
+          >
+            <Ionicons 
+              name="bookmark-outline" 
+              size={18} 
+              color={product.metadata.isSavedToHistory ? "#6b7280" : "white"} 
+            />
+            <StyledText 
+              className={`font-sans-bold ml-2 ${
+                product.metadata.isSavedToHistory ? 'text-text-primary' : 'text-white'
+              }`}
+            >
+              {product.metadata.isSavedToHistory ? "Sparad" : "Spara"}
+            </StyledText>
+          </StyledPressable>
         </StyledView>
-      ) : (
-        <AnalysisControls 
-          onSaveToHistory={handleSaveToHistory}
-          isAlreadySaved={product.metadata.isSavedToHistory}
-          onFavoriteToggle={handleToggleFavorite}
-          isFavorite={product.metadata.isFavorite}
-          onShare={handleShareResult}
-          onNew={handleNewScan}
-        />
-      )}
+      </StyledView>
     </StyledSafeAreaView>
   );
 } 

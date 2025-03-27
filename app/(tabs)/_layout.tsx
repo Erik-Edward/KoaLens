@@ -30,6 +30,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#4ECDC4',
@@ -50,6 +51,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" color={color} size={size} />
           ),
+          href: null, // Dölj denna tab i UI
         }}
       />
       <Tabs.Screen

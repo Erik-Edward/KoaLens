@@ -14,6 +14,8 @@ export interface ProductAnalysis {
   confidence: number;
   watchedIngredients: WatchedIngredient[]; // Ingredienser med anmärkningar
   reasoning?: string; // Förklaring av analysen
+  detectedLanguage?: string; // Detected language of the ingredients (sv, en, unknown)
+  detectedNonVeganIngredients?: string[]; // Array of specifically detected non-vegan ingredients
 }
 
 export interface ProductMetadata {
@@ -23,6 +25,7 @@ export interface ProductMetadata {
   isSavedToHistory: boolean;
   source?: string; // Manuell, skanning, etc.
   imageUri?: string; // URI till produktbild
+  croppedImageUri?: string; // URI till beskuren produktbild
   name?: string; // Produktnamn
 }
 
@@ -84,6 +87,8 @@ export function convertFromLegacyProduct(legacy: any): Product {
       confidence: legacy.confidence ?? 0.5,
       watchedIngredients,
       reasoning: legacy.reasoning || undefined,
+      detectedLanguage: legacy.detectedLanguage,
+      detectedNonVeganIngredients: legacy.detectedNonVeganIngredients,
     },
     metadata: {
       userId: legacy.userId,
@@ -92,6 +97,7 @@ export function convertFromLegacyProduct(legacy: any): Product {
       isSavedToHistory: true, // Antag att alla legacy-produkter är i historiken
       source: legacy.source || "Legacy import",
       imageUri: legacy.imageUri,
+      croppedImageUri: legacy.croppedImageUri,
       name: legacy.name || legacy.productName,
     }
   };
@@ -125,6 +131,8 @@ export function convertToLegacyProduct(product: Product): any {
     source: product.metadata.source,
     imageUri: product.metadata.imageUri,
     productName: product.metadata.name,
+    detectedLanguage: product.analysis.detectedLanguage,
+    detectedNonVeganIngredients: product.analysis.detectedNonVeganIngredients,
   };
 }
 

@@ -5,6 +5,7 @@ import theme from '@/constants/theme';
 const ScanLayout: FC = () => {
   return (
     <Stack 
+      initialRouteName="home"
       screenOptions={{
         headerShown: false,
         contentStyle: {
@@ -14,6 +15,13 @@ const ScanLayout: FC = () => {
     >
       <Stack.Screen
         name="index"
+        options={{
+          title: 'Skanna produkt',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="home"
         options={{
           title: 'Skanna produkt',
           headerShown: false,

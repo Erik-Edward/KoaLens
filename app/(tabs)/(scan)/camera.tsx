@@ -18,7 +18,6 @@ const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
 
 const GUIDE_KEY = 'KOALENS_CAMERA_GUIDE_SHOWN';
-const NAV_LOCK_KEY = 'KOALENS_CAMERA_NAV_LOCK';
 
 // Tydligt deklarerad som default export-funktion
 export default function CameraScreen() {
@@ -27,48 +26,10 @@ export default function CameraScreen() {
   const camera = useRef<any>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [navLocked, setNavLocked] = useState(true); // Start with navigation locked
   const navigation = useNavigation();
   
   // Check for web browser environment
   const isWebEnvironment = Platform.OS === 'web';
-
-  // Set a stronger navigation lock to prevent unwanted navigation away from the camera
-  useEffect(() => {
-    console.log('Setting up camera screen navigation lock');
-    
-    const setupNavigationLock = async () => {
-      try {
-        // Clear any existing timeouts
-        const timeoutString = await AsyncStorage.getItem('KOALENS_CAMERA_TIMEOUT');
-        if (timeoutString) {
-          const timeoutId = parseInt(timeoutString, 10);
-          clearTimeout(timeoutId);
-          await AsyncStorage.removeItem('KOALENS_CAMERA_TIMEOUT');
-          console.log('Cleared previous camera safety timeout');
-        }
-        
-        // Set the navigation lock
-        await AsyncStorage.setItem(NAV_LOCK_KEY, 'true');
-        setNavLocked(true);
-        console.log('Camera navigation locked successfully');
-      } catch (err) {
-        console.error('Failed to set navigation lock:', err);
-      }
-    };
-    
-    setupNavigationLock();
-    
-    // More aggressive cleanup when component unmounts
-    return () => {
-      console.log('Camera screen unmounting, cleaning up');
-      
-      // Clear navigation lock when component unmounts
-      AsyncStorage.removeItem(NAV_LOCK_KEY)
-        .then(() => console.log('Camera navigation lock cleared'))
-        .catch(err => console.error('Failed to clear navigation lock:', err));
-    };
-  }, []);
 
   // Handle hardware back button
   useEffect(() => {
@@ -82,30 +43,6 @@ export default function CameraScreen() {
     
     return () => backHandler.remove();
   }, []);
-
-  // Listen for navigation attempts and block unwanted ones more aggressively
-  useEffect(() => {
-    console.log('Setting up navigation protection');
-    
-    const blockUnwantedNavigation = (e: any) => {
-      // Block all navigation events while locked
-      if (navLocked) {
-        console.log('Blocked navigation event:', e.data.action.type);
-        e.preventDefault();
-        
-        // Only handle back navigation, ignore other types
-        if (e.data.action.type === 'GO_BACK') {
-          console.log('Handling back navigation manually');
-          handleBack();
-        }
-      }
-    };
-    
-    // Add listener for beforeRemove events
-    const unsubscribe = navigation.addListener('beforeRemove', blockUnwantedNavigation);
-    
-    return unsubscribe;
-  }, [navigation, navLocked]);
 
   // Log screen view when component mounts
   useEffect(() => {
@@ -150,10 +87,7 @@ export default function CameraScreen() {
         
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // Unlock navigation before taking photo
-        await AsyncStorage.removeItem(NAV_LOCK_KEY);
-        setNavLocked(false);
-        console.log('Navigation unlocked for photo navigation');
+        console.log('Taking photo...');
         
         const photo = await camera.current.takePhoto({
           flash: 'off',
@@ -164,41 +98,14 @@ export default function CameraScreen() {
         
         // Navigate to crop screen
         console.log('Navigating to crop screen with photo path:', photo.path);
-        try {
-          // Kort väntetid för att säkerställa att bilden är tillgänglig
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          // Försök navigera med router.replace för att ersätta nuvarande skärm
-          router.replace({
-            pathname: '/(tabs)/(scan)/crop',
-            params: { photoPath: photo.path }
-          });
-          
-          console.log('Navigation till crop-skärmen initierad');
-          
-          // Sätt en timer som fallback om navigeringen misslyckas
-          setTimeout(() => {
-            console.log('Kontrollerar om fallback-navigering behövs');
-            try {
-              // Fallback-navigering som sista säkerhet
-              router.navigate('/(tabs)/(scan)/crop');
-            } catch (innerError) {
-              console.error('Fallback-timer navigation error:', innerError);
-            }
-          }, 1000);
-        } catch (navError) {
-          console.error('Navigeringsfel till beskärningsskärmen:', navError);
-          
-          // Sista utvägen: Använd navigate som fallback
-          try {
-            router.navigate('/(tabs)/(scan)/crop');
-          } catch (fallbackError) {
-            console.error('Även fallback-navigation misslyckades:', fallbackError);
-            
-            // Visa felmeddelande till användaren
-            Alert.alert('Navigeringsfel', 'Kunde inte navigera vidare. Försök igen eller starta om appen.');
-          }
-        }
+        
+        // Använd en rak router.replace för att gå till beskärningsskärmen
+        router.replace({
+          pathname: '/(tabs)/(scan)/crop',
+          params: { photoPath: photo.path }
+        });
+        
+        console.log('Navigation till crop-skärmen initierad');
       }
     } catch (error) {
       console.error('Failed to take photo:', error);
@@ -216,51 +123,53 @@ export default function CameraScreen() {
         [{ text: "OK" }]
       );
       
-      // Unlock navigation after error
-      await AsyncStorage.removeItem(NAV_LOCK_KEY);
-      setNavLocked(false);
-    } finally {
       setIsCapturing(false);
     }
   };
 
   // Explicitly handle back navigation
   const handleBack = async () => {
-    console.log('Manual back navigation from camera');
-    
-    // Unlock navigation
-    await AsyncStorage.removeItem(NAV_LOCK_KEY);
-    setNavLocked(false);
-    console.log('Navigation unlocked for back navigation');
-    
-    // Use a more direct router method
-    router.replace('/(tabs)/(scan)');
-  };
-
-  // Handle closing the guide
-  const handleCloseGuide = async () => {
     try {
-      await AsyncStorage.setItem(GUIDE_KEY, 'true');
-      setShowGuide(false);
+      console.log('Handling back navigation from camera screen');
       
-      // Log guide interaction
-      logEvent('guide_completed', { type: 'camera_guide' });
+      // Ge haptisk feedback
+      await Haptics.selectionAsync();
+      
+      // Gå tillbaka till föregående skärm
+      router.back();
     } catch (error) {
-      console.error('Error saving guide status:', error);
-      setShowGuide(false);
+      console.error('Error in back navigation:', error);
+      
+      // Som fallback, använd direkt replacement
+      router.replace('/(tabs)/(scan)');
     }
   };
 
-  // Show informative text for web environment
-  if (isWebEnvironment) {
+  // Render camera guide overlay
+  const renderGuide = () => {
+    if (!showGuide) return null;
+    
     return (
-      <StyledView className="flex-1 justify-center items-center bg-background-main p-4">
+      <CameraGuide 
+        onClose={() => {
+          setShowGuide(false);
+          AsyncStorage.setItem(GUIDE_KEY, 'true')
+            .catch(error => console.error('Failed to save guide status:', error));
+        }} 
+      />
+    );
+  };
+
+  if (isWebEnvironment) {
+    // Special handling for web environment - show placeholder
+    return (
+      <StyledView className="flex-1 bg-background-main justify-center items-center p-4">
         <Ionicons name="camera-outline" size={48} color="#ffffff" />
         <StyledText className="text-text-primary font-sans-bold text-xl text-center mt-4 mb-2">
-          Kameran är inte tillgänglig
+          Kamera ej tillgänglig
         </StyledText>
         <StyledText className="text-text-secondary font-sans text-center mb-6">
-          Kamerafunktionaliteten är bara tillgänglig på fysiska enheter och i EAS builds, inte i webbläsaren eller Expo Go.
+          Kamerafunktionen är bara tillgänglig på fysiska enheter och i EAS builds, inte i webbläsaren eller Expo Go.
         </StyledText>
         <StyledPressable 
           onPress={handleBack}
@@ -274,16 +183,20 @@ export default function CameraScreen() {
     );
   }
 
-  // Show error if no device found
-  if (device == null) {
+  // Camera hardware is not available
+  if (!device) {
     return (
-      <StyledView className="flex-1 justify-center items-center bg-background-main">
-        <StyledText className="text-text-primary font-sans text-lg">
-          Kunde inte hitta kameran
+      <StyledView className="flex-1 bg-[#000000] justify-center items-center p-4">
+        <Ionicons name="alert-circle-outline" size={48} color="#ffd33d" />
+        <StyledText className="text-white font-sans-bold text-lg text-center mt-4 mb-2">
+          Kameran är inte tillgänglig
+        </StyledText>
+        <StyledText className="text-gray-300 font-sans text-center mb-6">
+          Vi kunde inte få tillgång till enhetens kamera. Kontrollera kamerabehörigheter i enhetsinställningarna.
         </StyledText>
         <StyledPressable 
           onPress={handleBack}
-          className="mt-6 bg-primary px-6 py-3 rounded-lg"
+          className="bg-primary px-6 py-3 rounded-lg"
         >
           <StyledText className="text-text-inverse font-sans-medium">
             Gå tillbaka
@@ -293,15 +206,11 @@ export default function CameraScreen() {
     );
   }
 
-  // Show camera view
   return (
     <StyledView className="flex-1 bg-black">
-      <StatusBar 
-        style="light"
-        backgroundColor="transparent"
-        translucent={true}
-      />
+      <StatusBar style="light" />
       
+      {/* Real Camera View */}
       <Camera
         ref={camera}
         style={{ flex: 1 }}
@@ -310,47 +219,54 @@ export default function CameraScreen() {
         photo={true}
       />
       
-      {/* Guide grid */}
-      <StyledView className="absolute inset-0 flex justify-center items-center">
-        <StyledView className="w-4/5 h-32 border-2 border-white/50 rounded-lg" />
-      </StyledView>
-      
-      {/* Dev button - only visible during development */}
-      {__DEV__ && (
-        <StyledPressable 
-          onPress={resetGuide}
-          className="absolute top-2 left-2 bg-black/30 p-2 rounded-full"
-        >
-          <Ionicons name="refresh" size={20} color="#fff" />
-        </StyledPressable>
-      )}
-      
-      {/* Camera controls */}
-      <StyledView className="absolute bottom-0 left-0 right-0 h-24 bg-black/50">
-        <StyledView className="flex-row justify-between items-center px-8 h-full">
-          <StyledPressable 
+      {/* Camera Controls Overlay */}
+      <StyledView className="absolute inset-0 pointer-events-none">
+        {/* Top Bar */}
+        <StyledView className="flex-row justify-between items-center p-4 pointer-events-auto">
+          <StyledPressable
             onPress={handleBack}
-            className="w-12 h-12 rounded-full bg-gray-800/80 justify-center items-center"
+            className="bg-black/50 rounded-full p-2"
           >
-            <Ionicons name="close" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </StyledPressable>
-
+          
+          <StyledPressable
+            onPress={() => setShowGuide(true)}
+            className="bg-black/50 rounded-full p-2"
+          >
+            <Ionicons name="help-circle-outline" size={24} color="white" />
+          </StyledPressable>
+        </StyledView>
+        
+        {/* Center guidance text */}
+        <StyledView className="flex-1 justify-center items-center p-4">
+          <StyledView className="bg-black/50 rounded-lg px-6 py-3">
+            <StyledText className="text-white text-center font-sans">
+              Placera ingredienslistan i mitten av skärmen
+            </StyledText>
+          </StyledView>
+        </StyledView>
+        
+        {/* Bottom Bar */}
+        <StyledView className="flex-row justify-center items-center pb-12 pt-6 pointer-events-auto">
           <StyledPressable
             onPress={capturePhoto}
             disabled={isCapturing}
-            className={`w-16 h-16 rounded-full justify-center items-center ${
-              isCapturing ? 'bg-gray-400' : 'bg-white'
+            className={`bg-white rounded-full w-16 h-16 items-center justify-center border-4 border-gray-800 ${
+              isCapturing ? 'opacity-50' : ''
             }`}
           >
-            <StyledView className="w-14 h-14 rounded-full border-2 border-black" />
+            {isCapturing ? (
+              <StyledView className="bg-gray-600 rounded-full w-12 h-12" />
+            ) : (
+              <StyledView className="bg-white rounded-full w-12 h-12" />
+            )}
           </StyledPressable>
-
-          <StyledView className="w-12 h-12" />
         </StyledView>
       </StyledView>
-
-      {/* Guide overlay */}
-      {showGuide && <CameraGuide onClose={handleCloseGuide} />}
+      
+      {/* Render Camera Guide if needed */}
+      {renderGuide()}
     </StyledView>
   );
 }

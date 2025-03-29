@@ -38,7 +38,7 @@ const dummyCamera = {
     };
   },
   
-  Camera: ({ style, device, isActive }: any) => {
+  Camera: ({ style, device, isActive, video, audio, photo }: any) => {
     console.warn('VisionCamera: Camera component rendered in unsupported environment');
     return null;
   }

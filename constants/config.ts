@@ -11,9 +11,7 @@ export const COMPANY_NAME = 'KoaLens';
 export const WEBSITE_URL = 'https://koalens.live';
 
 // API endpoints och tjänster
-export const BACKEND_URL = __DEV__ 
-  ? 'http://192.168.1.67:3000' 
-  : 'https://koalens-backend.fly.dev';
+export const BACKEND_URL = 'https://koalens-backend.fly.dev';
 
 // Alias för bakåtkompatibilitet
 export const API_BASE_URL = BACKEND_URL;

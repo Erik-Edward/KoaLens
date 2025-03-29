@@ -20,7 +20,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../../../hooks/useProducts';
 import { useCounter } from '../../../hooks/useCounter';
-import { Product, ProductAnalysis } from '../../../models/productModel';
+import { Product, ProductAnalysis, WatchedIngredient } from '../../../models/productModel';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { getUserId } from '@/stores/adapter';
@@ -142,16 +142,55 @@ export default function ResultScreen() {
     let isActive = true;
     
     console.log('RESULT SCREEN: Initializing screen...');
+    console.log('RESULT SCREEN: Available params:', Object.keys(params).join(', '));
     
     const initScreen = async () => {
       try {
         console.log('RESULT SCREEN: Starting initialization');
         
-        // Spara fotosökväg om den finns
+        // Kontrollera om vi har resultat från temp-filen (för fallback-navigering)
+        try {
+          const tempFilePath = `${FileSystem.cacheDirectory}temp_analysis_result.json`;
+          const fileInfo = await FileSystem.getInfoAsync(tempFilePath);
+          
+          if (fileInfo.exists) {
+            console.log('RESULT SCREEN: Found temp analysis file, reading...');
+            const tempData = await FileSystem.readAsStringAsync(tempFilePath);
+            const tempParams = JSON.parse(tempData);
+            
+            console.log('RESULT SCREEN: Using temp params:', Object.keys(tempParams).join(', '));
+            
+            // Uppdatera params från temp-filen
+            if (tempParams.analysisResult) {
+              params.analysisResult = JSON.stringify(tempParams.analysisResult);
+            }
+            if (tempParams.videoPath) {
+              params.videoPath = tempParams.videoPath;
+            }
+            if (tempParams.analysisType) {
+              params.analysisType = tempParams.analysisType;
+            }
+            
+            // Ta bort temp-filen
+            await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+            console.log('RESULT SCREEN: Temp file processed and deleted');
+          }
+        } catch (tempError) {
+          console.log('RESULT SCREEN: No temp file or error reading it:', tempError);
+        }
+        
+        // Spara foto- eller videosökväg om den finns
         if (params.photoPath) {
           photoPathRef.current = params.photoPath as string;
           console.log('RESULT SCREEN: Photo path set:', photoPathRef.current);
+        } else if (params.videoPath) {
+          photoPathRef.current = params.videoPath as string;
+          console.log('RESULT SCREEN: Video path set:', photoPathRef.current);
         }
+        
+        // Avgör om detta är en videoanalys
+        const isVideoAnalysis = params.analysisType === 'video';
+        console.log('RESULT SCREEN: Is video analysis:', isVideoAnalysis);
         
         // Hämta användar-ID
         const userId = await getUserId();
@@ -160,11 +199,12 @@ export default function ResultScreen() {
         // Hantera analysresultat
         if (params.analysisResult) {
           try {
-            console.log('RESULT SCREEN: Found analysis result in params');
+            console.log('RESULT SCREEN: Found analysis result in params, length:', 
+              (params.analysisResult as string)?.length || 0);
             
             // Hantera direktanalys
             const rawData = params.analysisResult as string;
-            console.log('RESULT SCREEN: Raw data length:', rawData?.length || 0);
+            console.log('RESULT SCREEN: Raw data type:', typeof rawData);
             
             let analysisResult: any = null;
             
@@ -174,74 +214,177 @@ export default function ResultScreen() {
               analysisResult = JSON.parse(rawData);
               console.log('RESULT SCREEN: JSON parsed successfully');
             } catch (parseError) {
-              console.log('RESULT SCREEN: Initial parse failed, trying alternative methods');
+              console.log('RESULT SCREEN: Initial parse failed, trying alternative methods:', parseError);
               // Parseringförsök 2: Hantera dubbel-stringifierad JSON
               try {
                 const cleaned = rawData.replace(/^"|"$/g, '').replace(/\\"/g, '"');
                 analysisResult = JSON.parse(cleaned);
                 console.log('RESULT SCREEN: Parsed JSON from cleaned string');
               } catch (innerError) {
+                console.log('RESULT SCREEN: Second parse attempt failed:', innerError);
+                
+                // Om det är ett objekt redan, använd det direkt
+                if (typeof rawData === 'object') {
+                  console.log('RESULT SCREEN: Using raw data as object directly');
+                  analysisResult = rawData;
+                }
                 // Behandla rådata som text om det innehåller vissa nyckelord
-                if (typeof rawData === 'string' && 
+                else if (typeof rawData === 'string' && 
                     (rawData.includes('The model is overloaded') || 
                      rawData.includes('Error:') || 
                      rawData.includes('Failed') || 
                      rawData.includes('rate limit'))) {
                   console.error('RESULT SCREEN: API error message detected in raw data');
                   throw new Error(`API-tjänsten är överbelastad: ${rawData.substring(0, 100)}`);
+                } else {
+                  console.error('RESULT SCREEN: Failed to parse analysis result');
+                  throw new Error('Kunde inte tolka analysresultatet');
                 }
-                
-                console.error('RESULT SCREEN: Failed to parse analysis result');
-                throw new Error('Kunde inte tolka analysresultatet');
               }
             }
             
+            console.log('RESULT SCREEN: Analysis result keys:', Object.keys(analysisResult).join(', '));
+            
             // Skapa produktobjekt från analysresultatet
             console.log('RESULT SCREEN: Creating product from analysis result');
-            const newProduct: Product = createProductFromAnalysis(
+            const newProduct = createProductFromAnalysis(
               analysisResult, 
-              photoPathRef.current, 
-              userId || 'anonymous'
+              photoPathRef.current,
+              userId
             );
             
-            if (isActive) {
-              console.log('RESULT SCREEN: Setting product and finishing loading');
-              setProduct(newProduct);
-              setIsLoading(false);
-              setProgress(100);
-            }
+            setProduct(newProduct);
+            setProgress(100);
+            setStatusText("Analys slutförd!");
+            setIsLoading(false);
           } catch (error) {
-            if (isActive) {
-              console.error('RESULT SCREEN: Error processing analysis result:', error);
-              setErrorMessage(`${error instanceof Error ? error.message : 'Ett okänt fel inträffade'}`);
-              setIsLoading(false);
-            }
-          }
-        } else {
-          // Ingen analysdata tillgänglig
-          console.error('RESULT SCREEN: No analysis data available');
-          if (isActive) {
-            setErrorMessage('Ingen analysinformation tillgänglig');
+            console.error('RESULT SCREEN: Error handling analysis result:', error);
+            setErrorMessage(`Kunde inte tolka analysresultatet: ${error instanceof Error ? error.message : String(error)}`);
             setIsLoading(false);
           }
-        }
-      } catch (error) {
-        if (isActive) {
-          console.error('RESULT SCREEN: Fatal error during initialization:', error);
-          setErrorMessage(`${error instanceof Error ? error.message : 'Ett okänt fel inträffade'}`);
+        } 
+        // Ingen analysResult i params, utför egen analys
+        else if (photoPathRef.current) {
+          try {
+            console.log('RESULT SCREEN: No analysis result in params, performing analysis');
+            
+            const analysisService = new AnalysisService();
+            
+            // Starta lyssning på analysframsteg
+            const progressListener = setInterval(() => {
+              setProgress(analysisService.analysisProgress);
+            }, 500);
+            
+            let ingredients: string[] = [];
+            let analysisResult;
+            
+            try {
+              if (isVideoAnalysis) {
+                console.log('RESULT SCREEN: Performing video analysis');
+                setStatusText("Analyserar video...");
+                
+                // Direkt analys av videofilen
+                analysisResult = await analysisService.analyzeVideo(photoPathRef.current);
+              } else {
+                console.log('RESULT SCREEN: Performing image analysis');
+                setStatusText("Extraherar ingredienser från bild...");
+                
+                // Extrahera ingredienser från bilden först
+                ingredients = await analysisService.extractIngredientsFromImage(photoPathRef.current);
+                console.log(`RESULT SCREEN: Extracted ${ingredients.length} ingredients`);
+                
+                // Analysera sedan ingredienserna
+                if (ingredients && ingredients.length > 0) {
+                  setStatusText("Analyserar ingredienser...");
+                  analysisResult = await analysisService.analyzeIngredients(ingredients);
+                } else {
+                  throw new Error('Kunde inte hitta några ingredienser i bilden');
+                }
+              }
+            } catch (analysisError) {
+              console.error('RESULT SCREEN: Analysis error:', analysisError);
+              
+              // Om analysen misslyckas, försök med direktanalys av bilden
+              if (!isVideoAnalysis) {
+                console.log('RESULT SCREEN: Falling back to direct image analysis');
+                setStatusText("Använder alternativ analysmetod...");
+                analysisResult = await analysisService.analyzeImageDirectly(photoPathRef.current);
+              } else {
+                throw analysisError;
+              }
+            }
+            
+            // Avbryt lyssning på analysframsteg
+            clearInterval(progressListener);
+            
+            // Skapa produkt från analysresultatet
+            if (analysisResult) {
+              console.log('RESULT SCREEN: Analysis succeeded, creating product');
+              setProgress(95);
+              
+              const scanDate = new Date().toISOString();
+              let ingredients: string[] = [];
+              
+              // Extrahera ingredienser
+              if (Array.isArray(analysisResult.ingredientList)) {
+                ingredients = analysisResult.ingredientList;
+              }
+              
+              // Skapa watchedIngredients
+              const watchedIngredients: WatchedIngredient[] = 
+                Array.isArray(analysisResult.watchedIngredients) ? 
+                  analysisResult.watchedIngredients :
+                  [];
+              
+              // Skapa produkt enligt Product-interfacet
+              const newProduct: Product = {
+                id: uuidv4(),
+                timestamp: scanDate,
+                ingredients: ingredients,
+                analysis: {
+                  isVegan: analysisResult.isVegan === true,
+                  confidence: analysisResult.confidence || 0.7,
+                  watchedIngredients: watchedIngredients,
+                  reasoning: analysisResult.reasoning || ''
+                },
+                metadata: {
+                  userId: userId || 'anonymous',
+                  scanDate: scanDate,
+                  isFavorite: false,
+                  isSavedToHistory: true,
+                  source: isVideoAnalysis ? 'video' : 'image',
+                  imageUri: photoPathRef.current || undefined,
+                  croppedImageUri: photoPathRef.current || undefined,
+                  name: 'Analyserad produkt'
+                }
+              };
+              
+              setProduct(newProduct);
+              setProgress(100);
+              setStatusText("Analys slutförd!");
+              setIsLoading(false);
+            } else {
+              throw new Error('Analysen gav inget resultat');
+            }
+          } catch (error) {
+            console.error('RESULT SCREEN: Analysis error:', error);
+            setErrorMessage(`Analys misslyckades: ${error instanceof Error ? error.message : String(error)}`);
+            setIsLoading(false);
+          }
+        } else {
+          console.error('RESULT SCREEN: No photo path or analysis result');
+          setErrorMessage('Ingen bild eller video att analysera');
           setIsLoading(false);
         }
+      } catch (error) {
+        // Fånga alla oväntade fel
+        console.error('RESULT SCREEN: Unexpected error during initialization:', error);
+        setErrorMessage(`Ett oväntat fel uppstod: ${error instanceof Error ? error.message : String(error)}`);
+        setIsLoading(false);
       }
     };
-    
-    // Kör initScreen med en kort fördröjning för att säkerställa att parametrarna har laddats
-    setTimeout(() => {
-      initScreen().catch(error => {
-        console.error('RESULT SCREEN: Unhandled error in initScreen:', error);
-        setErrorMessage(`Oväntat fel: ${error instanceof Error ? error.message : 'Okänt fel'}`);
-        setIsLoading(false);
-      });
-    }, 100);
+
+    initScreen();
     
     return () => {
       isActive = false;
@@ -254,104 +397,81 @@ export default function ResultScreen() {
     photoPath: string | null | undefined,
     userId: string
   ): Product => {
-    console.log('RESULT SCREEN: Creating product with analysis result keys:', Object.keys(analysisResult || {}));
+    console.log('RESULT SCREEN: Inside createProductFromAnalysis');
     
-    // Basprodukt med standardvärden
-    const product: Product = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      ingredients: [],
-      metadata: {
-        scanDate: new Date().toISOString(),
-        croppedImageUri: photoPath || undefined,
-        isSavedToHistory: false,
-        isFavorite: false,
-        userId: userId
-      },
-      analysis: {
-        isVegan: false,
-        confidence: 0,
-        watchedIngredients: [],
-        reasoning: 'Ingen analysgrund tillgänglig'
-      }
-    };
+    // Bestäm källa (bild eller video)
+    const isVideoAnalysis = params.analysisType === 'video';
+    const source = isVideoAnalysis ? 'video' : 'image';
     
-    // Uppdatera med faktiska värden från analysresultatet
-    if (analysisResult) {
-      // Hantera isVegan på ett säkert sätt
-      if ('isVegan' in analysisResult) {
-        product.analysis.isVegan = analysisResult.isVegan === true;
-      }
-      
-      // Hantera confidence på ett säkert sätt
-      if ('confidence' in analysisResult) {
-        const confidenceValue = Number(analysisResult.confidence);
-        product.analysis.confidence = isNaN(confidenceValue) ? 0 : confidenceValue;
-      }
-      
-      // Hantera reasoning på ett säkert sätt
-      if ('reasoning' in analysisResult) {
-        if (typeof analysisResult.reasoning === 'string') {
-          product.analysis.reasoning = analysisResult.reasoning;
-        } else if (analysisResult.reasoning !== null && analysisResult.reasoning !== undefined) {
-          try {
-            product.analysis.reasoning = JSON.stringify(analysisResult.reasoning);
-          } catch (e) {
-            product.analysis.reasoning = 'Kunde inte konvertera analysgrund';
-          }
-        }
-      }
-      
-      // Hantera ingredienser på ett säkert sätt
-      if ('ingredientList' in analysisResult && Array.isArray(analysisResult.ingredientList)) {
-        product.ingredients = analysisResult.ingredientList
-          .filter((item: any) => item !== null && item !== undefined)
-          .map((item: any) => typeof item === 'string' ? item : String(item));
-      }
-      
-      // Hantera icke-veganska ingredienser
-      if ('nonVeganIngredients' in analysisResult && 
-          Array.isArray(analysisResult.nonVeganIngredients)) {
-        // Kopiera nonVeganIngredients direkt till produkten för enkel åtkomst senare
-        (product.analysis as any).nonVeganIngredients = analysisResult.nonVeganIngredients
-          .filter((item: any) => item !== null && item !== undefined)
-          .map((item: any) => typeof item === 'string' ? item : String(item));
-          
-        // Lägg till icke-veganska ingredienser i watchedIngredients
-        const nonVeganWatched = analysisResult.nonVeganIngredients
-          .filter((item: any) => item !== null && item !== undefined)
-          .map((item: any) => ({
-            name: typeof item === 'string' ? item : String(item),
-            reason: 'non-vegan',
-            description: 'Identifierad som icke-vegansk'
-          }));
-          
-        product.analysis.watchedIngredients = [
-          ...product.analysis.watchedIngredients,
-          ...nonVeganWatched
-        ];
-      }
-      
-      // Hantera bevakade ingredienser direkt från analysresultatet
-      if ('watchedIngredients' in analysisResult && 
-          Array.isArray(analysisResult.watchedIngredients)) {
-        const safeWatchedIngredients = analysisResult.watchedIngredients
-          .filter((item: any) => item !== null && item !== undefined && typeof item === 'object')
-          .map((item: any) => ({
-            name: typeof item.name === 'string' ? item.name : String(item.name || ''),
-            reason: typeof item.reason === 'string' ? item.reason : 'unknown',
-            description: item.description ? String(item.description) : undefined
-          }));
-          
-        // Kombinera med befintliga bevakade ingredienser
-        product.analysis.watchedIngredients = [
-          ...product.analysis.watchedIngredients,
-          ...safeWatchedIngredients
-        ];
-      }
+    if (!analysisResult) {
+      throw new Error('Analysresultatet är tomt');
     }
     
-    return product;
+    // Extrahera ingredienser från olika API-format
+    let ingredients: string[] = [];
+    
+    if (Array.isArray(analysisResult.ingredients)) {
+      ingredients = analysisResult.ingredients.map((i: any) => 
+        typeof i === 'string' ? i : i.name || i.ingredient || String(i)
+      );
+    } else if (Array.isArray(analysisResult.allIngredients)) {
+      ingredients = analysisResult.allIngredients.map((i: any) => 
+        typeof i === 'string' ? i : i.name || i.ingredient || String(i)
+      );
+    } else if (typeof analysisResult.text === "string") {
+      ingredients = analysisResult.text
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0);
+    }
+    
+    // Sammanställ bevakade ingredienser
+    let watchedIngredients: WatchedIngredient[] = [];
+    
+    if (Array.isArray(analysisResult.watchedIngredients)) {
+      watchedIngredients = analysisResult.watchedIngredients;
+    } else if (Array.isArray(analysisResult.flaggedIngredients)) {
+      watchedIngredients = analysisResult.flaggedIngredients.map((i: any) => ({
+        name: i.name || String(i),
+        reason: i.reason || 'non-vegan',
+        description: i.description || ''
+      }));
+    } else if (Array.isArray(analysisResult.nonVeganIngredients)) {
+      watchedIngredients = analysisResult.nonVeganIngredients.map((i: any) => ({
+        name: typeof i === 'string' ? i : i.name || String(i),
+        reason: 'non-vegan',
+        description: i.description || i.details || ''
+      }));
+    }
+    
+    const scanDate = new Date().toISOString();
+    
+    // Skapa produktobjekt enligt Product-interfacet
+    return {
+      id: uuidv4(),
+      timestamp: scanDate,
+      ingredients: ingredients,
+      analysis: {
+        isVegan: analysisResult.isVegan === true,
+        confidence: typeof analysisResult.confidence === 'number' ? analysisResult.confidence : 0.7,
+        watchedIngredients: watchedIngredients,
+        reasoning: analysisResult.reasoning || analysisResult.summary || '',
+        detectedLanguage: analysisResult.detectedLanguage,
+        detectedNonVeganIngredients: Array.isArray(analysisResult.nonVeganIngredients) 
+          ? analysisResult.nonVeganIngredients.map((i: any) => typeof i === 'string' ? i : i.name || String(i))
+          : undefined
+      },
+      metadata: {
+        userId: userId,
+        scanDate: scanDate,
+        isFavorite: false,
+        isSavedToHistory: true,
+        source: source,
+        imageUri: photoPath || undefined,
+        croppedImageUri: photoPath || undefined, 
+        name: analysisResult.productName || 'Analyserad produkt'
+      }
+    };
   };
   
   // Hantera navigering tillbaka
@@ -600,8 +720,23 @@ export default function ResultScreen() {
       </StyledView>
       
       <StyledScrollView className="flex-1">
+        {/* Video analysis indicator (replacing video player) */}
+        {product.metadata.source === 'video' && (
+          <StyledView className="w-full bg-primary-light p-4 m-4 rounded-lg">
+            <StyledView className="flex-row items-center mb-2">
+              <Ionicons name="videocam" size={24} color="#1f2937" />
+              <StyledText className="text-text-primary font-sans-bold ml-2">
+                Videoanalys genomförd
+              </StyledText>
+            </StyledView>
+            <StyledText className="text-text-secondary">
+              Videon har analyserats för att identifiera ingredienser.
+            </StyledText>
+          </StyledView>
+        )}
+        
         {/* Produktbild */}
-        {product.metadata.croppedImageUri && (
+        {product.metadata.source !== 'video' && product.metadata.croppedImageUri && (
           <StyledView className="w-full h-64 bg-black">
             <StyledImage 
               source={{ uri: product.metadata.croppedImageUri }} 

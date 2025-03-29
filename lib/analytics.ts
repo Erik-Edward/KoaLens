@@ -15,6 +15,17 @@ export const Events = {
   ANALYSIS_COMPLETED: 'analysis_completed',
   ANALYSIS_ERROR: 'analysis_error',
   
+  // Video
+  VIDEO_RECORDING_STARTED: 'video_recording_started',
+  VIDEO_RECORDING_COMPLETED: 'video_recording_completed',
+  VIDEO_RECORDING_ERROR: 'video_recording_error',
+  VIDEO_RECORDED: 'video_recorded',
+  VIDEO_RESET: 'video_reset',
+  VIDEO_RECORDING_CANCELLED: 'video_recording_cancelled',
+  VIDEO_ANALYSIS_STARTED: 'video_analysis_started',
+  VIDEO_ANALYSIS_COMPLETED: 'video_analysis_completed',
+  VIDEO_ANALYSIS_ERROR: 'video_analysis_error',
+  
   // Användaråtgärder
   TOGGLE_FAVORITE: 'toggle_favorite',
   SHARE_RESULT: 'share_result',

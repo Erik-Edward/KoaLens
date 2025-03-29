@@ -16,7 +16,7 @@ import {
   StyleSheet
 } from 'react-native';
 import { styled } from 'nativewind';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../../../hooks/useProducts';
 import { useCounter } from '../../../hooks/useCounter';
@@ -28,6 +28,9 @@ import { AnalysisService } from '@/services/analysisService';
 import { v4 as uuidv4 } from 'uuid';
 import { ProductRepository } from '@/services/productRepository';
 import { logScreenView } from '@/lib/analyticsWrapper';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { Video, ResizeMode } from 'expo-av';
 
 // Styled components
 const StyledView = styled(View);
@@ -36,6 +39,14 @@ const StyledScrollView = styled(ScrollView);
 const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledImage = styled(Image);
+
+// Styles
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  }
+});
 
 /**
  * SafeText-komponent för att säkert rendera text
@@ -77,6 +88,33 @@ function SafeText({
   );
 }
 
+// Mock data för fallback
+const mockAnalysisResult = {
+  isVegan: false,
+  confidence: 0.75,
+  watchedIngredients: [
+    {
+      name: "Mjölk",
+      reason: "Mjölk är en animalisk produkt",
+      description: "Mjölk kommer från kor och är därför inte veganskt."
+    }
+  ],
+  ingredientList: ["Socker", "Vetemjöl", "Mjölk", "Salt"],
+  reasoning: "OBS! DETTA ÄR DEMO-DATA. Produkten innehåller mjölk vilket gör den icke-vegansk."
+};
+
+// Funktion för att parse JSON säkert
+function safeJsonParse(jsonString: string | undefined, fallback: any = null) {
+  if (!jsonString) return fallback;
+  
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('Kunde inte tolka JSON:', error, jsonString);
+    return fallback;
+  }
+}
+
 /**
  * Huvudkomponent för resultatskärmen
  */
@@ -88,6 +126,10 @@ export default function ResultScreen() {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("Förbereder analys...");
   const [isSaved, setIsSaved] = useState(false);
+  const [videoPath, setVideoPath] = useState<string | null>(null);
+  const [analysisType, setAnalysisType] = useState<string>('image');
+  const [showVideoThumbnail, setShowVideoThumbnail] = useState(false);
+  const [isDemo, setIsDemo] = useState(false); // Indikator för demo-data
   
   // Referenser
   const photoPathRef = useRef<string | null>(null);
@@ -95,6 +137,7 @@ export default function ResultScreen() {
   
   // Hämta URL-parametrar
   const params = useLocalSearchParams();
+  const router = useRouter();
   console.log('RESULT SCREEN: Received params:', JSON.stringify(params, null, 2));
   
   const isDirectAnalysis = params.isDirectAnalysis === 'true';
@@ -704,19 +747,29 @@ export default function ResultScreen() {
   
   // Visa analysresultat
   return (
-    <StyledSafeAreaView className="flex-1 bg-background-main">
-      {/* Header */}
-      <StyledView className="flex-row justify-between items-center p-4 border-b border-gray-200">
-        <StyledPressable onPress={handleBack} className="flex-row items-center">
-          <Ionicons name="chevron-back" size={24} color="#1f2937" />
-          <StyledText className="text-text-primary font-sans-medium ml-1">
-            Tillbaka
+    <StyledSafeAreaView className="flex-1 bg-white">
+      <StatusBar style="dark" />
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* Visa demobanner om det är demodata */}
+      {isDemo && (
+        <StyledView className="bg-amber-500 px-4 py-2 mb-2">
+          <StyledText className="text-white text-center font-medium">
+            Detta är demo-data. Videoanalys-API är för närvarande i beta.
           </StyledText>
+        </StyledView>
+      )}
+
+      {/* Header */}
+      <StyledView className="flex-row justify-between items-center px-4 py-2">
+        <StyledPressable 
+          onPress={() => router.push('/(tabs)/(scan)')}
+          className="p-2"
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </StyledPressable>
-        <StyledText className="text-text-primary font-sans-bold text-lg">
-          Resultat
-        </StyledText>
-        <StyledView style={{ width: 70 }} />
+        <StyledText className="text-lg font-bold">Analysresultat</StyledText>
+        <StyledView style={{ width: 40 }} />
       </StyledView>
       
       <StyledScrollView className="flex-1">

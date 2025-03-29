@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, Image, Text } from 'react-native';
+import { View, ActivityIndicator, Image, Text, LogBox } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../providers/AuthProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { UserProfileSync } from '@/components/UserProfileSync';
@@ -10,12 +11,19 @@ import { AppInitializer } from '@/components/AppInitializer';
 import theme from '@/constants/theme';
 import { styled } from 'nativewind';
 import { supabase } from '@/lib/supabase';
+import Providers from '@/providers';
 
 // Styled komponenter för laddningsindikatorn
 const StyledView = styled(View);
 const StyledText = styled(Text);
 
-export default function RootLayout() {
+// Ignorera specifik varning relaterad till Metro bundler
+LogBox.ignoreLogs([
+  'Metro waiting on',
+  'Non-serializable values were found in the navigation state',
+]);
+
+const RootLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -69,44 +77,50 @@ export default function RootLayout() {
   }
 
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AppInitializer onInitialized={handleInitialized} />
-        <StatusBar 
-          style="light"
-          backgroundColor={theme.colors.background.main}
-          translucent={true}
-        />
-        <UserProfileSync />
-        <Stack 
-          screenOptions={{ 
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: theme.colors.background.main
-            },
-            animation: 'fade'
-          }}
-        >
-          <Stack.Screen 
-            name="(auth)" 
-            options={{
-              animation: 'fade'
-            }}
-          />
-          <Stack.Screen 
-            name="(tabs)"
-            options={{
-              animation: 'fade'
-            }}
-          />
-          <Stack.Screen 
-            name="(onboarding)"
-            options={{
-              animation: 'fade'
-            }}
-          />
-        </Stack>
-      </AuthProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Providers>
+        <ErrorBoundary>
+          <AuthProvider>
+            <AppInitializer onInitialized={handleInitialized} />
+            <StatusBar 
+              style="light"
+              backgroundColor={theme.colors.background.main}
+              translucent={true}
+            />
+            <UserProfileSync />
+            <Stack 
+              screenOptions={{ 
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: theme.colors.background.main
+                },
+                animation: 'fade'
+              }}
+            >
+              <Stack.Screen 
+                name="(auth)" 
+                options={{
+                  animation: 'fade'
+                }}
+              />
+              <Stack.Screen 
+                name="(tabs)"
+                options={{
+                  animation: 'fade'
+                }}
+              />
+              <Stack.Screen 
+                name="(onboarding)"
+                options={{
+                  animation: 'fade'
+                }}
+              />
+            </Stack>
+          </AuthProvider>
+        </ErrorBoundary>
+      </Providers>
+    </GestureHandlerRootView>
   );
 };
+
+export default RootLayout;

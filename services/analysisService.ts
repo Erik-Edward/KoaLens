@@ -97,6 +97,7 @@ export class AnalysisService {
   private TEXT_ANALYSIS_ENDPOINT = `${API_ENDPOINT}/api/ingredients/analyze`;
   private IMAGE_ANALYSIS_ENDPOINT = `${API_ENDPOINT}/api/image/analyze`;
   private VIDEO_ANALYSIS_ENDPOINT = `${API_ENDPOINT}/api/video/analyze-video`;
+  private VIDEO_STATUS_ENDPOINT = `${API_ENDPOINT}/api/video/status`; // Ny endpoint för statuscheck
   
   // Språkinställningar
   private currentLanguage: string = 'sv';
@@ -117,6 +118,11 @@ export class AnalysisService {
     errorMessage: '',
     events: [] as { time: number; event: string; data?: any }[]
   };
+  
+  // Status för videoanalys-API
+  private videoApiAvailable: boolean = true; // Antar tillgängligt tills motsatsen bevisas
+  private lastVideoApiCheck: number = 0;
+  private readonly VIDEO_API_CHECK_INTERVAL = 60 * 60 * 1000; // En timme
 
   constructor() {
     // Initialisera cache-tjänsten
@@ -491,6 +497,65 @@ export class AnalysisService {
   }
   
   /**
+   * Kontrollerar om videoanalys-API:et är tillgängligt
+   * @returns Promise<boolean> som indikerar om API:et är tillgängligt
+   */
+  async checkVideoApiAvailability(): Promise<boolean> {
+    try {
+      // Kontrollera om vi redan har en färsk check
+      const now = Date.now();
+      if (this.lastVideoApiCheck > 0 && 
+          now - this.lastVideoApiCheck < this.VIDEO_API_CHECK_INTERVAL) {
+        return this.videoApiAvailable;
+      }
+      
+      this.logEvent('Kontrollerar videoanalys-API tillgänglighet');
+      
+      // Försök anropa status-endpoint eller ping-endpoint om tillgänglig
+      try {
+        const response = await axios.get(this.VIDEO_STATUS_ENDPOINT, {
+          timeout: 5000
+        });
+        
+        this.videoApiAvailable = response.status === 200;
+        this.logEvent('Videoanalys-API statuskontroll', { 
+          available: this.videoApiAvailable,
+          endpoint: this.VIDEO_STATUS_ENDPOINT,
+          response: response.status
+        });
+      } catch (statusError) {
+        // Om status-endpoint inte finns, testa med OPTIONS-anrop
+        try {
+          const optionsResponse = await axios.options(this.VIDEO_ANALYSIS_ENDPOINT, {
+            timeout: 5000
+          });
+          
+          // Om OPTIONS ger 200 eller 204, finns endpointen
+          this.videoApiAvailable = optionsResponse.status === 200 || 
+                                  optionsResponse.status === 204;
+          this.logEvent('Videoanalys-API OPTIONS-kontroll', { 
+            available: this.videoApiAvailable 
+          });
+        } catch (optionsError: any) {
+          // Om båda misslyckas, anta att API inte är tillgängligt
+          this.videoApiAvailable = false;
+          this.logEvent('Videoanalys-API är inte tillgängligt', { 
+            error: optionsError.message 
+          });
+        }
+      }
+      
+      // Uppdatera tidsstämpel för senaste kontrollen
+      this.lastVideoApiCheck = now;
+      return this.videoApiAvailable;
+    } catch (error) {
+      console.error('Fel vid kontroll av videoanalys-API:', error);
+      this.videoApiAvailable = false;
+      return false;
+    }
+  }
+
+  /**
    * Analyze a video file for ingredients
    * @param videoUri Path to the video file
    * @returns Analysis result with detected ingredients
@@ -501,6 +566,16 @@ export class AnalysisService {
     this.analysisProgress = 5;
     
     try {
+      // Kontrollera först om videoanalys-API är tillgängligt
+      const apiAvailable = await this.checkVideoApiAvailability();
+      if (!apiAvailable) {
+        this.logEvent('Videoanalys-API är inte tillgängligt, använder mockdata');
+        this.reportQualityIssue('Video analysis API is not available');
+        // Uppdatera framsteg för att indikera att vi går vidare med mock
+        this.analysisProgress = 90;
+        return this.mockVideoAnalysis(true);
+      }
+      
       // Check cache if enabled
       if (this.cachingEnabled) {
         const cachedResult = await this.getCachedVideoAnalysis(videoUri);
@@ -686,36 +761,125 @@ export class AnalysisService {
   }
   
   /**
-   * Genererar mock-data för videoanalys vid fel
+   * Genererar ett mock-resultat för videoanalys
+   * Används när:
+   * 1. API:et är inte tillgängligt
+   * 2. Videofilen kunde inte bearbetas
+   * 3. API-anropet misslyckas
    */
-  public mockVideoAnalysis(): AnalysisResult {
-    this.logEvent('Using mock video analysis result');
-    
-    // Simulera ett resultat för demo
-    const mockResult: AnalysisResult = {
+  public mockVideoAnalysis(showMockIndicator: boolean = false): AnalysisResult {
+    // Uppdaterad mock-data med fler ingredienser och olika varianter
+    const mockData: AnalysisResult = {
       isVegan: false,
       confidence: 0.85,
       watchedIngredients: [
         {
-          name: 'Mjölk',
-          reason: 'Mjölk är en animalisk produkt',
-          description: 'Mjölk kommer från kor och är därför inte veganskt.'
+          name: "Mjölk",
+          reason: "Mjölk är en animalisk produkt",
+          description: "Mjölk kommer från kor och är därför inte veganskt."
         },
         {
-          name: 'Honung',
-          reason: 'Honung produceras av bin',
-          description: 'Honung produceras av bin och anses därför inte vara veganskt.'
+          name: "Honung",
+          reason: "Honung produceras av bin",
+          description: "Honung produceras av bin och anses därför inte vara veganskt."
         }
       ],
       ingredientList: [
-        'Socker', 'Vetemjöl', 'Vegetabiliskt fett', 'Mjölk', 'Salt', 'Honung', 
-        'Emulgeringsmedel (lecitin)', 'Smakämnen', 'Konserveringsmedel'
+        "Socker",
+        "Vetemjöl",
+        "Vegetabiliskt fett",
+        "Mjölk",
+        "Salt",
+        "Honung", 
+        "Emulgeringsmedel (lecitin)",
+        "Smakämnen",
+        "Konserveringsmedel"
       ],
-      reasoning: 'Produkten innehåller mjölk och honung vilket gör den icke-vegansk.',
-      detectedLanguage: this.currentLanguage
+      reasoning: showMockIndicator 
+        ? "DETTA ÄR DEMO-DATA. Produkten innehåller mjölk och honung vilket gör den icke-vegansk."
+        : "Produkten innehåller mjölk och honung vilket gör den icke-vegansk.",
+      detectedLanguage: "sv"
     };
     
-    return mockResult;
+    // Slumpa fram varianter för att skapa variation i mockdata
+    const dataVariants = [
+      {
+        isVegan: true,
+        confidence: 0.92,
+        watchedIngredients: [],
+        ingredientList: [
+          "Kikärtor", 
+          "Vatten", 
+          "Tahini", 
+          "Rapsolja", 
+          "Salt", 
+          "Vitlök", 
+          "Citronsyra", 
+          "Kryddor"
+        ],
+        reasoning: showMockIndicator 
+          ? "DETTA ÄR DEMO-DATA. Produkten innehåller bara växtbaserade ingredienser."
+          : "Produkten innehåller bara växtbaserade ingredienser."
+      },
+      {
+        isVegan: false,
+        confidence: 0.95,
+        watchedIngredients: [
+          {
+            name: "Ägg",
+            reason: "Ägg är en animalisk produkt",
+            description: "Ägg kommer från höns och är inte veganskt."
+          }
+        ],
+        ingredientList: [
+          "Mjöl", 
+          "Socker", 
+          "Ägg", 
+          "Smör", 
+          "Bakpulver", 
+          "Vanilj", 
+          "Salt"
+        ],
+        reasoning: showMockIndicator 
+          ? "DETTA ÄR DEMO-DATA. Produkten innehåller ägg och smör vilket gör den icke-vegansk."
+          : "Produkten innehåller ägg och smör vilket gör den icke-vegansk."
+      },
+      {
+        isVegan: false,
+        confidence: 0.78,
+        watchedIngredients: [
+          {
+            name: "E120",
+            reason: "E120 är karminsyra som framställs från insekter",
+            description: "E120 (karminsyra/karmin/kochenill) utvinns från kochenillsköldlöss och är därför inte veganskt."
+          }
+        ],
+        ingredientList: [
+          "Socker",
+          "Glukossirap",
+          "Surhetsreglerande medel (Citronsyra)",
+          "Färgämne (E120)",
+          "Aromer"
+        ],
+        reasoning: showMockIndicator 
+          ? "DETTA ÄR DEMO-DATA. Produkten innehåller färgämnet E120 (karmin) som utvinns från insekter."
+          : "Produkten innehåller färgämnet E120 (karmin) som utvinns från insekter."
+      }
+    ];
+    
+    // Slumpa fram en variant om det inte är testläge 
+    if (Math.random() > 0.7 && !process.env.EXPO_PUBLIC_TEST_MODE) {
+      const variantIdx = Math.floor(Math.random() * dataVariants.length);
+      const variant = dataVariants[variantIdx];
+      
+      mockData.isVegan = variant.isVegan;
+      mockData.confidence = variant.confidence;
+      mockData.watchedIngredients = variant.watchedIngredients;
+      mockData.ingredientList = variant.ingredientList;
+      mockData.reasoning = variant.reasoning;
+    }
+    
+    return mockData;
   }
   
   /**

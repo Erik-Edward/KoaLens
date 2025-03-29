@@ -13,7 +13,7 @@ interface VideoRecorderProps {
   maxDuration?: number;
 }
 
-export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration = 5 }: VideoRecorderProps) {
+export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration = 8 }: VideoRecorderProps) {
   const device = useCameraDevice('back');
   const [isPreparing, setIsPreparing] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
@@ -32,6 +32,7 @@ export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration =
 
   const recordButtonScale = useSharedValue(1);
   const stopButtonOpacity = useSharedValue(0);
+  const [showInstructions, setShowInstructions] = useState(true);
 
   // Återställ stopptimer om komponenten unmounts
   useEffect(() => {
@@ -43,6 +44,15 @@ export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration =
         clearTimeout(recordingTimer.current);
       }
     };
+  }, []);
+
+  // Visa instruktioner i 5 sekunder när komponenten monteras
+  useEffect(() => {
+    const instructionsTimer = setTimeout(() => {
+      setShowInstructions(false);
+    }, 5000);
+    
+    return () => clearTimeout(instructionsTimer);
   }, []);
 
   useEffect(() => {
@@ -80,9 +90,17 @@ export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration =
   });
 
   const onCameraReady = () => {
-    console.log('Kamera redo för inspelning');
+    console.log('Kamera redo');
     setCameraReady(true);
     setIsPreparing(false);
+    
+    // Starta en timer för att automatiskt stoppa inspelningen efter maxDuration
+    if (isRecording && !recordingTimer.current) {
+      recordingTimer.current = setTimeout(() => {
+        console.log('Maximal inspelningstid uppnådd, stoppar automatiskt...');
+        stopRecording();
+      }, maxDuration * 1000);
+    }
   };
 
   const startRecording = async () => {
@@ -331,6 +349,24 @@ export default function VideoRecorder({ onVideoRecorded, onCancel, maxDuration =
               <Ionicons name="arrow-back" size={28} color="white" />
             </TouchableOpacity>
 
+            {/* Instruktionsöverlagring */}
+            {showInstructions && (
+              <View style={styles.instructionsOverlay}>
+                <View style={styles.instructionsBox}>
+                  <Text style={styles.instructionsTitle}>Tips för bästa resultat</Text>
+                  <Text style={styles.instructionsText}>• Fokusera kameran på hela ingredienslistan</Text>
+                  <Text style={styles.instructionsText}>• Håll kameran stilla under inspelningen</Text>
+                  <Text style={styles.instructionsText}>• Försäkra dig om att texten är väl belyst</Text>
+                  <View style={styles.targetFrameHelp}>
+                    <Text style={styles.instructionsText}>Positionera ingredienslistan inom ramen</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {/* Ingredienslista-ram */}
+            <View style={styles.targetFrame}></View>
+
             <View style={styles.buttonContainer}>
               <Animated.View style={[styles.stopButtonContainer, stopButtonStyle]}>
                 <TouchableOpacity
@@ -471,5 +507,50 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  instructionsOverlay: {
+    position: 'absolute',
+    top: 80,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+  },
+  instructionsBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 10,
+    padding: 15,
+    width: '100%',
+  },
+  instructionsTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  instructionsText: {
+    color: 'white',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  targetFrame: {
+    position: 'absolute',
+    top: '30%',
+    left: '10%',
+    right: '10%',
+    height: '25%',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: 5,
+    borderStyle: 'dashed',
+  },
+  targetFrameHelp: {
+    marginTop: 10,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 5,
+    alignItems: 'center',
   }
 });

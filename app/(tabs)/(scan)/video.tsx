@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Alert, ActivityIndicator, Platform, Image } from 'react-native';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
@@ -14,6 +14,7 @@ import VideoRecorder from '@/components/VideoRecorder';
 import { AnalysisService } from '@/services/analysisService';
 // Bortkommenterar lottie-import eftersom det verkar saknas
 // import LottieView from 'lottie-react-native';
+import { useApiStatus } from '@/contexts/ApiStatusContext';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -27,24 +28,27 @@ function VideoScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { videoApiStatus, checkApiAvailability } = useApiStatus();
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoPlayerError, setVideoPlayerError] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const analysisService = new AnalysisService();
+  const processingRef = useRef(false);
+  const maxRetries = 2;
 
-  // KRITISK FÖRÄNDRING: Initiera videoUri från params när komponenten laddas
   useEffect(() => {
     const initializeFromParams = async () => {
       try {
         console.log('VideoScreen: Initializing from params:', params);
         
-        // Om vi kommer från kameraskärmen med en videoPath
         if (params.videoPath) {
           const videoPath = params.videoPath as string;
           console.log('VideoScreen: Received videoPath from params:', videoPath);
           
-          // Kontrollera om filen existerar
           try {
             const fileCheck = await checkFileExists(videoPath);
             
@@ -53,21 +57,26 @@ function VideoScreen() {
               console.log('VideoScreen: Setting validated videoPath:', validPath);
               setVideoUri(validPath);
               
-              // Starta analysen direkt efter att sökvägen validerats
-              setTimeout(() => analyzeVideo(), 500);
+              // Använd debounce för att förhindra flera anrop
+              if (!processingRef.current) {
+                setTimeout(() => analyzeVideo(), 500);
+              }
             } else {
               console.warn('VideoScreen: Received video path does not exist, using mock:', videoPath);
-              setVideoUri(videoPath); // Sätt ändå, eftersom vi har fallbacks
-              setTimeout(() => analyzeVideo(), 500);
+              setVideoUri(videoPath);
+              if (!processingRef.current) {
+                setTimeout(() => analyzeVideo(), 500);
+              }
             }
           } catch (error) {
             console.error('VideoScreen: Error validating video path, continuing anyway:', error);
             setVideoUri(videoPath);
-            setTimeout(() => analyzeVideo(), 500);
+            if (!processingRef.current) {
+              setTimeout(() => analyzeVideo(), 500);
+            }
           }
         } else {
           console.log('VideoScreen: No videoPath in params, starting fresh recording flow');
-          // Om ingen videoPath, starta ny inspelning (befintligt beteende)
         }
       } catch (error) {
         console.error('VideoScreen: Error during initialization:', error);
@@ -75,13 +84,15 @@ function VideoScreen() {
     };
 
     initializeFromParams();
-  }, [params]); // Kör när params ändras
+  }, [params]);
 
-  // Funktion för att kontrollera om filen existerar på olika möjliga platser
+  useEffect(() => {
+    checkApiAvailability();
+  }, []);
+
   const checkFileExists = async (path: string): Promise<{ exists: boolean, validPath?: string }> => {
     console.log('Kontrollerar om videofilen existerar på sökväg:', path);
     
-    // Kontrollera ursprunglig sökväg
     try {
       const originalPathInfo = await FileSystem.getInfoAsync(path);
       console.log('Ursprunglig sökväg info:', originalPathInfo);
@@ -92,7 +103,6 @@ function VideoScreen() {
       console.log('Fel vid kontroll av ursprunglig sökväg:', error);
     }
     
-    // Kontrollera med file:// prefix
     if (!path.startsWith('file://')) {
       const filePath = `file://${path}`;
       try {
@@ -106,7 +116,6 @@ function VideoScreen() {
       }
     }
     
-    // Kontrollera Cache-katalog
     try {
       const cacheDir = FileSystem.cacheDirectory;
       const fileName = path.split('/').pop();
@@ -128,8 +137,12 @@ function VideoScreen() {
   const handleVideoRecorded = async (uri: string) => {
     console.log('Video inspelad till:', uri);
     
-    // Om användaren kommer hit har videoinspelningen avslutats oavsett om vi har en giltig fil eller inte
-    // Hantera mock-sökvägar från felfall
+    // Förhindra dubbla anrop
+    if (processingRef.current) {
+      console.log('Redan bearbetar en video, ignorerar ny inspelning');
+      return;
+    }
+    
     if (uri.includes('/mock_video_path_after')) {
       console.log('Använda mock-video för analys');
       setVideoUri(uri);
@@ -138,97 +151,184 @@ function VideoScreen() {
     }
     
     setVideoUri(uri);
+    setIsProcessing(true);
+    processingRef.current = true;
     
-    // Kontrollera om filen existerar
     try {
       const fileCheck = await checkFileExists(uri);
       if (!fileCheck.exists) {
         console.warn('Video fil hittades inte, men vi fortsätter ändå:', uri);
       }
       
-      // Använd den validerade sökvägen eller ursprunglig om ingen validerad finns
       const validVideoUri = fileCheck.validPath || uri;
       console.log('Använder validerad video sökväg:', validVideoUri);
       setVideoUri(validVideoUri);
       
-      // Starta analysen direkt efter att filen har validerats
       setTimeout(() => analyzeVideo(), 500);
     } catch (error) {
       console.error('Fel vid validering av videofil, fortsätter ändå:', error);
-      // Vi fortsätter även om det inte gick att validera filen
       setTimeout(() => analyzeVideo(), 500);
     }
   };
 
   const handleCancel = () => {
-    router.back();
+    if (isLoading || isProcessing) {
+      Alert.alert(
+        'Avbryta analys?',
+        'Vill du avbryta den pågående analysen?',
+        [
+          { text: 'Fortsätt analys', style: 'cancel' },
+          { text: 'Avbryt', style: 'destructive', onPress: () => router.back() }
+        ]
+      );
+    } else {
+      router.back();
+    }
   };
 
   const analyzeVideo = async () => {
     if (!videoUri) {
       setError('Ingen video vald');
+      setIsProcessing(false);
+      processingRef.current = false;
+      return;
+    }
+
+    // Förhindra dubbla analyser
+    if (isLoading) {
+      console.log('Analys pågår redan, ignorerar ytterligare begäran');
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setUsingMockData(false);
 
     try {
       console.log('Analyserar video:', videoUri);
       
-      // Om vi använder en mock-sökväg, kör direkt mockAnalys
+      if (videoApiStatus === 'unavailable') {
+        console.log('VideoScreen: Använder mock-data eftersom API inte är tillgängligt');
+        const result = await analysisService.mockVideoAnalysis(true);
+        setUsingMockData(true);
+        navigateToResults(result, videoUri);
+        return;
+      }
+      
       if (videoUri.includes('/mock_video_path_after')) {
         console.log('Använder mock-analys för misslyckad video');
-        const result = await analysisService.mockVideoAnalysis();
-        console.log('Mock analysresultat genererat');
+        const result = await analysisService.mockVideoAnalysis(true);
+        setUsingMockData(true);
         
         navigateToResults(result, videoUri);
         return;
       }
       
-      // Kontrollera om filen fortfarande existerar
       let validVideoUri = videoUri;
       try {
         const fileCheck = await checkFileExists(videoUri);
         if (!fileCheck.exists) {
           console.warn('Videofilen hittades inte, försöker med mockAnalys');
-          const result = await analysisService.mockVideoAnalysis();
+          const result = await analysisService.mockVideoAnalysis(true);
+          setUsingMockData(true);
           navigateToResults(result, videoUri);
           return;
         }
         
-        // Använd den validerade sökvägen
         validVideoUri = fileCheck.validPath || videoUri;
         console.log('Validerad video sökväg för analys:', validVideoUri);
       } catch (error) {
         console.error('Fel vid validering av videofil:', error);
-        // Fortsätt trots allt med ursprungssökvägen
       }
       
-      // Försök analysera videon
       try {
         const result = await analysisService.analyzeVideo(validVideoUri);
+        
+        if (result.reasoning && result.reasoning.includes('DETTA ÄR DEMO-DATA')) {
+          setUsingMockData(true);
+        }
+        
         console.log('Analysresultat:', JSON.stringify(result).substring(0, 100) + '...');
         
         navigateToResults(result, validVideoUri);
       } catch (analysisError: any) {
         console.error('Analysfel:', analysisError);
-        setError(`Kunde inte analysera video: ${analysisError.message || 'Okänt fel'}`);
+        
+        let errorMsg = 'Kunde inte analysera video';
+        
+        if (analysisError.message?.includes('network') || 
+            analysisError.message?.includes('timeout') ||
+            analysisError.message?.includes('Network Error')) {
+          errorMsg = 'Nätverksfel: Kontrollera din internetanslutning';
+        } else if (analysisError.message?.includes('404')) {
+          errorMsg = 'Videoanalys är inte tillgänglig just nu. Försök igen senare.';
+          checkApiAvailability();
+        } else if (analysisError.message?.includes('413') || 
+                  analysisError.message?.includes('too large')) {
+          errorMsg = 'Videon är för stor. Försök med en kortare video.';
+        } else if (analysisError.message?.includes('500') ||
+                  analysisError.message?.includes('429')) {
+          errorMsg = 'Tjänsten är för närvarande överbelastad. ';
+          
+          // Implementera automatisk återförsök
+          if (retryCount < maxRetries) {
+            setRetryCount(prevCount => prevCount + 1);
+            setError(`${errorMsg} Försöker igen... (${retryCount + 1}/${maxRetries})`);
+            
+            // Vänta 3 sekunder och försök igen
+            setTimeout(() => {
+              setIsLoading(false);
+              analyzeVideo();
+            }, 3000);
+            return;
+          } else {
+            errorMsg += 'Försök igen senare eller använd demo-data.';
+          }
+        }
+        
+        setError(errorMsg);
         setIsLoading(false);
+        setIsProcessing(false);
+        processingRef.current = false;
+        
+        if (analysisError.message?.includes('404') || 
+            analysisError.message?.includes('network') ||
+            analysisError.message?.includes('timeout') ||
+            analysisError.message?.includes('429') ||
+            analysisError.message?.includes('500')) {
+          setTimeout(() => {
+            Alert.alert(
+              'Videoanalys misslyckades',
+              'Vill du använda demo-data istället?',
+              [
+                { text: 'Avbryt', style: 'cancel' },
+                { 
+                  text: 'Använd demo-data', 
+                  onPress: async () => {
+                    setIsLoading(true);
+                    const mockResult = await analysisService.mockVideoAnalysis(true);
+                    setUsingMockData(true);
+                    navigateToResults(mockResult, validVideoUri);
+                  }
+                }
+              ]
+            );
+          }, 500);
+        }
       }
     } catch (error: any) {
       console.error('Fel vid videoanalys:', error);
       setError(`Kunde inte analysera video: ${error.message || 'Okänt fel'}`);
       setIsLoading(false);
+      setIsProcessing(false);
+      processingRef.current = false;
     }
   };
   
-  // Samlad navigation till resultatsidan
   const navigateToResults = (result: any, videoPath: string) => {
     try {
       console.log('Navigerar till resultatskärm');
       
-      // Försök med normal navigering först
       try {
         router.replace({
           pathname: '/(tabs)/(scan)/result',
@@ -241,7 +341,6 @@ function VideoScreen() {
       } catch (routeError) {
         console.error('Första navigeringsförsöket misslyckades:', routeError);
         
-        // Försök med alternativ router.navigate metod
         router.navigate({
           pathname: '/(tabs)/(scan)/result',
           params: { 
@@ -254,25 +353,29 @@ function VideoScreen() {
     } catch (error) {
       console.error('Alla navigeringsförsök misslyckades:', error);
       
-      // Sista utväg - endast navigera till result utan parametrar
-      // och använd mockVideoAnalysis där också
       router.replace('/(tabs)/(scan)/result');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Hantera Video-spelar-fel
   const handleVideoError = (error: any) => {
     console.error('Video player error:', error);
     setVideoPlayerError(true);
   };
 
-  // Rendera med videovisning eller videoinspelning
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]} className="bg-black">
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
+      
+      {videoApiStatus === 'unavailable' && (
+        <StyledView className="absolute top-0 left-0 right-0 bg-amber-500 z-50 p-2">
+          <StyledText className="text-white text-center text-sm font-medium">
+            Videoanalys är i beta och API:et är inte tillgängligt just nu. Demo-data kommer att användas.
+          </StyledText>
+        </StyledView>
+      )}
       
       {!videoUri ? (
         <VideoRecorder onVideoRecorded={handleVideoRecorded} onCancel={handleCancel} />
@@ -369,5 +472,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Exportera komponenten som default
 export default VideoScreen; 

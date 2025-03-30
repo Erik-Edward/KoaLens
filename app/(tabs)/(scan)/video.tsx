@@ -9,12 +9,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import axios from 'axios';
 
 import VideoRecorder from '@/components/VideoRecorder';
 import { AnalysisService } from '@/services/analysisService';
 // Bortkommenterar lottie-import eftersom det verkar saknas
 // import LottieView from 'lottie-react-native';
 import { useApiStatus } from '@/contexts/ApiStatusContext';
+import { API_BASE_URL } from '@/constants/config';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -39,6 +41,9 @@ function VideoScreen() {
   const analysisService = new AnalysisService();
   const processingRef = useRef(false);
   const maxRetries = 2;
+  const [videoApiAvailable, setVideoApiAvailable] = useState(true);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [mockData, setMockData] = useState(false);
 
   useEffect(() => {
     const initializeFromParams = async () => {
@@ -203,71 +208,67 @@ function VideoScreen() {
     setIsLoading(true);
     setError(null);
     setUsingMockData(false);
+    setRetryCount(0);
 
     try {
       console.log('Analyserar video:', videoUri);
       
+      // Om API:et är inte tillgängligt, visa ett tydligt felmeddelande istället för mockdata
       if (videoApiStatus === 'unavailable') {
-        console.log('VideoScreen: Använder mock-data eftersom API inte är tillgängligt');
-        const result = await analysisService.mockVideoAnalysis(true);
-        setUsingMockData(true);
-        navigateToResults(result, videoUri);
-        return;
+        throw new Error('Videoanalys-API är inte tillgängligt för tillfället. Försök igen senare eller kontakta support.');
       }
       
+      // Om det är en mock-sökväg från en tidigare misslyckad inspelning, visa ett felmeddelande
       if (videoUri.includes('/mock_video_path_after')) {
-        console.log('Använder mock-analys för misslyckad video');
-        const result = await analysisService.mockVideoAnalysis(true);
-        setUsingMockData(true);
-        
-        navigateToResults(result, videoUri);
-        return;
+        throw new Error('Videoinspelningen misslyckades. Försök spela in igen med bättre ljus och fokus på ingredienslistan.');
       }
       
+      // Validera videofilen
       let validVideoUri = videoUri;
       try {
         const fileCheck = await checkFileExists(videoUri);
         if (!fileCheck.exists) {
-          console.warn('Videofilen hittades inte, försöker med mockAnalys');
-          const result = await analysisService.mockVideoAnalysis(true);
-          setUsingMockData(true);
-          navigateToResults(result, videoUri);
-          return;
+          throw new Error('Videofilen hittades inte. Försök spela in igen.');
         }
         
         validVideoUri = fileCheck.validPath || videoUri;
         console.log('Validerad video sökväg för analys:', validVideoUri);
-      } catch (error) {
-        console.error('Fel vid validering av videofil:', error);
+      } catch (fileError: any) {
+        console.error('Fel vid validering av videofil:', fileError);
+        throw new Error('Problem att lokalisera videofilen. Försök spela in igen.');
       }
       
+      // Utför analys med validerad sökväg
       try {
         const result = await analysisService.analyzeVideo(validVideoUri);
         
-        if (result.reasoning && result.reasoning.includes('DETTA ÄR DEMO-DATA')) {
-          setUsingMockData(true);
+        // Om resultatet är tomt eller inte innehåller nödvändiga fält
+        if (!result || result.ingredientList?.length === 0) {
+          throw new Error('Kunde inte identifiera några ingredienser i videon. Försök igen och fokusera på ingredienslistan.');
         }
         
         console.log('Analysresultat:', JSON.stringify(result).substring(0, 100) + '...');
-        
         navigateToResults(result, validVideoUri);
       } catch (analysisError: any) {
         console.error('Analysfel:', analysisError);
         
-        let errorMsg = 'Kunde inte analysera video';
+        let errorMsg = 'Kunde inte analysera video. ' + (analysisError.message || '');
         
         if (analysisError.message?.includes('network') || 
             analysisError.message?.includes('timeout') ||
-            analysisError.message?.includes('Network Error')) {
-          errorMsg = 'Nätverksfel: Kontrollera din internetanslutning';
-        } else if (analysisError.message?.includes('404')) {
+            analysisError.message?.includes('No response from server')) {
+          errorMsg = 'Nätverksfel: Kontrollera din internetanslutning och försök igen.';
+        } else if (analysisError.message?.includes('404') || 
+                  analysisError.message?.includes('endpoint not found')) {
           errorMsg = 'Videoanalys är inte tillgänglig just nu. Försök igen senare.';
           checkApiAvailability();
         } else if (analysisError.message?.includes('413') || 
                   analysisError.message?.includes('too large')) {
           errorMsg = 'Videon är för stor. Försök med en kortare video.';
         } else if (analysisError.message?.includes('500') ||
-                  analysisError.message?.includes('429')) {
+                  analysisError.message?.includes('Server error') ||
+                  analysisError.message?.includes('429') ||
+                  analysisError.message?.includes('Too many requests')) {
           errorMsg = 'Tjänsten är för närvarande överbelastad. ';
           
           // Implementera automatisk återförsök
@@ -282,7 +283,7 @@ function VideoScreen() {
             }, 3000);
             return;
           } else {
-            errorMsg += 'Försök igen senare eller använd demo-data.';
+            errorMsg += 'Försök igen senare.';
           }
         }
         
@@ -290,35 +291,10 @@ function VideoScreen() {
         setIsLoading(false);
         setIsProcessing(false);
         processingRef.current = false;
-        
-        if (analysisError.message?.includes('404') || 
-            analysisError.message?.includes('network') ||
-            analysisError.message?.includes('timeout') ||
-            analysisError.message?.includes('429') ||
-            analysisError.message?.includes('500')) {
-          setTimeout(() => {
-            Alert.alert(
-              'Videoanalys misslyckades',
-              'Vill du använda demo-data istället?',
-              [
-                { text: 'Avbryt', style: 'cancel' },
-                { 
-                  text: 'Använd demo-data', 
-                  onPress: async () => {
-                    setIsLoading(true);
-                    const mockResult = await analysisService.mockVideoAnalysis(true);
-                    setUsingMockData(true);
-                    navigateToResults(mockResult, validVideoUri);
-                  }
-                }
-              ]
-            );
-          }, 500);
-        }
       }
     } catch (error: any) {
       console.error('Fel vid videoanalys:', error);
-      setError(`Kunde inte analysera video: ${error.message || 'Okänt fel'}`);
+      setError(error.message || 'Ett oväntat fel inträffade vid videoanalys');
       setIsLoading(false);
       setIsProcessing(false);
       processingRef.current = false;
@@ -329,39 +305,224 @@ function VideoScreen() {
     try {
       console.log('Navigerar till resultatskärm');
       
-      try {
-        router.replace({
-          pathname: '/(tabs)/(scan)/result',
-          params: { 
-            analysisResult: JSON.stringify(result),
-            videoPath: videoPath,
-            analysisType: 'video'
-          }
-        });
-      } catch (routeError) {
-        console.error('Första navigeringsförsöket misslyckades:', routeError);
-        
-        router.navigate({
-          pathname: '/(tabs)/(scan)/result',
-          params: { 
-            analysisResult: JSON.stringify(result),
-            videoPath: videoPath,
-            analysisType: 'video'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Alla navigeringsförsök misslyckades:', error);
-      
-      router.replace('/(tabs)/(scan)/result');
-    } finally {
+      // Stoppa laddning först för att säkerställa att UI är redo för navigering
       setIsLoading(false);
+      setIsProcessing(false);
+      processingRef.current = false;
+      
+      // Använd setTimeout för att säkerställa att navigeringen sker efter att state har uppdaterats
+      setTimeout(() => {
+        try {
+          console.log('Försöker navigera till resultatskärm med params:', {
+            analysisResult: JSON.stringify(result),
+            videoPath: videoPath,
+            analysisType: 'video'
+          });
+          
+          // Använd push istället för replace för att undvika problem med navigationsstacken
+          router.push({
+            pathname: '/(tabs)/(scan)/result',
+            params: { 
+              analysisResult: JSON.stringify(result),
+              videoPath: videoPath,
+              analysisType: 'video'
+            }
+          });
+        } catch (routeError) {
+          console.error('Navigationsfel:', routeError);
+          
+          // Fallbackmetod om den första navigeringen misslyckas
+          Alert.alert(
+            'Navigationsfel',
+            'Kunde inte visa resultatskärmen. Vill du försöka igen?',
+            [
+              { 
+                text: 'Avbryt', 
+                style: 'cancel',
+                onPress: () => router.replace('/(tabs)/(scan)')
+              },
+              { 
+                text: 'Försök igen', 
+                onPress: () => {
+                  // Försök med en annan navigeringsmetod
+                  router.navigate({
+                    pathname: '/(tabs)/(scan)/result',
+                    params: {
+                      analysisResult: JSON.stringify(result),
+                      videoPath: videoPath,
+                      analysisType: 'video'
+                    }
+                  });
+                }
+              }
+            ]
+          );
+        }
+      }, 300);
+    } catch (error) {
+      console.error('Allvarligt navigationsfel:', error);
+      Alert.alert(
+        'Fel',
+        'Ett fel uppstod när analysresultatet skulle visas. Försök igen.',
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)/(scan)') }]
+      );
     }
   };
 
   const handleVideoError = (error: any) => {
     console.error('Video player error:', error);
     setVideoPlayerError(true);
+  };
+
+  // Funktion för att konvertera video till base64
+  const convertVideoToBase64 = async (uri: string): Promise<string> => {
+    try {
+      console.log('Converting video to base64:', uri);
+      
+      // Normalisera sökvägen för bättre kompatibilitet
+      let normalizedUri = uri;
+      if (!uri.startsWith('file://') && !uri.startsWith('content://')) {
+        normalizedUri = `file://${uri}`;
+      }
+      
+      // Hämta filinformation
+      const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
+      
+      // Kontrollera att filen existerar
+      if (!fileInfo.exists) {
+        throw new Error('Video file not found');
+      }
+      
+      // Kontrollera filstorlek (max 50MB)
+      if (fileInfo.size && fileInfo.size > 50 * 1024 * 1024) {
+        throw new Error('Video file is too large (max 50MB)');
+      }
+      
+      // Läs filen som base64
+      const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      console.log(`Successfully converted video to base64 (${base64.length} chars)`);
+      return base64;
+    } catch (error) {
+      console.error('Failed to convert video to base64:', error);
+      throw error;
+    }
+  };
+  
+  // Funktion för att generera mock-data för videoanalys
+  const generateMockVideoAnalysisResult = () => {
+    return {
+      isVegan: false,
+      confidence: 0.85,
+      ingredientList: [
+        "Socker", 
+        "Vetemjöl", 
+        "Mjölk", 
+        "Vegetabiliska oljor (palm, raps)", 
+        "Salt", 
+        "Emulgeringsmedel (sojalecitin)", 
+        "Arom"
+      ],
+      watchedIngredients: [
+        {
+          name: "Mjölk",
+          isVegan: false,
+          reason: "Mjölk är en animalisk produkt som kommer från kor"
+        },
+        {
+          name: "Vegetabiliska oljor (palm, raps)",
+          isVegan: true,
+          reason: "Vegetabiliska oljor är veganska, men palmolja kan ha etiska problem relaterade till miljöpåverkan"
+        }
+      ],
+      reasoning: "OBS! DETTA ÄR DEMO-DATA. Produkten innehåller mjölk vilket är en animalisk produkt och därför inte vegansk.",
+      detectedLanguage: "sv"
+    };
+  };
+
+  // Funktion som hanterar videoinspelning och skickar den för analys
+  const handleVideoSubmit = async (uri: string) => {
+    try {
+      setIsLoading(true);
+      setIsProcessing(true);
+      
+      // Optimerad prompt för bättre resultat
+      const customPrompt = `Analyze these food ingredients and determine if the product is vegan. 
+Respond in JSON format with these fields:
+{
+  "isVegan": boolean,
+  "confidence": number between 0 and 1,
+  "ingredientList": array of all ingredients,
+  "watchedIngredients": array of objects with non-vegan or questionable ingredients, each with: 
+    { 
+      "name": "ingredient name", 
+      "isVegan": boolean, 
+      "reason": "brief explanation" 
+    },
+  "reasoning": "short explanation about the decision",
+  "detectedLanguage": "language code"
+}`;
+
+      const videoBase64 = await convertVideoToBase64(uri);
+      
+      // Kontrollera om API:et är tillgängligt
+      if (!videoApiAvailable) {
+        console.log('Video API not available, handling with mock data');
+        // Visa felmeddelande eller indikator för demosyfte
+        setMockData(true);
+        
+        // Använd mockdata för demo
+        const mockResult = generateMockVideoAnalysisResult();
+        setAnalysisResult(mockResult);
+        
+        // Använd den säkrare navigeringsfunktionen
+        navigateToResults(mockResult, uri);
+        return;
+      }
+      
+      // Skickar videofilen för analys
+      const response = await axios.post(
+        `${API_BASE_URL}/api/video/analyze-video`,
+        {
+          base64Data: videoBase64,
+          mimeType: 'video/mp4',
+          preferredLanguage: 'sv',
+          customPrompt: customPrompt // Skicka med anpassad prompt
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000 // Längre timeout för videoanalys
+        }
+      );
+      
+      if (response.data && response.data.result) {
+        console.log('Fick svar från API:', response.data);
+        setAnalysisResult(response.data.result);
+        setMockData(false);
+        
+        // Använd den säkrare navigeringsfunktionen
+        navigateToResults(response.data.result, uri);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error submitting video for analysis:', error);
+
+      // Om fel uppstår, använd mock-data och markera att det är demo
+      setMockData(true);
+      const mockResult = generateMockVideoAnalysisResult();
+      setAnalysisResult(mockResult);
+      
+      // Använd den säkrare navigeringsfunktionen
+      navigateToResults(mockResult, uri);
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -432,7 +593,7 @@ function VideoScreen() {
                 )}
                 
                 <StyledPressable
-                  onPress={analyzeVideo}
+                  onPress={() => handleVideoSubmit(videoUri!)}
                   className="bg-emerald-600 rounded-lg p-4 items-center"
                 >
                   <StyledText className="text-white font-sans-bold text-lg">Analysera video</StyledText>

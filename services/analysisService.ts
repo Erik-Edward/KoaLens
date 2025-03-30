@@ -569,11 +569,9 @@ export class AnalysisService {
       // Kontrollera först om videoanalys-API är tillgängligt
       const apiAvailable = await this.checkVideoApiAvailability();
       if (!apiAvailable) {
-        this.logEvent('Videoanalys-API är inte tillgängligt, använder mockdata');
+        this.logEvent('Videoanalys-API är inte tillgängligt');
         this.reportQualityIssue('Video analysis API is not available');
-        // Uppdatera framsteg för att indikera att vi går vidare med mock
-        this.analysisProgress = 90;
-        return this.mockVideoAnalysis(true);
+        throw new Error('Video analysis API is not available');
       }
       
       // Check cache if enabled
@@ -594,9 +592,8 @@ export class AnalysisService {
         this.analysisProgress = 30;
       } catch (conversionError: any) {
         console.error('Video conversion error:', conversionError);
-        this.logEvent('Failed to convert video to base64, using fallback analysis', { error: conversionError.message });
-        // Om konvertering misslyckas, använd fallback för demo
-        return this.mockVideoAnalysis();
+        this.logEvent('Failed to convert video to base64', { error: conversionError.message });
+        throw new Error(`Failed to convert video: ${conversionError.message}`);
       }
       
       // Get user ID
@@ -627,7 +624,7 @@ export class AnalysisService {
           preferredLanguage: requestData.preferredLanguage
         });
         
-        // Försök hämta lista på tillgängliga API-slutpunkter (endast för diagnostik)
+        // Diagnostik: Försök hämta lista på tillgängliga API-slutpunkter
         try {
           console.log('AnalysisService: Försöker hämta tillgängliga API-slutpunkter...');
           const optionsResponse = await axios.options(`${API_ENDPOINT}/api`, {
@@ -647,44 +644,38 @@ export class AnalysisService {
           console.log('AnalysisService: Kunde inte utföra options-anrop:', error.message);
         }
         
-        // Testa om servern överhuvudtaget svarar
+        // Försök med ett enkelt GET-anrop för att se om servern svarar
         try {
           console.log('AnalysisService: Testar GET-anrop till servern...');
-          const rootResponse = await axios.get(API_ENDPOINT, {
-            timeout: 10000
+          const healthResponse = await axios.get(`${API_ENDPOINT}/api/health`, {
+            timeout: 5000
           }).catch(e => {
-            console.log('AnalysisService: Fel vid GET-anrop till rot-URL:', e.message);
+            console.log('AnalysisService: Server hälsokontroll misslyckades:', e.message);
             return null;
           });
           
-          if (rootResponse) {
-            console.log('AnalysisService: Servern svarar på GET, status:', rootResponse.status);
+          if (healthResponse) {
+            console.log('AnalysisService: Servern svarar på GET, status:', healthResponse.status);
           }
-        } catch (error: any) {
-          console.log('AnalysisService: Kunde inte utföra GET-anrop till rot-URL:', error.message);
-        }
-        
-        // Kontrollera vilka video-endpoints som finns tillgängliga
-        try {
+          
+          // Förbered för videoanalys genom att kontrollera endpoints
           console.log('AnalysisService: Undersöker tillgängliga video-endpoints...');
-          const videoApiResponse = await axios.get(`${API_ENDPOINT}/api/video`, {
-            timeout: 10000
+          const videoEndpointResponse = await axios.get(`${API_ENDPOINT}/api/video`, {
+            timeout: 5000
           }).catch(e => {
-            console.log(`AnalysisService: Fel vid GET-anrop till /api/video:`, e.message);
-            if (e.response) {
-              console.log('Status:', e.response.status, 'Data:', e.response.data);
-            }
+            console.log('AnalysisService: Fel vid GET-anrop till /api/video:', e.message);
+            console.log('Status:', e.response?.status, 'Data:', e.response?.data);
             return null;
           });
           
-          if (videoApiResponse) {
-            console.log('AnalysisService: Video API info:', videoApiResponse.data);
+          if (videoEndpointResponse) {
+            console.log('AnalysisService: Video-endpoints svar:', videoEndpointResponse.data);
           }
         } catch (error: any) {
-          console.log('AnalysisService: Kunde inte hämta video API info:', error.message);
+          console.log('AnalysisService: Diagnostiska anrop misslyckades:', error.message);
         }
         
-        // Försök med ett API-anrop
+        // Gör det faktiska API-anropet
         const response = await axios.post(this.VIDEO_ANALYSIS_ENDPOINT, requestData, {
           headers: {
             'Content-Type': 'application/json',
@@ -713,173 +704,97 @@ export class AnalysisService {
         
         this.analysisProgress = 90;
         
-        if (response.data && response.data.success) {
-          this.logEvent('Video API call successful');
-          
-          // Normalisera svarsdatan enligt backend-strukturen
-          const result: AnalysisResult = {
-            isVegan: response.data.isVegan === true,
-            confidence: response.data.confidence || 0.7,
-            watchedIngredients: response.data.watchedIngredients || 
-                               (response.data.nonVeganIngredients?.map((ingredient: string) => ({
-                                  name: ingredient,
-                                  reason: 'Non-vegan ingredient detected in video',
-                                  description: `The ingredient "${ingredient}" was detected in the video and is not vegan.`
-                               })) || []),
-            ingredientList: response.data.ingredients || response.data.ingredientList || [],
-            reasoning: response.data.reasoning || response.data.explanation || '',
-            detectedLanguage: response.data.detectedLanguage || this.currentLanguage
-          };
-          
-          // Cache the result
-          if (this.cachingEnabled) {
-            await this.cacheVideoAnalysisResult(videoUri, result);
-          }
-          
-          this.analysisProgress = 100;
-          this.analysisStats.success = true;
-          
-          return result;
-        } else {
-          throw new Error(response.data?.error || response.data?.message || 'Unknown API error');
+        // Validera API-svar
+        if (!response.data) {
+          throw new Error('Empty response from video analysis API');
         }
+        
+        if (response.data.error) {
+          throw new Error(`API error: ${response.data.error}`);
+        }
+        
+        if (!response.data.success && response.data.success !== undefined) {
+          throw new Error('API reported failure: ' + (response.data.message || 'Unknown error'));
+        }
+        
+        // Analysera resultat från API
+        let result: AnalysisResult;
+        
+        if (response.data.result) {
+          // Nytt API-format
+          result = response.data.result;
+          console.log('AnalysisService: Video API call successful');
+        } else if (response.data.isVegan !== undefined) {
+          // Äldre API-format - analysresultatet direkt i svaret
+          result = response.data;
+          console.log('AnalysisService: Video API call successful (legacy format)');
+        } else {
+          throw new Error('Invalid response format from video analysis API');
+        }
+        
+        // Kontrollera att resultatet innehåller nödvändiga fält
+        if (result.isVegan === undefined || result.confidence === undefined) {
+          throw new Error('Invalid analysis result: Missing required fields');
+        }
+        
+        // Spara i cache om cachning är aktiverat
+        if (this.cachingEnabled) {
+          await this.cacheVideoAnalysisResult(videoUri, result);
+        }
+        
+        // Uppdatera framsteg och returnera resultat
+        this.analysisProgress = 100;
+        this.analysisStats.success = true;
+        this.analysisStats.endTime = Date.now();
+        this.analysisStats.duration = this.analysisStats.endTime - this.analysisStats.startTime;
+        this.logEvent('Video analysis completed successfully', { duration: this.analysisStats.duration });
+        
+        return result;
       } catch (apiError: any) {
-        console.error('Video API error:', apiError);
-        this.logEvent('Video API call failed, using fallback analysis', { error: apiError.message });
-        return this.mockVideoAnalysis();
+        console.error('Error in video API call:', apiError);
+        this.logEvent('Error in video API call', { error: apiError.message });
+        this.reportQualityIssue('Video API call failed: ' + apiError.message);
+        
+        // Hantera olika feltyper
+        if (apiError.response) {
+          // Vi fick ett svar från servern men med felstatus
+          const status = apiError.response.status;
+          
+          if (status === 413) {
+            throw new Error('Video file is too large for analysis');
+          } else if (status === 404) {
+            throw new Error('Video analysis endpoint not found');
+          } else if (status === 429) {
+            throw new Error('Too many requests. Please try again later.');
+          } else if (status === 500) {
+            throw new Error('Server error during video analysis. Please try again later.');
+          } else {
+            throw new Error(`Video API returned ${status}: ${apiError.response.data?.error || apiError.message}`);
+          }
+        } else if (apiError.request) {
+          // Begäran gjordes men vi fick inget svar
+          throw new Error('No response from server. Please check your internet connection.');
+        } else {
+          // Något annat gick fel vid uppsättning av begäran
+          throw new Error(`Network error: ${apiError.message}`);
+        }
       }
     } catch (error: any) {
       console.error('Error in video analysis:', error);
-      this.logEvent('Error in video analysis, using fallback', { error: error.message });
-      this.reportQualityIssue('Video analysis failed, using mock data');
+      this.logEvent('Error in video analysis', { error: error.message });
+      this.reportQualityIssue('Video analysis failed: ' + error.message);
       
-      // Fallback för demo
-      return this.mockVideoAnalysis();
+      // Ange att analysen misslyckades
+      this.analysisStats.success = false;
+      this.analysisStats.endTime = Date.now();
+      this.analysisStats.duration = this.analysisStats.endTime - this.analysisStats.startTime;
+      this.analysisStats.errorMessage = error.message;
+      
+      // Propagera felet uppåt istället för att falla tillbaka på mock-data
+      throw error;
     } finally {
       this.analysisProgress = 100;
     }
-  }
-  
-  /**
-   * Genererar ett mock-resultat för videoanalys
-   * Används när:
-   * 1. API:et är inte tillgängligt
-   * 2. Videofilen kunde inte bearbetas
-   * 3. API-anropet misslyckas
-   */
-  public mockVideoAnalysis(showMockIndicator: boolean = false): AnalysisResult {
-    // Uppdaterad mock-data med fler ingredienser och olika varianter
-    const mockData: AnalysisResult = {
-      isVegan: false,
-      confidence: 0.85,
-      watchedIngredients: [
-        {
-          name: "Mjölk",
-          reason: "Mjölk är en animalisk produkt",
-          description: "Mjölk kommer från kor och är därför inte veganskt."
-        },
-        {
-          name: "Honung",
-          reason: "Honung produceras av bin",
-          description: "Honung produceras av bin och anses därför inte vara veganskt."
-        }
-      ],
-      ingredientList: [
-        "Socker",
-        "Vetemjöl",
-        "Vegetabiliskt fett",
-        "Mjölk",
-        "Salt",
-        "Honung", 
-        "Emulgeringsmedel (lecitin)",
-        "Smakämnen",
-        "Konserveringsmedel"
-      ],
-      reasoning: showMockIndicator 
-        ? "DETTA ÄR DEMO-DATA. Produkten innehåller mjölk och honung vilket gör den icke-vegansk."
-        : "Produkten innehåller mjölk och honung vilket gör den icke-vegansk.",
-      detectedLanguage: "sv"
-    };
-    
-    // Slumpa fram varianter för att skapa variation i mockdata
-    const dataVariants = [
-      {
-        isVegan: true,
-        confidence: 0.92,
-        watchedIngredients: [],
-        ingredientList: [
-          "Kikärtor", 
-          "Vatten", 
-          "Tahini", 
-          "Rapsolja", 
-          "Salt", 
-          "Vitlök", 
-          "Citronsyra", 
-          "Kryddor"
-        ],
-        reasoning: showMockIndicator 
-          ? "DETTA ÄR DEMO-DATA. Produkten innehåller bara växtbaserade ingredienser."
-          : "Produkten innehåller bara växtbaserade ingredienser."
-      },
-      {
-        isVegan: false,
-        confidence: 0.95,
-        watchedIngredients: [
-          {
-            name: "Ägg",
-            reason: "Ägg är en animalisk produkt",
-            description: "Ägg kommer från höns och är inte veganskt."
-          }
-        ],
-        ingredientList: [
-          "Mjöl", 
-          "Socker", 
-          "Ägg", 
-          "Smör", 
-          "Bakpulver", 
-          "Vanilj", 
-          "Salt"
-        ],
-        reasoning: showMockIndicator 
-          ? "DETTA ÄR DEMO-DATA. Produkten innehåller ägg och smör vilket gör den icke-vegansk."
-          : "Produkten innehåller ägg och smör vilket gör den icke-vegansk."
-      },
-      {
-        isVegan: false,
-        confidence: 0.78,
-        watchedIngredients: [
-          {
-            name: "E120",
-            reason: "E120 är karminsyra som framställs från insekter",
-            description: "E120 (karminsyra/karmin/kochenill) utvinns från kochenillsköldlöss och är därför inte veganskt."
-          }
-        ],
-        ingredientList: [
-          "Socker",
-          "Glukossirap",
-          "Surhetsreglerande medel (Citronsyra)",
-          "Färgämne (E120)",
-          "Aromer"
-        ],
-        reasoning: showMockIndicator 
-          ? "DETTA ÄR DEMO-DATA. Produkten innehåller färgämnet E120 (karmin) som utvinns från insekter."
-          : "Produkten innehåller färgämnet E120 (karmin) som utvinns från insekter."
-      }
-    ];
-    
-    // Slumpa fram en variant om det inte är testläge 
-    if (Math.random() > 0.7 && !process.env.EXPO_PUBLIC_TEST_MODE) {
-      const variantIdx = Math.floor(Math.random() * dataVariants.length);
-      const variant = dataVariants[variantIdx];
-      
-      mockData.isVegan = variant.isVegan;
-      mockData.confidence = variant.confidence;
-      mockData.watchedIngredients = variant.watchedIngredients;
-      mockData.ingredientList = variant.ingredientList;
-      mockData.reasoning = variant.reasoning;
-    }
-    
-    return mockData;
   }
   
   /**

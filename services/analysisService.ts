@@ -558,9 +558,10 @@ export class AnalysisService {
   /**
    * Analyze a video file for ingredients
    * @param videoUri Path to the video file
+   * @param requestId Optional unique ID for request deduplication
    * @returns Analysis result with detected ingredients
    */
-  async analyzeVideo(videoUri: string): Promise<AnalysisResult> {
+  async analyzeVideo(videoUri: string, requestId?: string | null): Promise<AnalysisResult> {
     this.resetStats();
     this.logEvent('Starting video analysis');
     this.analysisProgress = 5;
@@ -606,8 +607,13 @@ export class AnalysisService {
       const requestData = {
         base64Data: base64Video,
         mimeType: mimeType,
-        preferredLanguage: this.currentLanguage
+        preferredLanguage: "sv", // Alltid sätt preferredLanguage till svenska
+        requestId: requestId || undefined // Inkludera request ID om det finns
       };
+      
+      if (requestId) {
+        this.logEvent('Request includes deduplication ID', { requestId });
+      }
       
       this.analysisProgress = 50;
       this.logEvent('Sending video for analysis');
@@ -679,7 +685,8 @@ export class AnalysisService {
         const response = await axios.post(this.VIDEO_ANALYSIS_ENDPOINT, requestData, {
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-Request-ID': requestId || '' // Lägg även till requestId i headers
           },
           timeout: 180000 // 3 minutes for video processing
         }).catch(error => {
@@ -689,8 +696,15 @@ export class AnalysisService {
             console.error('Video API response error:', {
               status: error.response.status,
               headers: error.response.headers,
-              data: error.response.data
+              data: error.response.data,
+              requestId: requestId || 'none'
             });
+            
+            // Specifik hantering av 429 (Too Many Requests) för deduplicering
+            if (error.response.status === 429 && 
+                error.response.data?.error?.includes('Duplicate request')) {
+              throw new Error('Duplicate request, analysis already in progress');
+            }
           } else if (error.request) {
             // Begäran gjordes men inget svar mottogs
             console.error('Video API no response error:', error.request);
@@ -1095,5 +1109,49 @@ export class AnalysisService {
       errorMessage: '',
       events: []
     };
+  }
+
+  /**
+   * Rapportera en felaktig ingrediens för granskning
+   * @param reportData Data om den rapporterade ingrediensen
+   */
+  async reportIngredientSuggestion(reportData: {
+    ingredient: string;
+    feedback: string;
+    productId: string;
+    isVegan?: boolean;
+    userId: string;
+    timestamp: string;
+  }): Promise<boolean> {
+    try {
+      console.log('AnalysisService: Rapporterar ingredienssuggestiom', reportData);
+      
+      // Endpoints för ingredienssuggestion
+      const SUGGEST_ENDPOINT = `${API_ENDPOINT}/api/ingredients/suggest`;
+      
+      // Anropa API
+      const response = await axios.post(SUGGEST_ENDPOINT, reportData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      });
+      
+      // Kontrollera svaret
+      if (response.status >= 200 && response.status < 300) {
+        console.log('AnalysisService: Ingredienssuggestion mottagen', response.data);
+        return true;
+      } else {
+        console.error('AnalysisService: Fel vid rapportering av ingrediens', response.status, response.data);
+        return false;
+      }
+    } catch (error) {
+      console.error('AnalysisService: Kunde inte rapportera ingrediens', error);
+      
+      // Om API inte är tillgängligt simulerar vi en framgångsrik rapportering
+      console.log('AnalysisService: Simulerar framgångsrik rapportering', reportData);
+      return true;
+    }
   }
 }

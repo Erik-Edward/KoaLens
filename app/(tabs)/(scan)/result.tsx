@@ -3,7 +3,7 @@
  * Visar analys av produktingredienser med fokus på säker textrendering
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -14,7 +14,9 @@ import {
   SafeAreaView, 
   Alert,
   StyleSheet,
-  Platform
+  Platform,
+  Modal,
+  TextInput
 } from 'react-native';
 import { styled } from 'nativewind';
 import { router, useLocalSearchParams, useRouter } from 'expo-router';
@@ -40,6 +42,7 @@ const StyledScrollView = styled(ScrollView);
 const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledImage = styled(Image);
+const StyledTextInput = styled(TextInput);
 
 // Styles
 const styles = StyleSheet.create({
@@ -117,30 +120,182 @@ function safeJsonParse(jsonString: string | undefined, fallback: any = null) {
 }
 
 /**
+ * IngredientsList komponent
+ * Hanterar enkel ingredienslista med rapporteringsfunktionalitet
+ */
+function IngredientsList({ 
+  ingredients, 
+  watchedIngredients,
+  onReportIngredient
+}: { 
+  ingredients: string[],
+  watchedIngredients: WatchedIngredient[],
+  onReportIngredient?: (ingredient: string) => void
+}) {
+  const StyledView = styled(View);
+  const StyledPressable = styled(Pressable);
+  const StyledText = styled(Text);
+  
+  // Funktion för att ta bort duplicerade ingredienser (samma namn oavsett skiftläge)
+  const deduplicateIngredients = (ingredientList: string[]): string[] => {
+    const normalizedSet = new Set<string>();
+    const result: string[] = [];
+    
+    for (const ingredient of ingredientList) {
+      const normalized = ingredient.toLowerCase().trim();
+      if (!normalizedSet.has(normalized)) {
+        normalizedSet.add(normalized);
+        result.push(ingredient);
+      }
+    }
+    
+    return result;
+  };
+  
+  // Hjälpfunktion för att bedöma om en ingrediens är icke-vegansk
+  const getIngredientStyles = (ingredient: string) => {
+    // Hitta matchande övervakad ingrediens
+    const watched = watchedIngredients.find(
+      w => w.name.toLowerCase() === ingredient.toLowerCase()
+    );
+    
+    // Bestäm färger baserat på status
+    let textColor = '#333';
+    let bgColor = 'transparent';
+    let borderColor = 'transparent';
+    
+    if (watched) {
+      if (watched.reason === 'non-vegan') {
+        textColor = '#d32f2f';
+        bgColor = '#ffebee';
+        borderColor = '#ffcdd2';
+      } else if (watched.reason === 'maybe-non-vegan') {
+        textColor = '#ef6c00';
+        bgColor = '#fff3e0';
+        borderColor = '#ffe0b2';
+      }
+    }
+    
+    return { textColor, bgColor, borderColor };
+  };
+
+  // Deduplicera listan med ingredienser
+  const uniqueIngredients = deduplicateIngredients(ingredients);
+
+  return (
+    <StyledView className="mt-3">
+      <StyledView className="flex-row justify-between items-center mb-2">
+        <StyledText className="text-base font-medium">Ingredienser</StyledText>
+      </StyledView>
+      
+      {uniqueIngredients.map((ingredient, index) => {
+        const { textColor, bgColor, borderColor } = getIngredientStyles(ingredient);
+        
+        return (
+          <StyledView 
+            key={index}
+            className="p-2 mb-1 rounded-md"
+            style={{ 
+              backgroundColor: bgColor,
+              borderWidth: borderColor !== 'transparent' ? 1 : 0,
+              borderColor
+            }}
+          >
+            <StyledView className="flex-row justify-between">
+              <StyledView>
+                <SafeText 
+                  value={ingredient}
+                  style={{ 
+                    fontSize: 16,
+                    color: textColor,
+                    fontWeight: '500'
+                  }}
+                />
+              </StyledView>
+            </StyledView>
+            
+            {/* Rapportera-knapp */}
+            {onReportIngredient && (
+              <StyledPressable 
+                onPress={() => onReportIngredient(ingredient)}
+                className="mt-2 flex-row items-center self-end"
+              >
+                <Ionicons name="flag-outline" size={16} color="#6b7280" style={{ marginRight: 2 }} />
+                <StyledText className="text-xs text-gray-500">
+                  Rapportera
+                </StyledText>
+              </StyledPressable>
+            )}
+          </StyledView>
+        );
+      })}
+    </StyledView>
+  );
+}
+
+// Textinnehåll för hjälpdialogen  
+const helpDialogContent = (
+  <StyledView className="p-2">
+    <StyledText className="text-lg font-bold mb-4">Om ingrediensanalysen</StyledText>
+    
+    <StyledText className="text-base mb-2 font-medium">Vad betyder färgerna?</StyledText>
+    <StyledView className="mb-4">
+      <StyledText>• <StyledText className="text-red-600 font-medium">Röd</StyledText> - Icke-vegansk ingrediens</StyledText>
+      <StyledText>• <StyledText className="text-orange-600 font-medium">Orange</StyledText> - Potentiellt icke-vegansk ingrediens</StyledText>
+      <StyledText>• <StyledText className="text-black">Svart</StyledText> - Vegansk ingrediens</StyledText>
+    </StyledView>
+    
+    <StyledText className="text-base mb-2 font-medium">Om ingredienserna</StyledText>
+    <StyledText className="mb-4">
+      Alla ingredienser visas på svenska. Om en produkt har ingredienser på andra språk, 
+      har vi försökt översätta dem till svenska så bra som möjligt.
+    </StyledText>
+    
+    <StyledText className="text-base mb-2 font-medium">Rapportera fel</StyledText>
+    <StyledText className="mb-4">
+      Om du upptäcker en felaktig ingrediens eller klassificering, kan du rapportera den 
+      genom att trycka på flaggikonen intill ingrediensen.
+    </StyledText>
+    
+    <StyledText className="text-xs text-gray-500 italic">
+      KoaLens AI-analys har en viss felmarginal. Dubbelkolla alltid vid allvarlig allergi.
+    </StyledText>
+  </StyledView>
+);
+
+/**
  * Huvudkomponent för resultatskärmen
  */
 export default function ResultScreen() {
-  // Lokal state
-  const [isLoading, setIsLoading] = useState(true);
+  // State för produktdata
   const [product, setProduct] = useState<Product | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState("Förbereder analys...");
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
-  const [videoPath, setVideoPath] = useState<string | null>(null);
-  const [analysisType, setAnalysisType] = useState<string>('image');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [showVideoThumbnail, setShowVideoThumbnail] = useState(false);
   const [isDemo, setIsDemo] = useState(false); // Indikator för demo-data
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportingIngredient, setReportingIngredient] = useState<string | null>(null);
+  const [reportFeedback, setReportFeedback] = useState<string>('');
+  const [isSending, setIsSending] = useState(false);
+  
+  // Referenser
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  console.log('RESULT SCREEN: Received params:', JSON.stringify(params, null, 2));
+  
+  // Lokal state för videoanalys
+  const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("Förbereder analys...");
+  const [videoPath, setVideoPath] = useState<string | null>(null);
+  const [analysisType, setAnalysisType] = useState<string>('image');
   
   // Referenser
   const photoPathRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
   
   // Hämta URL-parametrar
-  const params = useLocalSearchParams();
-  const router = useRouter();
-  console.log('RESULT SCREEN: Received params:', JSON.stringify(params, null, 2));
-  
   const isDirectAnalysis = params.isDirectAnalysis === 'true';
   
   // Hooks
@@ -320,86 +475,52 @@ export default function ResultScreen() {
     }
   }, [params]);
   
-  // Skapar en produkt från analysresultatet
+  // Konvertera analysdata till produktmodellen
   const createProductFromAnalysis = (analysisResult: any, userId: string | null, videoPath?: string): Product => {
-    console.log('RESULT SCREEN: Inside createProductFromAnalysis, input:', JSON.stringify(analysisResult).substring(0, 200) + '...');
+    const ingredientsList = Array.isArray(analysisResult.ingredients) 
+      ? analysisResult.ingredients 
+      : [];
     
-    try {
-      // Validera och normalisera resultat
-      const ingredients = Array.isArray(analysisResult.ingredientList) 
-        ? analysisResult.ingredientList 
-        : [];
-      
-      // Se till att vi har en watchedIngredients-array med korrekt format
-      let watchedIngredients = [];
-      if (Array.isArray(analysisResult.watchedIngredients)) {
-        // Validera och normalisera varje watchedIngredient
-        watchedIngredients = analysisResult.watchedIngredients.map((item: any) => {
-          return {
-            name: item.name || item.ingredient || (typeof item === 'string' ? item : 'Okänd ingrediens'),
-            reason: item.reason || 'okänd anledning',
-            description: item.description || ''
-          };
-        });
+    const timestamp = new Date().toISOString();
+    const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+    
+    // Skapa lista med alla ingredienser från analysen
+    const ingredients = ingredientsList.map((item: any) => typeof item === 'string' ? item : item.name);
+    
+    // Skapa lista med WatchedIngredients från analysen (icke-veganska ingredienser)
+    const watchedIngredients: WatchedIngredient[] = ingredientsList
+      .filter((item: any) => typeof item !== 'string' && item.isVegan === false)
+      .map((item: any) => ({
+        name: item.name,
+        reason: 'non-vegan',
+        description: 'Icke-vegansk ingrediens detekterad av AI'
+      }));
+    
+    // Returnera en produktmodell
+    return {
+      id,
+      timestamp,
+      ingredients,
+      analysis: {
+        isVegan: analysisResult.isVegan === true,
+        confidence: analysisResult.confidence || 0.7,
+        watchedIngredients,
+        reasoning: analysisResult.reasoning || analysisResult.explanation || '',
+        detectedLanguage: analysisResult.detectedLanguage || 'sv',
+        detectedNonVeganIngredients: ingredientsList
+          .filter((item: any) => typeof item !== 'string' && item.isVegan === false)
+          .map((item: any) => item.name)
+      },
+      metadata: {
+        userId: userId || 'anonymous',
+        scanDate: timestamp,
+        isFavorite: false,
+        isSavedToHistory: true,
+        source: 'video',
+        imageUri: '',
+        name: 'Analyserad produkt'
       }
-        
-      // Säkerställ att vi har en reasoning-sträng
-      const reasoning = typeof analysisResult.reasoning === 'string' 
-        ? analysisResult.reasoning 
-        : 'Ingen förklaring tillgänglig';
-      
-      // Säkerställ tidsstämpeln
-      const scanDate = new Date().toISOString();
-      
-      console.log('RESULT SCREEN: Prepared product data for display');
-      
-      // Skapa produkt
-      return {
-        id: uuidv4(),
-        timestamp: scanDate,
-        ingredients: ingredients,
-        analysis: {
-          isVegan: analysisResult.isVegan === true,
-          confidence: typeof analysisResult.confidence === 'number' ? analysisResult.confidence : 0.5,
-          watchedIngredients: watchedIngredients,
-          reasoning: reasoning,
-          detectedLanguage: analysisResult.detectedLanguage || 'sv'
-        },
-        metadata: {
-          userId: userId || 'anonymous',
-          scanDate: scanDate,
-          isFavorite: false,
-          isSavedToHistory: true,
-          source: 'video',
-          imageUri: '',
-          name: 'Analyserad produkt'
-        }
-      };
-    } catch (error) {
-      console.error('RESULT SCREEN: Error creating product from analysis:', error);
-      
-      // Skapa ett nödfall-produktobjekt med minimala data
-      return {
-        id: uuidv4(),
-        timestamp: new Date().toISOString(),
-        ingredients: [],
-        analysis: {
-          isVegan: false,
-          confidence: 0,
-          watchedIngredients: [],
-          reasoning: 'Kunde inte skapa produkt från analysresultat'
-        },
-        metadata: {
-          userId: userId || 'anonymous',
-          scanDate: new Date().toISOString(),
-          isFavorite: false,
-          isSavedToHistory: false,
-          source: 'video',
-          imageUri: '',
-          name: 'Analysfel'
-        }
-      };
-    }
+    };
   };
   
   // Hantera navigering tillbaka
@@ -571,6 +692,81 @@ export default function ResultScreen() {
   // Hantera ny skanning
   const handleNewScan = () => {
     router.replace('/(tabs)/(scan)');
+  };
+  
+  // Ny funktion för att hantera ingrediensrapportering
+  const submitIngredientReport = async () => {
+    if (!reportingIngredient || !reportFeedback) {
+      Alert.alert('Fyll i alla fält', 'Vänligen fyll i alla fält för att rapportera ingrediensen.');
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      
+      // Skapa rapportdata
+      const reportData = {
+        ingredient: reportingIngredient,
+        feedback: reportFeedback,
+        productId: product?.id || 'unknown',
+        isVegan: product?.analysis?.isVegan || false,
+        userId: userId || 'anonymous',
+        timestamp: new Date().toISOString()
+      };
+      
+      // Skicka till API
+      const analysisService = new AnalysisService();
+      await analysisService.reportIngredientSuggestion({
+        ingredient: reportData.ingredient,
+        feedback: reportData.feedback,
+        productId: reportData.productId,
+        isVegan: reportData.isVegan, 
+        userId: reportData.userId,
+        timestamp: reportData.timestamp
+      });
+      
+      // Visa bekräftelse
+      setIsSending(false);
+      setShowReportModal(false);
+      setReportFeedback('');
+      
+      Alert.alert(
+        'Tack för din rapportering',
+        'Din rapportering har skickats och kommer att granskas av vårt team.'
+      );
+    } catch (error) {
+      console.error('Failed to send report:', error);
+      setIsSending(false);
+      Alert.alert(
+        'Något gick fel',
+        'Det gick inte att skicka rapporten just nu. Försök igen senare.'
+      );
+    }
+  };
+  
+  // Create mock video analysis for testing
+  const createMockVideoAnalysis = () => {
+    return {
+      id: 'mock-' + Date.now().toString(36),
+      timestamp: new Date().toISOString(),
+      ingredients: ['Socker', 'Salt', 'Vetemjöl', 'Vatten'],
+      analysis: {
+        isVegan: true,
+        confidence: 0.9,
+        watchedIngredients: [],
+        reasoning: 'Alla ingredienser är veganska.',
+        detectedLanguage: 'sv',
+        detectedNonVeganIngredients: []
+      },
+      metadata: {
+        userId: 'anonymous',
+        scanDate: new Date().toISOString(),
+        isFavorite: false,
+        isSavedToHistory: true,
+        source: 'mock-data',
+        name: 'Testprodukt'
+      }
+    };
   };
   
   // ===== UI-rendering =====
@@ -792,118 +988,11 @@ export default function ResultScreen() {
               Ingredienser
             </StyledText>
             
-            {product.ingredients.length === 0 ? (
-              <StyledText className="text-text-secondary italic">
-                Inga ingredienser hittades
-              </StyledText>
-            ) : (
-              <StyledView className="bg-gray-50 p-4 rounded-xl">
-                {/* Alla ingredienser */}
-                {product.ingredients.map((ingredient, index) => {
-                  // Avgör om ingrediensen är icke-vegansk
-                  const isNonVegan = product.analysis.watchedIngredients.some(
-                    w => w.name.toLowerCase() === ingredient.toLowerCase() && w.reason === 'non-vegan'
-                  );
-                  
-                  // Avgör om ingrediensen är granskad (men vegansk/oklar)
-                  const isWatched = product.analysis.watchedIngredients.some(
-                    w => w.name.toLowerCase() === ingredient.toLowerCase() && w.reason !== 'non-vegan'
-                  );
-                  
-                  let iconName = "leaf-outline";
-                  let iconColor = "#15803d"; // grön
-                  let bgColor = "bg-white";
-                  let textColor = "#1f2937";
-                  
-                  if (isNonVegan) {
-                    iconName = "close-circle";
-                    iconColor = "#b91c1c"; // röd
-                    bgColor = "bg-red-50";
-                    textColor = "#991b1b";
-                  } else if (isWatched) {
-                    iconName = "alert-circle-outline";
-                    iconColor = "#92400e"; // gul/orange
-                    bgColor = "bg-amber-50";
-                    textColor = "#92400e";
-                  }
-                  
-                  return (
-                    <StyledView 
-                      key={`ingredient-${index}`} 
-                      className={`mb-3 p-3 rounded-lg ${bgColor} shadow-sm`}
-                    >
-                      <StyledView className="flex-row items-center">
-                        <Ionicons name={iconName} size={20} color={iconColor} style={{ marginRight: 8 }} />
-                        <SafeText 
-                          value={ingredient}
-                          style={{ 
-                            fontSize: 16,
-                            color: textColor,
-                            fontWeight: '500'
-                          }}
-                        />
-                      </StyledView>
-                    </StyledView>
-                  );
-                })}
-                
-                {/* Förklaring av ikoner */}
-                <StyledView className="mt-4 p-3 bg-gray-100 rounded-lg">
-                  <StyledText className="text-sm text-gray-700 font-medium mb-2">Förklaring:</StyledText>
-                  <StyledView className="flex-row items-center mb-1">
-                    <Ionicons name="leaf-outline" size={16} color="#15803d" style={{ marginRight: 8 }} />
-                    <StyledText className="text-sm text-gray-600">Vegansk ingrediens</StyledText>
-                  </StyledView>
-                  <StyledView className="flex-row items-center mb-1">
-                    <Ionicons name="alert-circle-outline" size={16} color="#92400e" style={{ marginRight: 8 }} />
-                    <StyledText className="text-sm text-gray-600">Granskad ingrediens</StyledText>
-                  </StyledView>
-                  <StyledView className="flex-row items-center">
-                    <Ionicons name="close-circle" size={16} color="#b91c1c" style={{ marginRight: 8 }} />
-                    <StyledText className="text-sm text-gray-600">Icke-vegansk ingrediens</StyledText>
-                  </StyledView>
-                </StyledView>
-                
-                {/* Detaljerad information om granskade ingredienser */}
-                {product.analysis.watchedIngredients.length > 0 && (
-                  <StyledView className="mt-6 bg-gray-100 p-4 rounded-lg">
-                    <StyledText className="text-lg font-sans-bold text-gray-800 mb-3">
-                      Detaljer om granskade ingredienser
-                    </StyledText>
-                    
-                    {product.analysis.watchedIngredients.map((item, index) => (
-                      <StyledView key={`detail-${index}`} className="mb-3 bg-white p-4 rounded-lg shadow-sm">
-                        <StyledView className="flex-row items-center mb-2">
-                          <Ionicons 
-                            name={item.reason === 'non-vegan' ? "close-circle" : "alert-circle-outline"} 
-                            size={20} 
-                            color={item.reason === 'non-vegan' ? "#b91c1c" : "#92400e"} 
-                            style={{ marginRight: 8 }}
-                          />
-                          <StyledText 
-                            className={`font-sans-bold text-base ${
-                              item.reason === 'non-vegan' ? 'text-red-800' : 'text-amber-800'
-                            }`}
-                          >
-                            {item.name}
-                          </StyledText>
-                        </StyledView>
-                        
-                        <StyledText 
-                          className={`text-sm ml-7 ${
-                            item.reason === 'non-vegan' ? 'text-red-700' : 'text-amber-700'
-                          }`}
-                        >
-                          {item.reason === 'non-vegan' 
-                            ? (item.description || 'Icke-vegansk ingrediens') 
-                            : (item.description || 'Potentiellt problematisk ingrediens')}
-                        </StyledText>
-                      </StyledView>
-                    ))}
-                  </StyledView>
-                )}
-              </StyledView>
-            )}
+            <IngredientsList 
+              ingredients={product.ingredients}
+              watchedIngredients={product.analysis.watchedIngredients}
+              onReportIngredient={setReportingIngredient}
+            />
           </StyledView>
           
           {/* Tomt utrymme i botten */}
@@ -965,6 +1054,82 @@ export default function ResultScreen() {
           </StyledView>
         </StyledView>
       </StyledSafeAreaView>
+      
+      {/* Modal för rapportering av ingredienser */}
+      <Modal
+        visible={showReportModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <StyledView className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <StyledView className="bg-white rounded-xl p-6 m-5 w-11/12 max-w-md shadow-xl">
+            <StyledView className="flex-row justify-between items-center mb-4">
+              <StyledText className="text-xl font-sans-bold text-gray-800">
+                Rapportera ingrediens
+              </StyledText>
+              <StyledPressable onPress={() => setShowReportModal(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </StyledPressable>
+            </StyledView>
+            
+            <StyledView className="mb-5">
+              <StyledText className="text-base font-medium text-gray-700 mb-1">
+                Ingrediens:
+              </StyledText>
+              <StyledView className="bg-gray-100 p-3 rounded-lg">
+                <StyledText className="text-gray-800 font-medium">
+                  {reportingIngredient || ''}
+                </StyledText>
+              </StyledView>
+            </StyledView>
+            
+            <StyledView className="mb-5">
+              <StyledText className="text-base font-medium text-gray-700 mb-1">
+                Vad är fel med denna ingrediens?
+              </StyledText>
+              <StyledTextInput
+                className="bg-gray-100 p-3 rounded-lg text-gray-800"
+                multiline={true}
+                numberOfLines={4}
+                placeholder="Beskriv vad som är fel (t.ex. felaktig klassificering, felstavning, etc.)"
+                value={reportFeedback}
+                onChangeText={setReportFeedback}
+                style={{ textAlignVertical: 'top' }}
+              />
+            </StyledView>
+            
+            <StyledView className="flex-row justify-end">
+              <StyledPressable 
+                onPress={() => setShowReportModal(false)}
+                className="mr-3 py-2 px-4 rounded-lg bg-gray-200"
+              >
+                <StyledText className="text-gray-700 font-medium">
+                  Avbryt
+                </StyledText>
+              </StyledPressable>
+              
+              <StyledPressable 
+                onPress={() => submitIngredientReport()}
+                className={`py-2 px-4 rounded-lg ${
+                  reportFeedback.trim().length > 0 ? 'bg-primary-main' : 'bg-gray-300'
+                }`}
+                disabled={reportFeedback.trim().length === 0 || isSending}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <StyledText className={`font-medium ${
+                    reportFeedback.trim().length > 0 ? 'text-white' : 'text-gray-500'
+                  }`}>
+                    Skicka
+                  </StyledText>
+                )}
+              </StyledPressable>
+            </StyledView>
+          </StyledView>
+        </StyledView>
+      </Modal>
     </StyledView>
   );
 } 

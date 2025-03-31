@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 import VideoRecorder from '@/components/VideoRecorder';
 import { AnalysisService } from '@/services/analysisService';
@@ -44,6 +45,14 @@ function VideoScreen() {
   const [videoApiAvailable, setVideoApiAvailable] = useState(true);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [mockData, setMockData] = useState(false);
+  // Ny ref för att hålla det aktuella request ID
+  const requestIdRef = useRef<string | null>(null);
+  // Ny state för att indikera om en analysbegäran avbröts
+  const [requestCancelled, setRequestCancelled] = useState(false);
+  // Timestamp för senaste analysbegäran
+  const lastRequestTimeRef = useRef<number>(0);
+  // Minsta tid mellan analysbegäran (millisekunder)
+  const MIN_REQUEST_INTERVAL = 3000;
 
   useEffect(() => {
     const initializeFromParams = async () => {
@@ -142,11 +151,30 @@ function VideoScreen() {
   const handleVideoRecorded = async (uri: string) => {
     console.log('Video inspelad till:', uri);
     
-    // Förhindra dubbla anrop
+    // Förhindra dubbla anrop med en kombination av flera mekanismer
     if (processingRef.current) {
       console.log('Redan bearbetar en video, ignorerar ny inspelning');
       return;
     }
+    
+    // Kontrollera om det har gått tillräckligt med tid sedan senaste begäran
+    const now = Date.now();
+    if (now - lastRequestTimeRef.current < MIN_REQUEST_INTERVAL) {
+      console.log('För tidigt att starta ny analys, ignorerar begäran');
+      Alert.alert(
+        'Vänta lite',
+        'Du kan inte starta en ny analys så snabbt efter den förra. Vänta några sekunder och försök igen.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    // Uppdatera timestamp för denna begäran
+    lastRequestTimeRef.current = now;
+    
+    // Generera ett nytt unikt requestId för denna analyssession
+    requestIdRef.current = uuidv4();
+    console.log('Nytt requestId genererat:', requestIdRef.current);
     
     if (uri.includes('/mock_video_path_after')) {
       console.log('Använda mock-video för analys');
@@ -158,6 +186,7 @@ function VideoScreen() {
     setVideoUri(uri);
     setIsProcessing(true);
     processingRef.current = true;
+    setRequestCancelled(false); // Återställ avbrytstatus för ny begäran
     
     try {
       const fileCheck = await checkFileExists(uri);
@@ -183,7 +212,19 @@ function VideoScreen() {
         'Vill du avbryta den pågående analysen?',
         [
           { text: 'Fortsätt analys', style: 'cancel' },
-          { text: 'Avbryt', style: 'destructive', onPress: () => router.back() }
+          { 
+            text: 'Avbryt', 
+            style: 'destructive', 
+            onPress: () => {
+              // Markera att begäran är avbruten
+              setRequestCancelled(true);
+              // Återställ bearbetningsstatus
+              processingRef.current = false;
+              setIsProcessing(false);
+              setIsLoading(false);
+              router.back();
+            } 
+          }
         ]
       );
     } else {
@@ -199,9 +240,15 @@ function VideoScreen() {
       return;
     }
 
-    // Förhindra dubbla analyser
+    // Förhindra dubbla analyser med flera kontroller
     if (isLoading) {
       console.log('Analys pågår redan, ignorerar ytterligare begäran');
+      return;
+    }
+    
+    // Kontrollera om begäran är avbruten
+    if (requestCancelled) {
+      console.log('Analysbegäran avbruten av användaren, avbryter');
       return;
     }
 
@@ -238,9 +285,11 @@ function VideoScreen() {
         throw new Error('Problem att lokalisera videofilen. Försök spela in igen.');
       }
       
-      // Utför analys med validerad sökväg
+      // Utför analys med validerad sökväg och requestId
       try {
-        const result = await analysisService.analyzeVideo(validVideoUri);
+        // Skicka med det unika request ID till analysfunktionen
+        console.log('Skickar begäran med requestId:', requestIdRef.current);
+        const result = await analysisService.analyzeVideo(validVideoUri, requestIdRef.current);
         
         // Om resultatet är tomt eller inte innehåller nödvändiga fält
         if (!result || result.ingredientList?.length === 0) {
@@ -254,6 +303,19 @@ function VideoScreen() {
         
         let errorMsg = 'Kunde inte analysera video. ' + (analysisError.message || '');
         
+        // Hantera specifikt felmeddelande för duplicerade begäran
+        if (analysisError.message?.includes('Duplicate request') || 
+            analysisError.message?.includes('429') ||
+            analysisError.message?.includes('Too many requests')) {
+          
+          errorMsg = 'En analys pågår redan. Vänta tills den är klar eller försök igen senare.';
+          setError(errorMsg);
+          setIsLoading(false);
+          setIsProcessing(false);
+          processingRef.current = false;
+          return;
+        }
+        
         if (analysisError.message?.includes('network') || 
             analysisError.message?.includes('timeout') ||
             analysisError.message?.includes('No response from server')) {
@@ -266,15 +328,17 @@ function VideoScreen() {
                   analysisError.message?.includes('too large')) {
           errorMsg = 'Videon är för stor. Försök med en kortare video.';
         } else if (analysisError.message?.includes('500') ||
-                  analysisError.message?.includes('Server error') ||
-                  analysisError.message?.includes('429') ||
-                  analysisError.message?.includes('Too many requests')) {
+                  analysisError.message?.includes('Server error')) {
           errorMsg = 'Tjänsten är för närvarande överbelastad. ';
           
           // Implementera automatisk återförsök
           if (retryCount < maxRetries) {
             setRetryCount(prevCount => prevCount + 1);
             setError(`${errorMsg} Försöker igen... (${retryCount + 1}/${maxRetries})`);
+            
+            // Generera ett nytt requestId för återförsöket
+            requestIdRef.current = uuidv4();
+            console.log('Nytt requestId för återförsök:', requestIdRef.current);
             
             // Vänta 3 sekunder och försök igen
             setTimeout(() => {

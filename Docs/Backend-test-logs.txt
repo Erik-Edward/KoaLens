@@ -1,311 +1,65 @@
-info: ImageProcessor initialized {"service":"koalens-backend","timestamp":"2025-04-01T09:10:57.656Z"}
-info: AnalysisService initialized with enhanced prompt templates {"service":"koalens-backend","timestamp":"2025-04-01T09:10:57.661Z"}
-info: GeminiService initialized {"maxOutputTokens":1024,"modelName":"gemini-2.0-flash","service":"koalens-backend","timestamp":"2025-04-01T09:10:57.973Z"}
-info: Loaded 29 non-vegan ingredients from database {"service":"koalens-backend","timestamp":"2025-04-01T09:10:58.055Z"}
-info: Loaded 52 uncertain ingredients from database {"service":"koalens-backend","timestamp":"2025-04-01T09:10:58.056Z"}
-info: Loaded 343 vegan ingredients from database {"service":"koalens-backend","timestamp":"2025-04-01T09:10:58.058Z"}
-info: VideoOptimizer initialized {"ffmpegInstalled":true,"service":"koalens-backend","timestamp":"2025-04-01T09:10:58.074Z"}
-info: VideoAnalysisService initialized {"maxVideoSizeBytes":20971520,"service":"koalens-backend","tempDir":"C:\\Users\\erike\\AppData\\Local\\Temp\\koalens-videos","timestamp":"2025-04-01T09:10:58.074Z"}
-info: Temporary file cleaner scheduler started {"cleanupIntervalHours":6,"maxAgeHours":24,"service":"koalens-backend","tempDir":"C:\\Users\\erike\\AppData\\Local\\Temp\\koalens-videos","timestamp":"2025-04-01T09:10:58.119Z"}
-Server running on port 3000
-Video analysis API available at http://localhost:3000/api/video/analyze-video
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Karmin,E120,Rött färgämne utvinnet från koschenillsköldlöss (Dactylopius coccus). Används ofta i röda livsmedel och kosmetika'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Gelatin,E441,Protein utvunnet från djurvävnad (hud ben och bindväv). Används ej längre som E-nummer men förekommer som ingrediens'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Bivax,E901,Naturligt vax producerat av honungsbin. Används som ytbehandlingsmedel och glansmedel'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Shellack,E904,Naturligt hartssekret från lacksköldlusen. Används som ytbehandlingsmedel och glansmedel på frukt och godis'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'L-cystein,E920,Aminosyra traditionellt utvunnen från djurhorn eller fjädrar. Används som mjölbehandlingsmedel'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Laktitol,E966,Sötningsmedel framställt genom hydrering av laktos (mjölksocker) från komjölk'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Lysozym,E1105,Enzym utvunnet ur äggvita. Används som konserveringsmedel särskilt i ost'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mjölkpulver,-,Torkat koncentrat av komjölk. Innehåller alla mjölkens beståndsdelar'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mjölkprotein,-,Proteiner utvunna ur komjölk (främst kasein och vassleproteiner)'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Skummjölkspulver,-,Torkat koncentrat av skummad komjölk'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Vassle,-,Proteinrik vätska som separeras från mjölk vid ostproduktion'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kasein,-,Huvudproteinet i komjölk. Används ofta som bindmedel och proteintillskott'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kaseinat,-,Salter av kasein. Används som emulgeringsmedel och förtjockningsmedel'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Laktos,-,Mjölksocker utvunnet ur komjölk. Används som sötningsmedel och fyllnadsmedel'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Ägg,-,Hela ägg från höns eller andra fåglar'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Äggpulver,-,Torkade och pulveriserade hela ägg'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Äggvitepulver,-,Torkad och pulveriserad äggvita'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Äggulepulver,-,Torkad och pulveriserad äggula'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Albumin,-,Protein från äggvita. Används ofta som bindmedel och i bakverk'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Honung,-,Sockersöt vätska producerad av bin från nektar'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Bidrottningsgelé,-,Näringsrik vätska producerad av arbetarbin för att mata bidrottningen'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Royal jelly,-,Alternativt namn för bidrottningsgelé'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Pollen,-,Insamlade pollenkorn från bin. Används som kosttillskott'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Propolis,-,Kåda insamlad och bearbetad av bin. Används som naturläkemedel'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Gelatin,-,Protein från djurvävnad. Används som förtjockningsmedel och i kapslar'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Löpe,-,Enzym från kalvmagar. Används vid ostproduktion'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Talg,-,Fett från nötkreatur eller får. Används i livsmedel och kosmetika'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kollagen,-,Protein från bindväv senor och ben. Används i kosmetika och som kosttillskott'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Askorbylplamitat och askorbylstearat,E304,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Lecitin,E322,Kan vara från ägg eller soja'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Glycerol,E422,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyxietylenstearat,E431,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyoxietylensorbitanmonolaurat,E432,Emulgeringsmedel som kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyoxietylensorbitanmonooleat,E433,Emulgeringsmedel som kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyoxietylensorbitanmonopalmitat,E434,Emulgeringsmedel som kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyoxietylensorbitantristearat,E435,Emulgeringsmedel som kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyoxietylensorbitantristearat,E436,Emulgeringsmedel som kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Ammoniumfosfatider,E442,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Glycerolestrar av trähartser,E445,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Natruim- kalium- och kalciumsalter av fettsyror,E470a,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Magnesiumsalt av fettsyror,E470b,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders av fettsyror,E471,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders ättiksyraestrar,E472a,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders mjölksyraestrar,E472b,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders citronsyraestrar,E472c,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders vinsyraestrar,E472d,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Mono- och diglyceriders Diacetylvinsyraestrar,E472e,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Blandade ättik- och vinsyraestrar av mono- och diglycerider,E472f,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sackarosestrar av fettsyror,E473,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sackarosestrar i blandning med mono- och diglycerider av fettsyror,E474,Kan vara växt- eller djurbaserad'   
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyglycerolestrar av fettsyror,E475,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Polyglycerolpolyricinoleat,E476,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Propylenglykolestrar av fettsyror,E477,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Termiskt oxiderad sojaolja i reaktion med mono- och diglycerider av fettsyror,E479b,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Natriumstearyoyllaktylat,E481,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Natriumstearyoyllaktylat,E482,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Stearoyltartrat,E483,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sorbitanmonostearat,E491,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sorbitantristearat,E492,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sorbitanmonolaurat,E493,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sorbitan monooleat,E494,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Sorbitanmonopalmitat,E495,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Fettsyror,E570,Kan vara från växt- eller djurfetter'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Guanylsyra,E626,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Dinatriumguanylat,E627,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Dikaliumguanylat,E628,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kalciumguanylat,E629,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Inosinsyra,E630,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Dinatriumosinat,E631,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Dikaliuminosinat,E632,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kalciuminosinat,E633,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Kalcium-5′-ribonukleinsyra,E634,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Dinatrium-5′-riboneukleotider,E635,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Maltol,E636,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Ethyl maltol,E637,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Glyceryldiacetat,E1517,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Glyceryltriacetat,E1518,Kan vara växt- eller djurbaserad'
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Vitamin D3,-,Kan framställas av alger men vanligtvis från fårull'
-}
-Error loading uncertain.csv: CsvError: Invalid Record Length: columns length is 1, got 3 on line 52
-    at Object.__onRecord (C:\Projects\koalens-backend\node_modules\csv-parse\dist\cjs\index.cjs:1354:15)
-    at Object.parse (C:\Projects\koalens-backend\node_modules\csv-parse\dist\cjs\index.cjs:1181:40)
-    at Parser._transform (C:\Projects\koalens-backend\node_modules\csv-parse\dist\cjs\index.cjs:1783:26)
-    at Parser.Transform._write (node:internal/streams/transform:171:8)
-    at writeOrBuffer (node:internal/streams/writable:564:12)
-    at _write (node:internal/streams/writable:493:10)
-    at Parser.Writable.write (node:internal/streams/writable:502:10)
-    at ReadStream.ondata (node:internal/streams/readable:1007:22)
-    at ReadStream.emit (node:events:518:28)
-    at addChunk (node:internal/streams/readable:559:12) {
-  code: 'CSV_RECORD_INCONSISTENT_COLUMNS',
-  bytes: 3668,
-  comment_lines: 0,
-  empty_lines: 0,
-  invalid_field_length: 0,
-  lines: 52,
-  records: 50,
-  columns: [ { name: 'name,e_number,description' } ],
-  error: undefined,
-  header: false,
-  index: 3,
-  raw: undefined,
-  column: null,
-  quoting: false,
-  record: [ 'Arom', '', 'Kan vara växtbaserat eller animaliskt' ]
-}
-Skipping invalid row in CSV: {
-  'name,e_number,description': 'Isinglass,-,Kollagen från fiskblåsor. Används som klarningsmedel i öl och vin'
-}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:12.661Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:12.662Z"}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:14.508Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:14.518Z"}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:14.949Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:14.949Z"}
-info: Video optimization completed {"compressionRatio":"2.76","optimizedSizeMB":"3.60","originalSizeMB":"9.95","service":"koalens-backend","timestamp":"2025-04-01T09:13:19.408Z"}
-info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T09:13:19.415Z","videoSizeKB":3690}
-info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3778365,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T09:13:19.423Z"}
-info: Video optimization completed {"compressionRatio":"2.76","optimizedSizeMB":"3.60","originalSizeMB":"9.95","service":"koalens-backend","timestamp":"2025-04-01T09:13:21.889Z"}
-info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T09:13:21.894Z","videoSizeKB":3690}
-info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3778365,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T09:13:21.895Z"}
-info: Video optimization completed {"compressionRatio":"2.76","optimizedSizeMB":"3.60","originalSizeMB":"9.95","service":"koalens-backend","timestamp":"2025-04-01T09:13:22.340Z"}
-info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T09:13:22.343Z","videoSizeKB":3690}
-info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3778365,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T09:13:22.344Z"}
-info: AI Response [gemini] {"completionTokens":311.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T09:13:23.979Z"}
-warn: JSON parsing failed, trying to extract with regex {"jsonError":{},"service":"koalens-backend","timestamp":"2025-04-01T09:13:23.980Z"}
-info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":13,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T09:13:23.983Z","uncertainIngredientsCount":0}
-info: Video analysis completed {"ingredientCount":13,"isVegan":false,"processingTimeSec":"11.33","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:23.987Z"}
-info: AI Response [gemini] {"completionTokens":311.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T09:13:25.637Z"}
-warn: JSON parsing failed, trying to extract with regex {"jsonError":{},"service":"koalens-backend","timestamp":"2025-04-01T09:13:25.637Z"}
-info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":13,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T09:13:25.638Z","uncertainIngredientsCount":0}
-info: Video analysis completed {"ingredientCount":13,"isVegan":false,"processingTimeSec":"11.13","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:25.641Z"}
-info: AI Response [gemini] {"completionTokens":335.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T09:13:26.649Z"}
-warn: JSON parsing failed, trying to extract with regex {"jsonError":{},"service":"koalens-backend","timestamp":"2025-04-01T09:13:26.650Z"}
-info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":14,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T09:13:26.651Z","uncertainIngredientsCount":0}
-info: Video analysis completed {"ingredientCount":14,"isVegan":false,"processingTimeSec":"11.71","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:26.654Z"}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:27.079Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:27.080Z"}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:29.432Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:29.434Z"}
-info: Video analysis request received {"dataSize":13914972,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T09:13:30.401Z"}
-info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13914972,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T09:13:30.401Z"}
-info: Video optimization completed {"compressionRatio":"2.76","optimizedSizeMB":"3.60","originalSizeMB":"9.95","service":"koalens-backend","timestamp":"2025-04-01T09:13:32.020Z"}
-info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T09:13:32.031Z","videoSizeKB":3690}
-info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3778365,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T09:13:32.032Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:28:55.231Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:28:55.232Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:28:55.333Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:28:55.334Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:28:56.132Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:28:56.133Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:04.163Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:04.170Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:04.171Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:04.476Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:04.483Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:04.484Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:05.714Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:05.718Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:05.719Z"}
+info: AI Response [gemini] {"completionTokens":371.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.191Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Vasslepulver\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.7\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.9\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 1.0\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 1.0\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.192Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:09.196Z"}
+info: Video analysis completed {"confidenceScore":1,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:09.196Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"13.87","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.201Z"}
+info: AI Response [gemini] {"completionTokens":377.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.223Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vasslepulver (från mjölk)\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 1.0\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.6\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.8\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 1.0\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.224Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:09.226Z"}
+info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:09.226Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"14.00","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:09.229Z"}
+info: AI Response [gemini] {"completionTokens":378.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:10.098Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vasslepulver (från mjölk)\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.6\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.8\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.99\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:10.098Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:10.109Z"}
+info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:10.109Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"13.98","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:10.112Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:12.627Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:29:12.628Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:13.865Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:29:13.866Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:18.181Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:18.191Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:18.192Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:19.253Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:19.257Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:19.257Z"}
+info: AI Response [gemini] {"completionTokens":378.75,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:22.768Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vasslepulver (från mjölk)\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.8\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.9\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.99\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:22.768Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:22.770Z"}
+info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:22.771Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"10.15","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:22.774Z"}
+info: AI Response [gemini] {"completionTokens":378.5,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:23.498Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vasslepulver (från mjölk)\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.6\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.8\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 0.9\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.99\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:23.499Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:23.500Z"}
+info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:23.500Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"9.64","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:23.503Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:26.295Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:29:26.296Z"}
+info: Video analysis request received {"dataSize":13839244,"mimeType":"video/quicktime","preferredLanguage":"sv","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:27.007Z"}
+info: Video analysis request received {"clientInfo":{},"dataSizeBytes":13839244,"mimeType":"video/quicktime","operation":"request","preferredLanguage":"sv","requestId":"not-provided","service":"videoAnalysis","timestamp":"2025-04-01T12:29:27.007Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:31.525Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:31.532Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:31.533Z"}
+info: Video optimization completed {"compressionRatio":"2.71","optimizedSizeMB":"3.66","originalSizeMB":"9.90","service":"koalens-backend","timestamp":"2025-04-01T12:29:32.711Z"}
+info: Sending video for AI analysis {"promptLength":2290,"service":"koalens-backend","timestamp":"2025-04-01T12:29:32.715Z","videoSizeKB":3747}
+info: AI Request [gemini] {"generationConfig":{"maxOutputTokens":1536,"temperature":0.2,"topK":40,"topP":0.95},"mediaSizeBytes":3836805,"mediaType":"video/mp4","prompt":"\nDu är en expert på att analysera matprodukter och identifiera deras ingredienser för att avgöra om produkten är vegansk.\n\nINSTRUKTIONER:\n1. Analysera videon NOGGRANT. Identifiera ingredienserna som tydligt VISAS på produktens förpackning.\n2. Fokusera på ingredienslistan i videon.\n3. Översätt ALLA identifierade ingredienser till svenska. Använd vanliga svenska livsmedelsnamn.\n4. Bedöm om produkten är vegansk. En ingrediens är *inte* vegansk om den *definitivt* kommer från djur.\n   - Icke-veganska ingredienser: ägg, mjölk, ost, grädde, kött, fisk, gelatin, honung, bivax, lanolin, etc.\n   - Extra uppmärksam på E-nummer:\n     - E120 (karmin), E441 (gelatin), E901 (bivax), E904 (shellack), E920 (L-cystein) är INTE veganska.\n     - Andra E-nummer kan vara osäkra, men försök identifiera alla E-nummer du ser i ingredienslistan.\n   - Sojabaserade produkter (tofu, tempeh, sojasås, etc.) är ALLTID veganska.\n5. Lista varje identifierad ingrediens ENBART EN gång på svenska.\n\nSVARA ENDAST med ett JSON-objekt i detta format (utan extra text före eller efter):\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"ingrediensnamn på svenska\",\n      \"isVegan\": true/false,\n      \"confidence\": 0.0-1.0\n    }\n  ],\n  \"isVegan\": true/false,\n  \"confidence\": 0.0-1.0\n}\n```\n\nExempel på korrekt svar:\n\n```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majskorn\",\n      \"isVegan\": true,\n      \"confidence\": 0.98\n    },\n    {\n      \"name\": \"Palmolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"E471\",\n      \"isVegan\": false,\n      \"confidence\": 0.95\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.97\n}\n```\n\nExempel på svar om inga ingredienser kan identifieras:\n\n```json\n{\n  \"ingredients\": [],\n  \"isVegan\": false,\n  \"confidence\": 0.0\n}\n```\n\nSe till att:\n1. Följa det exakta JSON-formatet UTAN extra text före eller efter.\n2. ALLTID översätta alla identifierade ingredienser till svenska.\n3. Ange \"confidence\" som ett nummer mellan 0 och 1.\n4. Markera ingredienser korrekt som veganska/icke-veganska.\n5. Inkludera ALLA identifierade ingredienser.\n6. Endast inkludera ingredienser som du FAKTISKT KAN SE i videon.\n7. Var extra uppmärksam på E-nummer och försök identifiera alla du ser.\n","provider":"gemini","service":"koalens-backend","timestamp":"2025-04-01T12:29:32.716Z"}
+info: AI Response [gemini] {"completionTokens":375.5,"mediaTokens":"Video content","promptTokens":572.5,"provider":"gemini","responseText":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": ...","service":"koalens-backend","timestamp":"2025-04-01T12:29:35.942Z"}
+warn: Direct JSON parsing failed for AI response. Falling back to regex extraction. {"fullResponse":"```json\n{\n  \"ingredients\": [\n    {\n      \"name\": \"Majs\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Rapsolja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vasslepulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Salt\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Kärnmjölkspulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Ostpulver\",\n      \"isVegan\": false,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Lökpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Tomatpulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Dextros\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Vitlökspulver\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Arom\",\n      \"isVegan\": true,\n      \"confidence\": 0.5\n    },\n    {\n      \"name\": \"Äppelsyra\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Persilja\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Natriumdiacetat\",\n      \"isVegan\": true,\n      \"confidence\": 0.9\n    },\n    {\n      \"name\": \"Cayennepeppar\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    },\n    {\n      \"name\": \"Paprikaoleoresin\",\n      \"isVegan\": true,\n      \"confidence\": 0.99\n    }\n  ],\n  \"isVegan\": false,\n  \"confidence\": 0.99\n}\n```","service":"koalens-backend","timestamp":"2025-04-01T12:29:35.943Z"}
+info: Successfully parsed and enhanced AI analysis result {"ingredientCount":16,"isUncertain":false,"isVegan":false,"service":"koalens-backend","timestamp":"2025-04-01T12:29:35.945Z"}
+info: Video analysis completed {"confidenceScore":0.99,"ingredientCount":16,"isUncertain":false,"isVegan":false,"operation":"response:success","processingTimeSec":0,"requestId":"not-provided","service":"videoAnalysis","statusCode":200,"timestamp":"2025-04-01T12:29:35.945Z","uncertainIngredientsCount":0}
+info: Video analysis completed {"ingredientCount":16,"isVegan":false,"processingTimeSec":"9.65","requestId":"not-provided","service":"koalens-backend","timestamp":"2025-04-01T12:29:35.948Z"}

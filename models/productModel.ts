@@ -7,6 +7,7 @@ export interface WatchedIngredient {
   name: string;
   description?: string;
   reason?: string; // Vegansk/icke-vegansk/gråzon
+  status?: string; // Nytt fält för tydligare status (uncertain, non-vegan, vegan)
 }
 
 export interface ProductAnalysis {

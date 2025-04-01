@@ -216,13 +216,18 @@ function IngredientsList({
   const getIngredientStyleInfo = (ingredient: string): { textColor: string; statusColor: string } => {
     // Grundläggande validering
     if (!ingredient || typeof ingredient !== 'string') {
-      console.log('Ogiltig ingrediens:', ingredient);
+      console.log('[getStyle] Ogiltig ingrediens:', ingredient);
       return { textColor: '#333', statusColor: '#9ca3af' }; // Default grå
     }
     
     try {
       const lowerCaseIngredient = ingredient.toLowerCase().trim();
       
+      // Logga varje gång funktionen körs för Arom
+      if (lowerCaseIngredient === 'arom') {
+        console.log(`[getStyle] Körs för ingrediens: "${ingredient}" (lowercase: "${lowerCaseIngredient}")`);
+      }
+
       // Steg 1: Kolla om ingrediensen finns i den slutgiltiga icke-veganska listan från backend
       if (Array.isArray(detectedNonVeganIngredients) && detectedNonVeganIngredients.length > 0) {
         const isNonVegan = detectedNonVeganIngredients.some(nonVegan => {
@@ -231,7 +236,7 @@ function IngredientsList({
         });
         
         if (isNonVegan) {
-          console.log(`Ingrediens "${ingredient}" markerad som ICKE-VEGANSK (röd)`);
+          // console.log(`[getStyle] Ingrediens "${ingredient}" markerad som ICKE-VEGANSK (röd)`); // Reducerad loggning
           return { textColor: '#b91c1c', statusColor: '#ef4444' }; // Röd
         }
       }
@@ -240,27 +245,47 @@ function IngredientsList({
       if (Array.isArray(watchedIngredients) && watchedIngredients.length > 0) {
         const matchingWatchedIngredient = watchedIngredients.find(watched => {
           if (!watched || !watched.name) return false;
-          return watched.name.toLowerCase().trim() === lowerCaseIngredient;
+          const watchedNameLower = watched.name.toLowerCase().trim();
+          const isEqual = watchedNameLower === lowerCaseIngredient;
+          
+          // Detaljerad loggning *endast* när vi letar efter "arom"
+          if (lowerCaseIngredient === 'arom') {
+            console.log(`[getStyle] Jämför "${lowerCaseIngredient}" med watched "${watched.name}" (lowercase: "${watchedNameLower}"). Match: ${isEqual}`);
+          }
+          
+          return isEqual;
         });
         
-        if (matchingWatchedIngredient) {
-          // Kontrollera reason-fältet för att avgöra om det är osäkert
+        // Logga om vi hittade en match för "arom"
+        if (lowerCaseIngredient === 'arom') {
+           console.log(`[getStyle] Hittade matchande watchedIngredient för "arom"?`, matchingWatchedIngredient ? 'JA' : 'NEJ', matchingWatchedIngredient);
+        }
+        
+        if (matchingWatchedIngredient) { 
           const isUncertain = 
+            matchingWatchedIngredient.status === 'uncertain' || 
             matchingWatchedIngredient.reason === 'uncertain' || 
             matchingWatchedIngredient.reason === 'maybe-non-vegan';
             
+          // Logga resultatet av isUncertain-kontrollen för "arom"
+          if (lowerCaseIngredient === 'arom') {
+             console.log(`[getStyle] Är matchingWatchedIngredient osäker? ${isUncertain}`);
+          }
+
           if (isUncertain) {
-            console.log(`Ingrediens "${ingredient}" markerad som OSÄKER (orange)`);
+            console.log(`[getStyle] Ingrediens "${ingredient}" markerad som OSÄKER (orange)`);
             return { textColor: '#d97706', statusColor: '#f59e0b' }; // Orange
           }
         }
       }
       
-      // Om vi kommer hit är ingrediensen förmodligen OK (grå prick)
-      // Logga inte detta för att minska brus, vi loggar bara rött/orange
+      // Fallback till grå
+      if (lowerCaseIngredient === 'arom') {
+        console.log(`[getStyle] Fallback till grå för "${ingredient}"`);
+      }
       return { textColor: '#333', statusColor: '#9ca3af' };
     } catch (error) {
-      console.error('Fel vid avgörande av ingrediensstatus:', error, ingredient);
+      console.error('[getStyle] Fel vid avgörande av ingrediensstatus:', error, ingredient);
       return { textColor: '#333', statusColor: '#9ca3af' }; // Fallback till grå vid fel
     }
   };

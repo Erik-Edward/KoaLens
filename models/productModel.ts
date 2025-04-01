@@ -11,11 +11,13 @@ export interface WatchedIngredient {
 
 export interface ProductAnalysis {
   isVegan: boolean;
+  isUncertain?: boolean; // Ny status för osäker vegan-status
   confidence: number;
   watchedIngredients: WatchedIngredient[]; // Ingredienser med anmärkningar
   reasoning?: string; // Förklaring av analysen
   detectedLanguage?: string; // Detected language of the ingredients (sv, en, unknown)
   detectedNonVeganIngredients?: string[]; // Array of specifically detected non-vegan ingredients
+  uncertainReasons?: string[]; // Orsaker till osäker status
 }
 
 export interface ProductMetadata {
@@ -25,6 +27,7 @@ export interface ProductMetadata {
   isSavedToHistory: boolean;
   source?: string; // Manuell, skanning, etc.
   imageUri?: string; // URI till produktbild
+  videoUri?: string; // URI till produktvideo
   croppedImageUri?: string; // URI till beskuren produktbild
   name?: string; // Produktnamn
 }
@@ -97,6 +100,7 @@ export function convertFromLegacyProduct(legacy: any): Product {
       isSavedToHistory: true, // Antag att alla legacy-produkter är i historiken
       source: legacy.source || "Legacy import",
       imageUri: legacy.imageUri,
+      videoUri: legacy.videoUri,
       croppedImageUri: legacy.croppedImageUri,
       name: legacy.name || legacy.productName,
     }
@@ -130,6 +134,7 @@ export function convertToLegacyProduct(product: Product): any {
     userId: product.metadata.userId,
     source: product.metadata.source,
     imageUri: product.metadata.imageUri,
+    videoUri: product.metadata.videoUri,
     productName: product.metadata.name,
     detectedLanguage: product.analysis.detectedLanguage,
     detectedNonVeganIngredients: product.analysis.detectedNonVeganIngredients,

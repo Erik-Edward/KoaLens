@@ -20,8 +20,8 @@ interface AnalysisResult {
   confidence: number;
   watchedIngredients: WatchedIngredient[];
   reasoning?: string;
-  detectedLanguage?: string;
-  detectedNonVeganIngredients?: string[];
+  detectedLanguage?: string; 
+  detectedNonVeganIngredients?: string[]; 
   ingredientList?: string[];
 }
 
@@ -91,6 +91,24 @@ const WATCHED_INGREDIENTS = [
 
 // Använd API_BASE_URL från config eller fallback till standardvärden
 const API_ENDPOINT = API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || 'https://api.koalens.app';
+
+// --- Start: New Interfaces for Video Backend Response ---
+interface BackendIngredient {
+  name: string;
+  isVegan: boolean;
+  confidence: number;
+  isUncertain?: boolean;
+}
+
+interface VideoAnalysisBackendResponse {
+  ingredients: BackendIngredient[];
+  isVegan: boolean;
+  isUncertain?: boolean;
+  confidence: number;
+  reasoning?: string;
+  uncertainReasons?: string[];
+}
+// --- End: New Interfaces for Video Backend Response ---
 
 export class AnalysisService {
   // API-slutpunkter
@@ -718,96 +736,96 @@ export class AnalysisService {
         
         this.analysisProgress = 90;
         
-        // Validera API-svar
-        if (!response.data) {
-          throw new Error('Empty response from video analysis API');
+        // --- Start: Updated Response Handling with Mapping ---
+        // Analysera resultat från API (Uppdaterad logik)
+        if (!response || !response.data) {
+           throw new Error('Empty or invalid response from video analysis API');
         }
-        
-        if (response.data.error) {
-          throw new Error(`API error: ${response.data.error}`);
+
+        // Steg 1: Tolka svaret enligt den nya backend-strukturen
+        const backendResult: VideoAnalysisBackendResponse = response.data; 
+        this.logEvent('Video API call successful, received new format', { 
+            isVegan: backendResult.isVegan, 
+            isUncertain: backendResult.isUncertain, 
+            ingredientCount: backendResult.ingredients?.length ?? 0 
+        });
+
+        // Kontrollera att grundläggande fält från backend finns
+        if (backendResult.isVegan === undefined || backendResult.confidence === undefined || !Array.isArray(backendResult.ingredients)) {
+          this.logEvent('Invalid backend response structure received', { responseData: backendResult });
+          throw new Error('Invalid response format from video analysis API backend');
         }
-        
-        if (!response.data.success && response.data.success !== undefined) {
-          throw new Error('API reported failure: ' + (response.data.message || 'Unknown error'));
-        }
-        
-        // Analysera resultat från API
-        let result: AnalysisResult;
-        
-        if (response.data.result) {
-          // Nytt API-format
-          result = response.data.result;
-          console.log('AnalysisService: Video API call successful');
-        } else if (response.data.isVegan !== undefined) {
-          // Äldre API-format - analysresultatet direkt i svaret
-          result = response.data;
-          console.log('AnalysisService: Video API call successful (legacy format)');
-        } else {
-          throw new Error('Invalid response format from video analysis API');
-        }
-        
-        // Kontrollera att resultatet innehåller nödvändiga fält
-        if (result.isVegan === undefined || result.confidence === undefined) {
-          throw new Error('Invalid analysis result: Missing required fields');
-        }
-        
-        // Spara i cache om cachning är aktiverat
+
+        // Steg 2: Mappa från backend-struktur till den gamla AnalysisResult-strukturen
+        const mappedResult: AnalysisResult = {
+            isVegan: backendResult.isVegan,
+            confidence: backendResult.confidence,
+            // Mappa backend ingredients till watchedIngredients
+            watchedIngredients: backendResult.ingredients.map(ing => ({
+                name: ing.name,
+                reason: ing.isVegan ? (ing.isUncertain ? 'uncertain' : 'vegan') : 'non-vegan',
+                // Description kan användas för osäkra skäl om det finns per ingrediens, annars undefined
+                description: ing.isUncertain ? `Osäker status (Konfidens: ${ing.confidence.toFixed(2)})` : undefined 
+            })),
+            // Kombinera reasoning och uncertainReasons till ett fält
+            reasoning: backendResult.reasoning || backendResult.uncertainReasons?.join('; ') || (backendResult.isUncertain ? 'Produkten har osäker vegansk status.' : ''),
+            // Fyll i gamla fält baserat på ny data
+            detectedNonVeganIngredients: backendResult.ingredients
+                .filter(ing => !ing.isVegan && !ing.isUncertain)
+                .map(ing => ing.name),
+            ingredientList: backendResult.ingredients.map(ing => ing.name),
+            detectedLanguage: 'sv' // Antag svenska baserat på backend-prompt
+        };
+
+        this.logEvent('Mapped backend response to frontend AnalysisResult', { 
+            mappedIsVegan: mappedResult.isVegan,
+            watchedCount: mappedResult.watchedIngredients.length
+        });
+        // --- End: Updated Response Handling with Mapping ---
+
+        // Cache the mapped result if enabled
         if (this.cachingEnabled) {
-          await this.cacheVideoAnalysisResult(videoUri, result);
+          try {
+            await this.cacheVideoAnalysisResult(videoUri, mappedResult); // Cache the mapped structure
+            this.logEvent('Cached video analysis result');
+          } catch (cacheError: any) {
+            console.error('Failed to cache video analysis result:', cacheError.message);
+            this.logEvent('Failed to cache video result', { error: cacheError.message });
+          }
         }
-        
-        // Uppdatera framsteg och returnera resultat
+
         this.analysisProgress = 100;
         this.analysisStats.success = true;
-        this.analysisStats.endTime = Date.now();
-        this.analysisStats.duration = this.analysisStats.endTime - this.analysisStats.startTime;
-        this.logEvent('Video analysis completed successfully', { duration: this.analysisStats.duration });
+        this.logEvent('Video analysis completed successfully');
+        return mappedResult; // Return the result mapped to the original AnalysisResult interface
         
-        return result;
-      } catch (apiError: any) {
-        console.error('Error in video API call:', apiError);
-        this.logEvent('Error in video API call', { error: apiError.message });
-        this.reportQualityIssue('Video API call failed: ' + apiError.message);
+      } catch (error: any) {
+        // Hantera fel
+        this.analysisProgress = 100;
+        this.analysisStats.success = false;
+        this.analysisStats.errorMessage = error.message || 'Unknown error during video analysis';
+        this.logEvent('Video analysis failed', { error: this.analysisStats.errorMessage, stack: error.stack });
         
-        // Hantera olika feltyper
-        if (apiError.response) {
-          // Vi fick ett svar från servern men med felstatus
-          const status = apiError.response.status;
-          
-          if (status === 413) {
-            throw new Error('Video file is too large for analysis');
-          } else if (status === 404) {
-            throw new Error('Video analysis endpoint not found');
-          } else if (status === 429) {
-            throw new Error('Too many requests. Please try again later.');
-          } else if (status === 500) {
-            throw new Error('Server error during video analysis. Please try again later.');
-          } else {
-            throw new Error(`Video API returned ${status}: ${apiError.response.data?.error || apiError.message}`);
-          }
-        } else if (apiError.request) {
-          // Begäran gjordes men vi fick inget svar
-          throw new Error('No response from server. Please check your internet connection.');
+        // Specifik felhantering kan läggas till här, t.ex. för timeout eller nätverksfel
+        if (error.message === 'Duplicate request, analysis already in progress') {
+          // Informera användaren specifikt om detta
+          throw new Error('Analysen pågår redan för denna video.'); 
+        } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          throw new Error('Timeout vid anrop till videoanalys-API. Försök igen.');
         } else {
-          // Något annat gick fel vid uppsättning av begäran
-          throw new Error(`Network error: ${apiError.message}`);
+          throw new Error(`Fel vid videoanalys: ${this.analysisStats.errorMessage}`);
         }
       }
     } catch (error: any) {
-      console.error('Error in video analysis:', error);
-      this.logEvent('Error in video analysis', { error: error.message });
-      this.reportQualityIssue('Video analysis failed: ' + error.message);
-      
-      // Ange att analysen misslyckades
+      // Övergripande felhantering
       this.analysisStats.success = false;
+      this.analysisStats.errorMessage = error.message || 'An unexpected error occurred';
+      this.logEvent('Critical error in analyzeVideo', { error: this.analysisStats.errorMessage });
+      throw error; // Kasta vidare felet
+    } finally {
       this.analysisStats.endTime = Date.now();
       this.analysisStats.duration = this.analysisStats.endTime - this.analysisStats.startTime;
-      this.analysisStats.errorMessage = error.message;
-      
-      // Propagera felet uppåt istället för att falla tillbaka på mock-data
-      throw error;
-    } finally {
-      this.analysisProgress = 100;
+      console.log('AnalysisService: Video analysis finished.', this.analysisStats);
     }
   }
   

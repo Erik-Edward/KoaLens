@@ -92,24 +92,6 @@ const WATCHED_INGREDIENTS = [
 // Använd API_BASE_URL från config eller fallback till standardvärden
 const API_ENDPOINT = API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || 'https://api.koalens.app';
 
-// --- Start: New Interfaces for Video Backend Response ---
-interface BackendIngredient {
-  name: string;
-  isVegan: boolean;
-  confidence: number;
-  isUncertain?: boolean;
-}
-
-interface VideoAnalysisBackendResponse {
-  ingredients: BackendIngredient[];
-  isVegan: boolean;
-  isUncertain?: boolean;
-  confidence: number;
-  reasoning?: string;
-  uncertainReasons?: string[];
-}
-// --- End: New Interfaces for Video Backend Response ---
-
 export class AnalysisService {
   // API-slutpunkter
   private TEXT_ANALYSIS_ENDPOINT = `${API_ENDPOINT}/api/ingredients/analyze`;
@@ -736,68 +718,76 @@ export class AnalysisService {
         
         this.analysisProgress = 90;
         
-        // --- Start: Updated Response Handling with Mapping ---
-        // Analysera resultat från API (Uppdaterad logik)
+        // --- Start: Corrected & Simplified Response Handling ---
+        // Analysera resultat från API (Förenklad logik)
         if (!response || !response.data) {
-           throw new Error('Empty or invalid response from video analysis API');
+           throw new Error('Empty or invalid response structure from video analysis API');
         }
 
-        // Steg 1: Tolka svaret enligt den nya backend-strukturen
-        const backendResult: VideoAnalysisBackendResponse = response.data; 
-        this.logEvent('Video API call successful, received new format', { 
-            isVegan: backendResult.isVegan, 
-            isUncertain: backendResult.isUncertain, 
-            ingredientCount: backendResult.ingredients?.length ?? 0 
-        });
-
-        // Kontrollera att grundläggande fält från backend finns
-        if (backendResult.isVegan === undefined || backendResult.confidence === undefined || !Array.isArray(backendResult.ingredients)) {
-          this.logEvent('Invalid backend response structure received', { responseData: backendResult });
-          throw new Error('Invalid response format from video analysis API backend');
-        }
-
-        // Steg 2: Mappa från backend-struktur till den gamla AnalysisResult-strukturen
-        const mappedResult: AnalysisResult = {
-            isVegan: backendResult.isVegan,
-            confidence: backendResult.confidence,
-            // Mappa backend ingredients till watchedIngredients
-            watchedIngredients: backendResult.ingredients.map(ing => ({
-                name: ing.name,
-                reason: ing.isVegan ? (ing.isUncertain ? 'uncertain' : 'vegan') : 'non-vegan',
-                // Description kan användas för osäkra skäl om det finns per ingrediens, annars undefined
-                description: ing.isUncertain ? `Osäker status (Konfidens: ${ing.confidence.toFixed(2)})` : undefined 
-            })),
-            // Kombinera reasoning och uncertainReasons till ett fält
-            reasoning: backendResult.reasoning || backendResult.uncertainReasons?.join('; ') || (backendResult.isUncertain ? 'Produkten har osäker vegansk status.' : ''),
-            // Fyll i gamla fält baserat på ny data
-            detectedNonVeganIngredients: backendResult.ingredients
-                .filter(ing => !ing.isVegan && !ing.isUncertain)
-                .map(ing => ing.name),
-            ingredientList: backendResult.ingredients.map(ing => ing.name),
-            detectedLanguage: 'sv' // Antag svenska baserat på backend-prompt
+        // Steg 1: Destrukturera det yttre svaret från backend
+        const { success, responseData, error: backendError } = response.data as { 
+            success: boolean; 
+            responseData?: AnalysisResult; // Förvänta den gamla AnalysisResult-strukturen inuti
+            error?: string 
         };
 
-        this.logEvent('Mapped backend response to frontend AnalysisResult', { 
-            mappedIsVegan: mappedResult.isVegan,
-            watchedCount: mappedResult.watchedIngredients.length
-        });
-        // --- End: Updated Response Handling with Mapping ---
+        // Steg 2: Kontrollera 'success'-flaggan och att 'responseData' finns
+        if (success && responseData) {
+            // Steg 2a: responseData är nu direkt resultatet vi vill ha
+            const result: AnalysisResult = responseData; 
+            this.logEvent('Video API call successful, received expected structure', { 
+                isVegan: result.isVegan, 
+                watchedCount: result.watchedIngredients?.length ?? 0 
+            });
 
-        // Cache the mapped result if enabled
-        if (this.cachingEnabled) {
-          try {
-            await this.cacheVideoAnalysisResult(videoUri, mappedResult); // Cache the mapped structure
-            this.logEvent('Cached video analysis result');
-          } catch (cacheError: any) {
-            console.error('Failed to cache video analysis result:', cacheError.message);
-            this.logEvent('Failed to cache video result', { error: cacheError.message });
-          }
+            // Steg 2b: Validera strukturen på det *inre* objektet (responseData / result)
+            // Kontrollera fält som förväntas i AnalysisResult
+            if (result.isVegan === undefined || result.confidence === undefined) {
+              this.logEvent('Invalid inner response: Missing isVegan or confidence', { responseData: result });
+              throw new Error('Invalid inner data structure: Missing isVegan or confidence');
+            }
+            if (result.watchedIngredients === undefined || result.watchedIngredients === null) {
+              this.logEvent('Invalid inner response: Missing watchedIngredients', { responseData: result });
+              throw new Error('Invalid inner data structure: Missing watchedIngredients');
+            }
+            if (!Array.isArray(result.watchedIngredients)) {
+              this.logEvent('Invalid inner response: watchedIngredients is not an Array', {
+                  responseData: result,
+                  watchedIngredientsType: typeof result.watchedIngredients 
+               });
+              throw new Error(`Invalid inner data structure: watchedIngredients is not an Array (type: ${typeof result.watchedIngredients})`);
+            }
+
+            // Validation passed if we reach here
+
+            // Steg 2c: Mapping behövs inte längre eftersom responseData redan är i rätt format
+            // REMOVED MAPPING LOGIC
+
+            this.logEvent('Using received responseData directly as AnalysisResult');
+
+            // Cache the result if enabled
+            if (this.cachingEnabled) {
+              try {
+                await this.cacheVideoAnalysisResult(videoUri, result); // Cache the result directly
+                this.logEvent('Cached video analysis result');
+              } catch (cacheError: any) {
+                console.error('Failed to cache video analysis result:', cacheError.message);
+                this.logEvent('Failed to cache video result', { error: cacheError.message });
+              }
+            }
+
+            this.analysisProgress = 100;
+            this.analysisStats.success = true;
+            this.logEvent('Video analysis completed successfully');
+            return result; // Return the result directly
+
+        } else {
+            // Hantera fallet där success är false eller responseData saknas
+            const errorMessage = backendError || 'Backend reported unsuccessful video analysis or missing data';
+            this.logEvent('Video analysis failed on backend', { success, error: backendError });
+            throw new Error(errorMessage);
         }
-
-        this.analysisProgress = 100;
-        this.analysisStats.success = true;
-        this.logEvent('Video analysis completed successfully');
-        return mappedResult; // Return the result mapped to the original AnalysisResult interface
+        // --- End: Corrected & Simplified Response Handling --- 
         
       } catch (error: any) {
         // Hantera fel

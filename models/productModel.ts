@@ -19,6 +19,7 @@ export interface ProductAnalysis {
   detectedLanguage?: string; // Detected language of the ingredients (sv, en, unknown)
   detectedNonVeganIngredients?: string[]; // Array of specifically detected non-vegan ingredients
   uncertainReasons?: string[]; // Orsaker till osäker status
+  uncertainIngredients?: string[]; // Nytt fält: Lista med osäkra ingrediensnamn
 }
 
 export interface ProductMetadata {

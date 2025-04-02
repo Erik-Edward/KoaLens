@@ -650,7 +650,8 @@ export default function ResultScreen() {
         reasoning: analysisResult.reasoning || analysisResult.explanation || '',
         detectedLanguage: analysisResult.detectedLanguage || 'sv',
         detectedNonVeganIngredients: detectedNonVeganNames, // Använd den filtrerade namnlistan
-        uncertainReasons: analysisResult.uncertainReasons || []
+        uncertainReasons: analysisResult.uncertainReasons || [],
+        uncertainIngredients: analysisResult.uncertainIngredients || []
       },
       metadata: {
         userId: userId || 'anonymous',
@@ -1124,6 +1125,44 @@ export default function ResultScreen() {
               Säkerhet: {Math.round(product.analysis.confidence * 100)}%
             </StyledText>
             
+            {/* ----- START: Ny villkorlig sammanfattning ----- */}
+
+            {/* Fall 1: Vegansk */}
+            {product.analysis.isVegan && (
+              <StyledView className="mt-3 mb-4 bg-green-100 p-3 rounded-lg border border-green-200">
+                <StyledText className="text-green-800 text-center">
+                  Alla ingredienser bedöms vara veganska.
+                </StyledText>
+              </StyledView>
+            )}
+
+            {/* Fall 2: Osäker */}
+            {!product.analysis.isVegan && product.analysis.isUncertain && product.analysis.uncertainIngredients && product.analysis.uncertainIngredients.length > 0 && (
+              <StyledView className="mt-3 mb-4 bg-amber-100 p-3 rounded-lg border border-amber-200">
+                <StyledText className="font-sans-bold text-amber-800 mb-1">
+                  Innehåller osäkra ingredienser:
+                </StyledText>
+                <StyledText className="text-amber-700">
+                  {/* Använd det nya uncertainIngredients-fältet */}
+                  {product.analysis.uncertainIngredients.join(', ')}
+                </StyledText>
+              </StyledView>
+            )}
+
+            {/* Fall 3: Ej Vegansk */}
+            {!product.analysis.isVegan && !product.analysis.isUncertain && product.analysis.detectedNonVeganIngredients && product.analysis.detectedNonVeganIngredients.length > 0 && (
+              <StyledView className="mt-3 mb-4 bg-red-100 p-3 rounded-lg border border-red-200">
+                <StyledText className="font-sans-bold text-red-800 mb-1">
+                  Innehåller icke-veganska ingredienser:
+                </StyledText>
+                <StyledText className="text-red-700">
+                  {product.analysis.detectedNonVeganIngredients.join(', ')}
+                </StyledText>
+              </StyledView>
+            )}
+
+            {/* ----- SLUT: Ny villkorlig sammanfattning ----- */}
+
             {/* Visa osäkerhetsanledningar om det är osäkert (befintlig kod, men nu mer relevant) */}
             {product.analysis.isUncertain && product.analysis.uncertainReasons && product.analysis.uncertainReasons.length > 0 && (
               <StyledView className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
@@ -1140,26 +1179,6 @@ export default function ResultScreen() {
                 ))}
               </StyledView>
             )}
-            
-            {/* Analysgrund (bakgrundsfärg uppdaterad för osäker) */}
-            <StyledView 
-              className={`mt-0 ${
-                product.analysis.isVegan ? 'bg-green-50' : 
-                product.analysis.isUncertain ? 'bg-amber-50' : 'bg-red-50'
-              } p-4 rounded-lg`}
-            >
-              <SafeText 
-                value={product.analysis.reasoning} 
-                fallback="Ingen analysgrund tillgänglig"
-                style={{ 
-                  color: product.analysis.isVegan ? '#166534' : 
-                         product.analysis.isUncertain ? '#92400e' : '#991b1b',
-                  fontSize: 15,
-                  lineHeight: 22,
-                  textAlign: 'center'
-                }}
-              />
-            </StyledView>
           </StyledView>
           
           {/* Ingredienslista */}

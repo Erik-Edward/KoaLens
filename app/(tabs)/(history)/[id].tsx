@@ -3,7 +3,7 @@
  * Använder den nya produktmodellen och våra custom hooks
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { 
   View, Text, Image, ScrollView, ActivityIndicator,
   Pressable, SafeAreaView, Alert, Share, Platform, StatusBar 
@@ -15,6 +15,8 @@ import { useProducts } from '../../../hooks/useProducts';
 import { Product } from '../../../models/productModel';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { useStore } from '@/stores/useStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // Styled components
 const StyledView = styled(View);
@@ -47,6 +49,7 @@ const STRINGS = {
   NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
   WATCH_INGREDIENTS: 'Bevakade ingredienser',
   UNKNOWN_INGREDIENTS: 'Okända ingredienser',
+  UNCERTAIN_INGREDIENTS: 'Osäkra ingredienser',
   VEGAN_RESULT: 'Vegansk',
   NON_VEGAN_RESULT: 'Inte vegansk',
   CONFIDENCE: 'Säkerhet',
@@ -68,7 +71,7 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
 const IngredientList: React.FC<{
   title: string;
   ingredients: string[];
-  type: 'vegan' | 'non-vegan' | 'watch' | 'unknown';
+  type: 'vegan' | 'non-vegan' | 'watch' | 'unknown' | 'user-watch';
 }> = ({ title, ingredients, type }) => {
   // Färgkodning för olika typer av ingredienser
   const getTypeColor = () => {
@@ -76,6 +79,7 @@ const IngredientList: React.FC<{
       case 'vegan': return 'bg-status-success';
       case 'non-vegan': return 'bg-status-error';
       case 'watch': return 'bg-status-warning';
+      case 'user-watch': return 'bg-blue-500';
       case 'unknown': return 'bg-gray-400';
       default: return 'bg-gray-400';
     }
@@ -126,6 +130,14 @@ export default function ProductDetailScreen() {
     getProductById, toggleFavorite, removeProduct
   } = useProducts();
   
+  // --- Get user's watched ingredients ---
+  const userWatchedIngredientNames = useStore(useShallow(state =>
+    Object.values(state.preferences?.watchedIngredients || {})
+      .filter(ing => ing.enabled)
+      .map(ing => ing.name.toLowerCase())
+  ));
+  // --------------------------------------
+  
   // Ladda produktdata
   const loadProduct = useCallback(async () => {
     if (!id) {
@@ -162,6 +174,15 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     loadProduct();
   }, [loadProduct]);
+  
+  // --- Filter product ingredients based on user's watch list ---
+  const watchedProductIngredients = useMemo(() => {
+    if (!product) return [];
+    return product.ingredients.filter(ing => 
+      userWatchedIngredientNames.includes(ing.toLowerCase().trim())
+    );
+  }, [product, userWatchedIngredientNames]);
+  // -----------------------------------------------------------
   
   // Hantera favorit-knapp
   const handleToggleFavorite = async () => {
@@ -345,41 +366,12 @@ export default function ProductDetailScreen() {
         
         {/* Innehåll */}
         <StyledView className="p-4">
-          {/* Resultat */}
-          <StyledView className="items-center mb-6">
-            <StyledView 
-              className={`py-2 px-4 rounded-full mb-4 ${
-                product.analysis.isVegan 
-                  ? 'bg-status-success/20' 
-                  : 'bg-status-error/20'
-              }`}
-            >
-              <StyledText className={`font-sans-bold text-lg ${
-                product.analysis.isVegan 
-                  ? 'text-status-success' 
-                  : 'text-status-error'
-              }`}>
-                {product.analysis.isVegan 
-                  ? STRINGS.VEGAN_RESULT 
-                  : STRINGS.NON_VEGAN_RESULT}
-              </StyledText>
-            </StyledView>
-            
-            <StyledView className="flex-row items-center mb-2">
-              <Ionicons name="shield-checkmark-outline" size={16} color="#9ca3af" />
-              <StyledText className="text-text-secondary font-sans ml-1">
-                {STRINGS.CONFIDENCE}: {Math.round(product.analysis.confidence * 100)}%
-              </StyledText>
-            </StyledView>
-            
-            <StyledView className="flex-row items-center">
-              <Ionicons name="calendar-outline" size={16} color="#9ca3af" />
-              <StyledText className="text-text-secondary font-sans ml-1">
-                {STRINGS.ANALYSIS_DATE}: {formattedDate}
-              </StyledText>
-            </StyledView>
-          </StyledView>
-          
+          {/* --- ADD PRODUCT NAME HERE --- */}
+          <StyledText className="text-2xl font-sans-bold text-text-primary mb-4">
+            {product.metadata.name}
+          </StyledText>
+          {/* ----------------------------- */}
+
           {/* Analys */}
           <StyledView className="mb-8">
             <SectionHeader title={STRINGS.SECTION_ANALYSIS} />
@@ -416,12 +408,22 @@ export default function ProductDetailScreen() {
             />
             
             <IngredientList
-              title={STRINGS.WATCH_INGREDIENTS}
+              title={STRINGS.UNCERTAIN_INGREDIENTS}
               ingredients={product.analysis.watchedIngredients
                 .filter(w => w.reason !== 'non-vegan')
                 .map(w => w.name)}
               type="watch"
             />
+            
+            {/* --- NEW: User's Watched Ingredients Section --- */}
+            {watchedProductIngredients.length > 0 && (
+              <IngredientList
+                title={STRINGS.WATCH_INGREDIENTS}
+                ingredients={watchedProductIngredients}
+                type="user-watch"
+              />
+            )}
+            {/* ------------------------------------------------- */}
             
             <IngredientList
               title={STRINGS.UNKNOWN_INGREDIENTS}

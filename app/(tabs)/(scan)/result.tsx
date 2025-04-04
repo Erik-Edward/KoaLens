@@ -16,7 +16,8 @@ import {
   StyleSheet,
   Platform,
   Modal,
-  TextInput
+  TextInput,
+  KeyboardAvoidingView
 } from 'react-native';
 import { styled } from 'nativewind';
 import { router, useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,6 +35,8 @@ import { logScreenView } from '@/lib/analyticsWrapper';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Video, ResizeMode } from 'expo-av';
+import { useStore } from '@/stores/useStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // Styled components
 const StyledView = styled(View);
@@ -180,16 +183,17 @@ function safeJsonParse(jsonString: string | undefined, fallback: any = null) {
 /**
  * IngredientsList komponent
  * Hanterar enkel ingredienslista med rapporteringsfunktionalitet
+ * och markering för användarens bevakade ingredienser.
  */
-function IngredientsList({ 
-  ingredients, 
-  watchedIngredients, // Används främst för 'uncertain' nu
-  detectedNonVeganIngredients, // Ny prop för slutgiltig lista
+function IngredientsList({
+  ingredients,
+  watchedIngredients, // Backend-provided uncertain/non-vegan
+  detectedNonVeganIngredients,
   onReportIngredient
-}: { 
+}: {
   ingredients: string[],
   watchedIngredients: WatchedIngredient[],
-  detectedNonVeganIngredients: string[], // Lägg till prop
+  detectedNonVeganIngredients: string[],
   onReportIngredient?: (ingredient: string) => void
 }) {
   const StyledView = styled(View);
@@ -217,12 +221,12 @@ function IngredientsList({
     // Grundläggande validering
     if (!ingredient || typeof ingredient !== 'string') {
       console.log('[getStyle] Ogiltig ingrediens:', ingredient);
-      return { textColor: '#333', statusColor: '#9ca3af' }; // Default grå
+      return { textColor: '#333', statusColor: '#9ca3af' }; // Default
     }
     
     try {
       const lowerCaseIngredient = ingredient.toLowerCase().trim();
-      
+
       // Logga varje gång funktionen körs för Arom
       if (lowerCaseIngredient === 'arom') {
         console.log(`[getStyle] Körs för ingrediens: "${ingredient}" (lowercase: "${lowerCaseIngredient}")`);
@@ -236,7 +240,6 @@ function IngredientsList({
         });
         
         if (isNonVegan) {
-          // console.log(`[getStyle] Ingrediens "${ingredient}" markerad som ICKE-VEGANSK (röd)`); // Reducerad loggning
           return { textColor: '#b91c1c', statusColor: '#ef4444' }; // Röd
         }
       }
@@ -279,14 +282,14 @@ function IngredientsList({
         }
       }
       
-      // Fallback till grå
+      // Fallback till grön för veganska ingredienser (tidigare grå)
       if (lowerCaseIngredient === 'arom') {
-        console.log(`[getStyle] Fallback till grå för "${ingredient}"`);
+        console.log(`[getStyle] Fallback till grön för "${ingredient}"`);
       }
-      return { textColor: '#333', statusColor: '#9ca3af' };
+      return { textColor: '#22c55e', statusColor: '#10b981' }; // Grön
     } catch (error) {
       console.error('[getStyle] Fel vid avgörande av ingrediensstatus:', error, ingredient);
-      return { textColor: '#333', statusColor: '#9ca3af' }; // Fallback till grå vid fel
+      return { textColor: '#333', statusColor: '#9ca3af' }; // Fallback vid fel
     }
   };
 
@@ -326,7 +329,7 @@ function IngredientsList({
                   marginRight: 8
                 }}
               />
-              
+
               {/* Ingrediensnamn med SafeText */}
               <SafeText
                 value={ingredient}
@@ -370,7 +373,7 @@ const helpDialogContent = (
     <StyledView className="mb-4">
       <StyledText>• <StyledText className="text-red-600 font-medium">Röd</StyledText> - Icke-vegansk ingrediens</StyledText>
       <StyledText>• <StyledText className="text-orange-600 font-medium">Orange</StyledText> - Potentiellt icke-vegansk ingrediens</StyledText>
-      <StyledText>• <StyledText className="text-black">Svart</StyledText> - Vegansk ingrediens</StyledText>
+      <StyledText>• <StyledText className="text-green-600 font-medium">Grön</StyledText> - Vegansk ingrediens</StyledText>
     </StyledView>
     
     <StyledText className="text-base mb-2 font-medium">Om ingredienserna</StyledText>
@@ -407,6 +410,10 @@ export default function ResultScreen() {
   const [reportingIngredient, setReportingIngredient] = useState<string | null>(null);
   const [reportFeedback, setReportFeedback] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
+  // ---- NEW STATE FOR PHASE 2 ----
+  const [isNamingModalVisible, setIsNamingModalVisible] = useState(false);
+  const [analysisName, setAnalysisName] = useState('');
+  // -------------------------------
   
   // Referenser
   const router = useRouter();
@@ -423,6 +430,17 @@ export default function ResultScreen() {
   const photoPathRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
   
+  // --- Get user's watched ingredients ---
+  const userWatchedIngredientNames = useStore(useShallow(state =>
+    Object.values(state.preferences?.watchedIngredients || {})
+      .filter(ing => ing.enabled)
+      .map(ing => ing.name.toLowerCase())
+  ));
+  useEffect(() => {
+    console.log('[DEBUG] User watched ingredients:', userWatchedIngredientNames);
+  }, [userWatchedIngredientNames]);
+  // --------------------------------------
+
   // Hämta URL-parametrar
   const isDirectAnalysis = params.isDirectAnalysis === 'true';
   
@@ -462,146 +480,81 @@ export default function ResultScreen() {
   
   // Hämta och behandla analysresultat från parametrarna
   useEffect(() => {
-    console.log('[DEBUG] ResultScreen mount/params update triggered');
-    console.log('[DEBUG] Params object:', Object.keys(params).length ? params : 'empty params');
-    
-    // Förhindra dubbla initieringar
-    if (hasInitializedRef.current) {
-      console.log('[DEBUG] Redan initialiserad, skipping');
-      return;
+    console.log('[DEBUG] ResultScreen mount/params update triggered. Params:', params, 'Product exists:', !!product, 'Initialized:', hasInitializedRef.current, 'IsLoading:', isLoading);
+
+    // Kontrollera *innan* initialize() anropas
+    if (hasInitializedRef.current && product) {
+      console.log('[DEBUG] Redan initialiserad och produkt finns, hoppar över effektkörning.');
+      // Om vi redan är klara och har en produkt, sätt isLoading till false ifall den råkat bli true
+      if (isLoading) setIsLoading(false);
+      return; // Avsluta effekten om vi redan är klara
     }
-    
-    const initializeFromParams = async () => {
+
+    const initialize = async () => {
+      // Sätt bara isLoading till true om vi inte redan har en produkt (eller om det är första körningen)
+      if (!product) {
+         setIsLoading(true);
+         console.log('[DEBUG] ResultScreen initialize start');
+      } else {
+         console.log('[DEBUG] Produkt finns redan, uppdaterar inte isLoading i början av initialize.');
+      }
+
+      // Hämta userId direkt
+      const currentUserId = await getUserId();
+      setUserId(currentUserId);
+
+      let resultData: ProductAnalysis | null = null; // För att kunna sätta ref i finally
+
       try {
-        console.log('[DEBUG] Initi start, setting loading true');
-        hasInitializedRef.current = true;
-        setIsLoading(true);
-        
-        console.log('RESULT SCREEN: Initializing screen...');
-        console.log('RESULT SCREEN: Available params:', Object.keys(params).join(', '));
-        console.log('RESULT SCREEN: Starting initialization');
-        
-        // Kontrollera först om vi har ett videoPath
-        if (params.videoPath) {
-          console.log('RESULT SCREEN: Video path set:', params.videoPath);
-          setVideoPath(params.videoPath as string);
-          setAnalysisType('video');
-        }
-        
-        // Kontrollera om detta är resultatet av en videoanalys
-        const isVideoAnalysis = params.analysisType === 'video';
-        console.log('RESULT SCREEN: Is video analysis:', isVideoAnalysis);
-        
-        if (isVideoAnalysis) {
-          setAnalysisType('video');
-        }
-        
-        // Hämta användarens ID för att spara produkten
-        const userId = await getUserId();
-        console.log('RESULT SCREEN: User ID retrieved:', userId);
-        
-        // Kontrollera om vi har analysresultat i params
-        if (params.analysisResult) {
-          const resultString = params.analysisResult as string;
-          console.log('RESULT SCREEN: Found analysis result in params, length:', resultString.length);
-          
-          // Kontrollera vad för typ av data vi har
-          console.log('RESULT SCREEN: Raw data type:', typeof resultString);
-          
-          try {
-            // Försök tolka JSON direkt
-            console.log('RESULT SCREEN: Attempting to parse JSON directly');
-            let parsedResult;
-            
-            // Förbättrad JSON parsing med konvertering av häftiga data
-            try {
-              parsedResult = JSON.parse(resultString);
-              console.log('RESULT SCREEN: Direct JSON parsing succeeded');
-            } catch (initialParseError) {
-              console.error('RESULT SCREEN: Initial JSON parse failed:', initialParseError);
-              
-              // Försök rensa strängen och tolka igen
-              try {
-                // Om strängen innehåller escape-tecken som stör parsningen
-                const cleanedString = resultString
-                  .replace(/\\"/g, '"')        // Ersätt \" med "
-                  .replace(/^"|"$/g, '')       // Ta bort omslutande citattecken
-                  .replace(/\\n/g, ' ')        // Ersätt radbrytningar med mellanslag
-                  .replace(/\\\\/g, '\\');     // Ersätt \\ med \
-                
-                console.log('RESULT SCREEN: Trying with cleaned string');
-                parsedResult = JSON.parse(cleanedString);
-                console.log('RESULT SCREEN: Cleaned JSON parsing succeeded');
-              } catch (secondParseError) {
-                console.error('RESULT SCREEN: Second parse attempt failed:', secondParseError);
-                throw new Error('Kunde inte tolka analysresultatet från JSON');
-              }
-            }
-            
-            // Skriv ut hela resultatet för felsökning
-            console.log('RESULT SCREEN: Parsed result:', JSON.stringify(parsedResult));
-            
-            // Validera att det är ett giltigt analysresultat
-            console.log('RESULT SCREEN: JSON parsed successfully');
-            console.log('RESULT SCREEN: Analysis result keys:', Object.keys(parsedResult).join(', '));
-            
-            if (!parsedResult.isVegan && parsedResult.isVegan !== false) {
-              console.error('RESULT SCREEN: Missing isVegan property in result');
-              throw new Error('Invalid analysis result: Missing isVegan property');
-            }
-            
-            if (!parsedResult.confidence && parsedResult.confidence !== 0) {
-              console.error('RESULT SCREEN: Missing confidence property in result');
-              throw new Error('Invalid analysis result: Missing confidence property');
-            }
-            
-            // Skapa en produkt från analysresultatet
-            console.log('RESULT SCREEN: Creating product from analysis result');
-            const product = createProductFromAnalysis(parsedResult, userId, params.videoPath as string | undefined);
-            
-            // Uppdatera state med produkten
-            setProduct(product);
-            
-            // Det kan vara en demo/mockup
-            if (parsedResult.reasoning && parsedResult.reasoning.includes('DEMO-DATA')) {
-              setIsDemo(true);
-            }
-            
-            // Spara produkten om användaren är autentiserad
-            if (userId) {
-              try {
-                await saveToHistory(product);
-                console.log('RESULT SCREEN: Product saved to history');
-              } catch (saveError) {
-                console.error('RESULT SCREEN: Error saving to history:', saveError);
-              }
-            }
-          } catch (parseError) {
-            console.error('RESULT SCREEN: Error parsing analysis result:', parseError);
-            setErrorMessage('Ett fel uppstod vid bearbetning av analysresultatet. Försök igen.');
+        if (params.analysisResult && typeof params.analysisResult === 'string') {
+          resultData = safeJsonParse(params.analysisResult, null); // Parse först
+          const videoPath = params.videoPath as string | undefined;
+
+          console.log('[DEBUG] Parsed analysis result:', resultData);
+
+          if (!resultData) {
+            setErrorMessage('Kunde inte läsa analysresultatet.');
+            // setIsLoading(false); // Flyttad till finally
+            return; // Avbryt om parsning misslyckades
           }
+
+          // Skapa produktobjektet
+          const productObject = createProductFromAnalysis(resultData, currentUserId, videoPath);
+          setProduct(productObject); // Sätt produkten
+          console.log('[DEBUG] Product state updated after creation');
+
+          // Borttaget automatiskt sparande
+
         } else {
-          console.error('RESULT SCREEN: No analysis result in params');
-          setErrorMessage('Inget analysresultat att visa. Gå tillbaka och försök igen.');
+          console.log('[DEBUG] Inga analysResult params, sätter felmeddelande.');
+          setErrorMessage('Ingen analys att visa. Starta en ny analys.');
         }
-      } catch (error: any) {
-        console.error('RESULT SCREEN: Error during initialization:', error);
-        setErrorMessage(`Ett fel uppstod: ${error.message || 'Okänt fel'}`);
+      } catch (error) {
+         console.error('Error initializing ResultScreen:', error);
+         setErrorMessage(`Fel vid initiering: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
-        setIsLoading(false);
-        console.log('RESULT SCREEN: Loading state changed:', false);
+        setIsLoading(false); // Sätt alltid till false i finally
+        console.log('[DEBUG] ResultScreen initialize end, isLoading set to false');
+        // Markera som initialiserad endast om vi faktiskt lyckades få ett resultat
+        if (resultData) { // Kolla om vi lyckades parsa
+           hasInitializedRef.current = true;
+           console.log('[DEBUG] Marked as initialized.');
+        }
       }
     };
-    
-    if (Object.keys(params).length > 0) {
-      console.log('[DEBUG] Params finns, initierar');
-      initializeFromParams();
-    } else {
-      console.log('[DEBUG] Inga params, avbryter init');
-      setErrorMessage('Ingen analys att visa. Starta en ny analys.');
+
+    // Anropa initialize endast om vi inte redan har markerat som klar ELLER om produkten saknas
+    // Vi behöver köra initialize minst en gång för att få produkten.
+    if (!hasInitializedRef.current || !product) {
+      console.log('[DEBUG] Calling initialize(). Initialized:', hasInitializedRef.current, 'Product exists:', !!product);
+      initialize();
+    } else if (isLoading) {
+      // Om vi av någon anledning har isLoading=true men är klara, sätt tillbaka till false.
+      console.log('[DEBUG] Already initialized and product exists, but isLoading is true. Setting isLoading to false.');
       setIsLoading(false);
     }
-  }, [params]);
+
+  }, [params, product, isLoading]);
   
   // Konvertera analysdata till produktmodellen
   const createProductFromAnalysis = (analysisResult: any, userId: string | null, videoPath?: string): Product => {
@@ -657,7 +610,7 @@ export default function ResultScreen() {
         userId: userId || 'anonymous',
         scanDate: timestamp,
         isFavorite: false,
-        isSavedToHistory: true, // Antag att den sparas direkt
+        isSavedToHistory: false, // Ändrad till false
         source: videoPath ? 'video' : 'image', // Sätt källan baserat på videoPath
         imageUri: '', // Behöver hanteras separat om det är bildanalys
         videoUri: videoPath, // Spara videoPath om det finns
@@ -684,76 +637,60 @@ export default function ResultScreen() {
     router.back();
   };
   
-  // Hantera spara till historik
-  const handleSaveToHistory = async () => {
+  // Hantera spara till historik - PHASE 2: Opens naming modal
+  const handleSaveToHistory = () => {
     if (!product) return;
-    
+    // Om den redan är sparad, gör inget
+    if (product.metadata.isSavedToHistory) return;
+
+    // Pre-populate name input with default
+    const defaultName = product.metadata.name || `Analys ${new Date().toLocaleDateString()}`;
+    setAnalysisName(defaultName);
+    setIsNamingModalVisible(true); // Show the modal instead of saving directly
+    console.log('Opening naming modal.');
+  };
+
+  // ---- NEW FUNCTION FOR PHASE 2 ----
+  // Handles the actual saving after name confirmation in modal
+  const confirmSaveWithName = async () => {
+    if (!product || !analysisName.trim()) {
+      Alert.alert("Namn saknas", "Ange ett namn för analysen.");
+      return;
+    }
+
     try {
-      setIsLoading(true);
-      
-      // Kopiera bilden till en permanent lagringsplats innan vi sparar
-      let permanentImageUri = product.metadata.croppedImageUri;
-      
-      if (permanentImageUri) {
-        try {
-          console.log('Kopierar bild till permanent lagring...');
-          // Skapa ett unikt filnamn baserat på produkt-ID
-          const timestamp = new Date().getTime();
-          const newFileName = `${product.id}_${timestamp}.jpg`;
-          const permanentDir = `${FileSystem.documentDirectory}images/`;
-          
-          // Skapa images-katalogen om den inte finns
-          const dirInfo = await FileSystem.getInfoAsync(permanentDir);
-          if (!dirInfo.exists) {
-            console.log('Skapar bildkatalog...');
-            await FileSystem.makeDirectoryAsync(permanentDir, { intermediates: true });
-          }
-          
-          const newUri = `${permanentDir}${newFileName}`;
-          console.log(`Kopierar från ${permanentImageUri} till ${newUri}`);
-          
-          // Kopiera bilden till den permanenta platsen
-          await FileSystem.copyAsync({
-            from: permanentImageUri,
-            to: newUri
-          });
-          
-          console.log('Bild kopierad till permanent lagring:', newUri);
-          permanentImageUri = newUri;
-        } catch (imgError) {
-          console.error('Fel vid kopiering av bild:', imgError);
-          // Om något går fel fortsätter vi ändå men utan bild
-          permanentImageUri = undefined;
-        }
-      }
-      
-      // Uppdatera metadata med den permanenta bildsökvägen
-      const updatedProduct = {
+      setIsLoading(true); // Show loading indicator during save
+      setIsNamingModalVisible(false); // Close modal immediately
+
+      // Create the product object to save with the new name and saved status
+      const productToSave: Product = {
         ...product,
         metadata: {
           ...product.metadata,
-          croppedImageUri: permanentImageUri,
-          isSavedToHistory: true
+          name: analysisName.trim(), // Use the entered name
+          isSavedToHistory: true    // Mark as saved
         }
       };
-      
-      // Spara till historik
+
+      // Save/update in history
       const repository = ProductRepository.getInstance();
-      await repository.updateProduct(updatedProduct);
-      
-      // Uppdatera lokalt produktobjekt
-      setProduct(updatedProduct);
-      setIsSaved(true);
-      setIsLoading(false);
-      
-      console.log('Produkt sparad till historik med bildsökväg:', permanentImageUri);
-      Alert.alert("Sparad", "Produkten har sparats i din historik.");
+      await repository.updateProduct(productToSave);
+
+      // Update local product state
+      setProduct(productToSave);
+      // setIsSaved(true); // This state might not be needed anymore as we rely on product.metadata.isSavedToHistory
+
+      console.log(`Produkt sparad till historik manuellt med namn: ${analysisName.trim()}`);
+      Alert.alert("Sparad", `Analysen har sparats med namnet "${analysisName.trim()}".`);
+
     } catch (error) {
-      console.error('Kunde inte spara produkt:', error);
-      setIsLoading(false);
+      console.error('Kunde inte spara produkt med namn:', error);
       Alert.alert("Fel", "Kunde inte spara produkten. Försök igen.");
+    } finally {
+      setIsLoading(false); // Hide loading indicator
     }
   };
+  // ---------------------------------
   
   // Hantera favorit-togglering
   const handleToggleFavorite = async () => {
@@ -922,6 +859,15 @@ export default function ResultScreen() {
     };
   };
   
+  // --- Filter product ingredients based on user's watch list (for new section) ---
+  const watchedProductIngredients = useMemo(() => {
+    if (!product || !product.ingredients) return [];
+    return product.ingredients.filter(ing =>
+      userWatchedIngredientNames.includes(ing.toLowerCase().trim())
+    );
+  }, [product, userWatchedIngredientNames]);
+  // -----------------------------------------------------------------------------
+
   // ===== UI-rendering =====
   
   // Visa laddningsskärm
@@ -1052,18 +998,18 @@ export default function ResultScreen() {
         </StyledView>
         
         <StyledScrollView className="flex-1">
-          {/* Video analysis indicator med förbättrad design */}
+          {/* Video analysis indicator med förbättrad design - Nytt Grått Tema */}
           {product.metadata.source === 'video' && (
-            <StyledView className="w-full bg-indigo-50 p-5 my-3 mx-4 rounded-xl shadow-sm border border-indigo-100">
+            <StyledView className="w-full bg-gray-50 p-5 my-3 mx-4 rounded-xl shadow-sm border border-gray-200">
               <StyledView className="flex-row items-center mb-2">
-                <StyledView className="w-10 h-10 rounded-full bg-indigo-100 justify-center items-center mr-3">
-                  <Ionicons name="videocam" size={20} color="#4f46e5" />
+                <StyledView className="w-10 h-10 rounded-full bg-gray-200 justify-center items-center mr-3">
+                  <Ionicons name="videocam" size={20} color="#6b7280" />
                 </StyledView>
-                <StyledText className="text-indigo-900 font-sans-bold text-lg">
+                <StyledText className="text-gray-800 font-sans-bold text-lg">
                   Videoanalys genomförd
                 </StyledText>
               </StyledView>
-              <StyledText className="text-indigo-700 text-base ml-1">
+              <StyledText className="text-gray-600 text-base ml-1">
                 Videon har analyserats för att identifiera ingredienser.
               </StyledText>
             </StyledView>
@@ -1082,6 +1028,7 @@ export default function ResultScreen() {
           
           {/* Status (Ikon + Text) och Analysgrund */}
           <StyledView className="px-4 mt-4 mb-4">
+            {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
             <StyledView className="flex-row items-center justify-center mb-4">
               <Ionicons 
                 name={
@@ -1117,17 +1064,22 @@ export default function ResultScreen() {
                       ? 'Osäker' // Ny text för osäker
                       : 'Ej vegansk'
                 }
-              </StyledText>
-            </StyledView>
+              </StyledText> 
+            </StyledView> 
             
             {/* Säkerhet (flyttad hit) */}
+            {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
             <StyledText className="text-center text-base text-gray-500 mb-4">
-              Säkerhet: {Math.round(product.analysis.confidence * 100)}%
-            </StyledText>
+              Säkerhet: {(() => {
+                const confidenceValue = product.analysis.confidence;
+                if (confidenceValue >= 0.8) return "Hög";
+                if (confidenceValue >= 0.5) return "Medel";
+                return "Låg";
+              })()}
+            </StyledText> 
             
             {/* ----- START: Ny villkorlig sammanfattning ----- */}
-
-            {/* Fall 1: Vegansk */}
+            {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
             {product.analysis.isVegan && (
               <StyledView className="mt-3 mb-4 bg-green-100 p-3 rounded-lg border border-green-200">
                 <StyledText className="text-green-800 text-center">
@@ -1136,20 +1088,17 @@ export default function ResultScreen() {
               </StyledView>
             )}
 
-            {/* Fall 2: Osäker */}
             {!product.analysis.isVegan && product.analysis.isUncertain && product.analysis.uncertainIngredients && product.analysis.uncertainIngredients.length > 0 && (
               <StyledView className="mt-3 mb-4 bg-amber-100 p-3 rounded-lg border border-amber-200">
                 <StyledText className="font-sans-bold text-amber-800 mb-1">
                   Innehåller osäkra ingredienser:
                 </StyledText>
                 <StyledText className="text-amber-700">
-                  {/* Använd det nya uncertainIngredients-fältet */}
                   {product.analysis.uncertainIngredients.join(', ')}
                 </StyledText>
               </StyledView>
             )}
 
-            {/* Fall 3: Ej Vegansk */}
             {!product.analysis.isVegan && !product.analysis.isUncertain && product.analysis.detectedNonVeganIngredients && product.analysis.detectedNonVeganIngredients.length > 0 && (
               <StyledView className="mt-3 mb-4 bg-red-100 p-3 rounded-lg border border-red-200">
                 <StyledText className="font-sans-bold text-red-800 mb-1">
@@ -1160,10 +1109,10 @@ export default function ResultScreen() {
                 </StyledText>
               </StyledView>
             )}
-
             {/* ----- SLUT: Ny villkorlig sammanfattning ----- */}
 
             {/* Visa osäkerhetsanledningar om det är osäkert (befintlig kod, men nu mer relevant) */}
+            {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
             {product.analysis.isUncertain && product.analysis.uncertainReasons && product.analysis.uncertainReasons.length > 0 && (
               <StyledView className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
                 <StyledText className="font-sans-bold text-amber-800 mb-2">
@@ -1181,22 +1130,53 @@ export default function ResultScreen() {
             )}
           </StyledView>
           
-          {/* Ingredienslista */}
-          <StyledView className="mx-4 mb-8">
-            <StyledText className="text-xl font-sans-bold text-text-primary mb-4">
+          {/* Ingredienslista (Main) */}
+          {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
+          <StyledView className="mx-4 mb-4"> 
+            {/* Tidigare rubrik bortkommenterad då den finns i komponenten nu */}
+            {/* <StyledText className="text-xl font-sans-bold text-text-primary mb-4">
               Ingredienser
-            </StyledText>
-            
-            {/* Använd useEffect för loggning istället för direkt JSX */}
-            
-            <IngredientsList 
+            </StyledText> */}
+
+            <IngredientsList
               ingredients={product.ingredients}
               watchedIngredients={product.analysis.watchedIngredients || []}
               detectedNonVeganIngredients={product.analysis.detectedNonVeganIngredients || []}
-              onReportIngredient={setReportingIngredient}
+              // onReportIngredient={setReportingIngredient} // Temporarily disable reporting for simplicity
+              onReportIngredient={(ingredient) => { 
+                setReportingIngredient(ingredient);
+                setShowReportModal(true);
+              }}
             />
           </StyledView>
-          
+
+          {/* --- NEW: Watched Ingredients Section (Conditional) --- */}
+          {/* --- RE-ENABLE THIS BLOCK FOR FINAL DEBUGGING --- */}
+          {product && Array.isArray(product.ingredients) && watchedProductIngredients.length > 0 && (
+            <StyledView className="mx-4 mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <StyledView className="flex-row items-center mb-3">
+                <Ionicons
+                  name="eye-outline"
+                  size={20}
+                  color="#3b82f6" // Blue color for watched section
+                  style={{ marginRight: 8 }}
+                />
+                <StyledText className="text-lg font-medium text-blue-800">
+                  Bevakade ingredienser
+                </StyledText>
+              </StyledView>
+              <StyledView className="pl-2">
+                {watchedProductIngredients.map((ingredient, index) => (
+                  // Ensure the bullet point and ingredient are correctly inside StyledText
+                  <StyledText key={index} className="text-blue-700 font-sans text-base mb-1">
+                    • {ingredient}
+                  </StyledText>
+                ))}
+              </StyledView>
+            </StyledView>
+          )}
+          {/* ------------------------------------------------------- */}
+
           {/* Tomt utrymme i botten */}
           <StyledView className="h-32" />
         </StyledScrollView>
@@ -1223,34 +1203,34 @@ export default function ResultScreen() {
             
             <StyledPressable
               onPress={handleToggleFavorite}
-              disabled={!product.metadata.isSavedToHistory}
+              disabled={!product || !product.metadata.isSavedToHistory}
               className="flex-row items-center justify-center p-3 rounded-lg mr-2 bg-gray-100"
             >
               <Ionicons 
-                name={product.metadata.isFavorite ? "heart" : "heart-outline"} 
+                name={product?.metadata?.isFavorite ? "heart" : "heart-outline"}
                 size={20} 
-                color={product.metadata.isFavorite ? "#ef4444" : "#4b5563"} 
+                color={product?.metadata?.isFavorite ? "#ef4444" : "#4b5563"} 
               />
             </StyledPressable>
             
             <StyledPressable
               onPress={handleSaveToHistory}
-              disabled={product.metadata.isSavedToHistory}
+              disabled={!product || product.metadata.isSavedToHistory}
               className={`flex-row items-center justify-center py-3 px-5 rounded-lg shadow-sm ${
-                product.metadata.isSavedToHistory ? 'bg-gray-100' : 'bg-primary-main'
+                product?.metadata?.isSavedToHistory ? 'bg-gray-100' : 'bg-primary-main'
               }`}
             >
               <Ionicons 
-                name="bookmark-outline" 
+                name={product?.metadata?.isSavedToHistory ? "bookmark" : "bookmark-outline"}
                 size={20} 
-                color={product.metadata.isSavedToHistory ? "#4b5563" : "white"} 
+                color={product?.metadata?.isSavedToHistory ? "#6b7280" : "#1f2937"}
               />
               <StyledText 
                 className={`font-sans-bold ml-2 ${
-                  product.metadata.isSavedToHistory ? 'text-text-primary' : 'text-white'
+                  product?.metadata?.isSavedToHistory ? 'text-gray-700' : 'text-gray-800'
                 }`}
               >
-                {product.metadata.isSavedToHistory ? "Sparad" : "Spara"}
+                {product?.metadata?.isSavedToHistory ? "Sparad" : "Spara"}
               </StyledText>
             </StyledPressable>
           </StyledView>
@@ -1258,80 +1238,135 @@ export default function ResultScreen() {
       </StyledSafeAreaView>
       
       {/* Modal för rapportering av ingredienser */}
-      <Modal
-        visible={showReportModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowReportModal(false)}
-      >
-        <StyledView className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <StyledView className="bg-white rounded-xl p-6 m-5 w-11/12 max-w-md shadow-xl">
-            <StyledView className="flex-row justify-between items-center mb-4">
-              <StyledText className="text-xl font-sans-bold text-gray-800">
-                Rapportera ingrediens
-              </StyledText>
-              <StyledPressable onPress={() => setShowReportModal(false)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
-              </StyledPressable>
-            </StyledView>
-            
-            <StyledView className="mb-5">
-              <StyledText className="text-base font-medium text-gray-700 mb-1">
-                Ingrediens:
-              </StyledText>
-              <StyledView className="bg-gray-100 p-3 rounded-lg">
-                <StyledText className="text-gray-800 font-medium">
-                  {reportingIngredient || ''}
-                </StyledText>
+      {showReportModal && (
+        <Modal
+          visible={showReportModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowReportModal(false)}
+        >
+          {/* Använd KeyboardAvoidingView här också för att hantera tangentbordet */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{
+              flex: 1, // Se till att den tar upp hela skärmen
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)' // Bakgrundsoskärpa
+            }}
+          >
+            {/* Innehållsboxen */}
+            <StyledView className="bg-white p-6 rounded-xl shadow-xl w-11/12 max-w-md">
+              <StyledText className="text-xl font-bold mb-5 text-center text-gray-800">Rapportera ingrediens</StyledText>
+              
+              {/* Visa den ingrediens som rapporteras (ej redigerbar) */}
+              <StyledView className="border border-gray-200 bg-gray-50 p-3 rounded-lg mb-4 w-full">
+                  <StyledText className="text-gray-600 text-base">
+                    Ingrediens: <StyledText className="font-medium text-gray-800">{reportingIngredient || 'Okänd'}</StyledText>
+                  </StyledText>
               </StyledView>
-            </StyledView>
-            
-            <StyledView className="mb-5">
-              <StyledText className="text-base font-medium text-gray-700 mb-1">
-                Vad är fel med denna ingrediens?
-              </StyledText>
+              
               <StyledTextInput
-                className="bg-gray-100 p-3 rounded-lg text-gray-800"
-                multiline={true}
-                numberOfLines={4}
-                placeholder="Beskriv vad som är fel (t.ex. felaktig klassificering, felstavning, etc.)"
                 value={reportFeedback}
                 onChangeText={setReportFeedback}
-                style={{ textAlignVertical: 'top' }}
+                placeholder="Beskriv felet eller ditt förslag..."
+                className="border border-gray-300 p-3 rounded-lg mb-5 w-full text-base h-24"
+                placeholderTextColor="#9ca3af"
+                multiline
+                textAlignVertical="top" // För Android
+                autoFocus={true}
               />
-            </StyledView>
-            
-            <StyledView className="flex-row justify-end">
-              <StyledPressable 
-                onPress={() => setShowReportModal(false)}
-                className="mr-3 py-2 px-4 rounded-lg bg-gray-200"
-              >
-                <StyledText className="text-gray-700 font-medium">
-                  Avbryt
-                </StyledText>
-              </StyledPressable>
               
-              <StyledPressable 
-                onPress={() => submitIngredientReport()}
-                className={`py-2 px-4 rounded-lg ${
-                  reportFeedback.trim().length > 0 ? 'bg-primary-main' : 'bg-gray-300'
-                }`}
-                disabled={reportFeedback.trim().length === 0 || isSending}
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <StyledText className={`font-medium ${
-                    reportFeedback.trim().length > 0 ? 'text-white' : 'text-gray-500'
-                  }`}>
-                    Skicka
-                  </StyledText>
-                )}
-              </StyledPressable>
+              {/* Knappcontainer - Applicera samma layout som för spara-modalen */}
+              <StyledView className="flex-row mt-2 w-full">
+                 <StyledPressable
+                   onPress={() => setShowReportModal(false)}
+                   className="bg-gray-200 py-2.5 px-5 rounded-lg flex-1 mr-2" // flex-1 och marginal
+                 >
+                   <StyledText className="text-gray-800 font-sans-bold text-base text-center">
+                     Avbryt
+                   </StyledText>
+                 </StyledPressable>
+                 
+                 <StyledPressable
+                   onPress={submitIngredientReport}
+                   disabled={isSending || !reportFeedback.trim()} // Inaktivera om feedback saknas
+                   className={`py-2.5 px-5 rounded-lg flex-1 ${isSending || !reportFeedback.trim() ? 'bg-blue-300' : 'bg-blue-600'}`} // flex-1 och styling
+                 >
+                   {isSending ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                   ) : (
+                     <StyledText className="text-white font-sans-bold text-base text-center">
+                       Rapportera
+                     </StyledText>
+                   )}
+                 </StyledPressable>
+              </StyledView>
             </StyledView>
-          </StyledView>
-        </StyledView>
-      </Modal>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
+
+      {/* --- NEW: Inline/Overlay View for Naming Analysis --- */}
+      {isNamingModalVisible && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          // Style to cover the whole screen and center content
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 10
+          }}
+        >
+            {/* The actual content box - remove margins */}
+            <StyledView className="bg-white p-6 rounded-xl shadow-xl w-11/12 max-w-md"> 
+              <StyledText className="text-xl font-bold mb-5 text-center text-gray-800">Namngivning av analys</StyledText>
+              <StyledTextInput
+                value={analysisName}
+                onChangeText={setAnalysisName}
+                placeholder="Analysnamn"
+                className="border border-gray-300 p-3 rounded-lg mb-5 w-full text-base"
+                placeholderTextColor="#9ca3af"
+                autoFocus={true}
+              />
+              <StyledView className="flex-row mt-2 w-full">
+                 <StyledPressable
+                   onPress={() => setIsNamingModalVisible(false)} // Close the view
+                   className="bg-gray-200 py-2.5 px-5 rounded-lg flex-1 mr-2"
+                 >
+                   <StyledText className="text-gray-800 font-sans-bold text-base text-center">
+                     Avbryt
+                   </StyledText>
+                 </StyledPressable>
+                 {/* Simplify Spara button styling drastically */}
+                 <StyledPressable
+                   onPress={confirmSaveWithName} // Save action
+                   // Minimal styling, remove most classes
+                   style={{
+                     backgroundColor: '#2563eb', // Blue color (primary-main equivalent)
+                     paddingVertical: 10, // Match py-2.5
+                     paddingHorizontal: 20, // Match px-5
+                     borderRadius: 8, // Match rounded-lg
+                     flex: 1 // Keep flex-1
+                   }}
+                 >
+                   {/* Minimal text styling */}
+                   <StyledText style={{ color: 'white', fontWeight: 'bold', textAlign: 'center', fontSize: 16 }}>
+                     Spara
+                   </StyledText>
+                 </StyledPressable>
+              </StyledView>
+            </StyledView>
+          {/* </ScrollView> was here */}
+        </KeyboardAvoidingView>
+      )}
+
     </StyledView>
   );
-} 
+}

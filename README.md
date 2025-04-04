@@ -102,3 +102,63 @@ Använd utvecklingsverktyg för att underlätta testning:
    - Inspektera AsyncStorage för att verifiera att data sparas korrekt
 
 Genom att följa denna teststrategi kan vi säkerställa att den nya arkitekturen fungerar som förväntat och att övergången från det gamla systemet går smidigt.
+
+# KoaLens
+
+En app för att scanna och analysera ingredienser för att avgöra om en produkt är vegansk.
+
+## Teknisk översikt
+
+KoaLens är byggd med React Native och Expo, och använder AI för att analysera ingredienser.
+
+## Tekniska utmaningar & lösningar
+
+### Problem med React Native `<Modal>` i ResultScreen
+
+**Problem:** Vid försök att använda den inbyggda `<Modal>`-komponenten från `react-native` i `ResultScreen` (för att namnge sparade analyser) uppstod ett ihållande renderfel: "Text strings must be rendered within a <Text> component". Felet kvarstod även när modalens innehåll var nästan helt utkommenterat, vilket indikerade en konflikt mellan `<Modal>` och skärmens kontext (möjligen relaterat till NativeWind, navigation eller annan struktur).
+
+**Lösning:** Problemet löstes genom att ersätta den inbyggda `<Modal>` med en egen "inline overlay"-vy. Denna vy implementerades med en `<KeyboardAvoidingView>` som stylades med `position: 'absolute'` för att täcka hela skärmen och renderades villkorligt baserat på samma state som tidigare styrde modalen. Detta kringgick konflikten med `<Modal>` och löste renderfelet.
+
+**Lärdom:** Om oväntade renderfel uppstår med `<Modal>`, överväg att implementera en egen overlay-vy som alternativ.
+
+## AnalysisService dubbla implementationer
+
+KoaLens har för närvarande två separata implementationer av `analysisService.ts`:
+
+1. **services/analysisService.ts** (i rootmappen)
+   - Fokuserar på videoanalys
+   - Integrerar med Gemini AI
+   - Innehåller komplex logik för videohantering och API-anrop
+
+2. **src/services/analysisService.ts**
+   - Tidigare implementation fokuserad på bild- och textanalys
+   - Använder Claude AI
+   - Innehåller lokal ingrediensvalidering via `veganIngredientDatabase`
+
+### Nuvarande status
+
+Bildanalysfunktionen har inaktiverats till förmån för videoanalys, som ger bättre resultat. Detta beror på:
+
+1. Videoanalys fångar hela ingredienslistan bättre
+2. Det är enklare för användaren att hantera en kort video
+3. Vi kan standardisera på en AI-modell (Gemini) istället för att ha två olika (Claude för bilder, Gemini för video)
+
+### Framtida plan
+
+Planen är att slå ihop de två versionerna av analysisService till en enda, enhetlig service:
+
+1. **Kortsiktig lösning**:
+   - Bildanalys har inaktiverats i `src/services/analysisService.ts`
+   - Alla UI-komponenter har uppdaterats för att bara erbjuda videoanalys
+   - Felmeddelanden informerar användaren om förändringen
+
+2. **Medellång sikt**:
+   - Slå ihop de båda servicen till en enda implementation
+   - Behåll värdefulla delar av båda, särskilt veganIngredientDatabase från src-implementationen
+   - Konsolidera felhantering och cachningslogik
+
+3. **Lång sikt**:
+   - Implementera Gemini-baserad bildanalys om behov finns
+   - Strukturera om till en mer modulär arkitektur med separata tjänster för olika analysmetoder
+
+För utvecklare: Använd `services/analysisService.ts` för alla videoanalys-behov och undvik att lägga till funktionalitet i `src/services/analysisService.ts` eftersom den kommer att fasas ut.

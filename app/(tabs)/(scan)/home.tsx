@@ -69,31 +69,6 @@ export default function HomeScreen() {
       setIsCheckingPermissions(false);
     }
   };
-
-  // Hantera knapp för att öppna kameran för foto
-  const handleOpenCamera = async () => {
-    try {
-      console.log('Opening camera for photo');
-      
-      // Ge haptisk feedback
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Kontrollera behörigheter
-      const hasPermission = await checkCameraPermissions();
-      if (!hasPermission) return;
-      
-      // Logga händelse
-      logEvent(Events.SCAN_STARTED);
-      
-      // Navigera till kameran med inställning för fotoläge
-      router.push({
-        pathname: '/(tabs)/(scan)/camera',
-        params: { mode: 'photo' }
-      });
-    } catch (error) {
-      console.error('Error opening camera:', error);
-    }
-  };
   
   // Hantera knapp för att öppna kameran för video
   const handleOpenVideo = async () => {
@@ -125,50 +100,57 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#232A35" />
       
       <StyledView className="flex-1 justify-center items-center p-6">
-        <StyledView className="items-center mb-8">
+        <StyledView className="items-center mb-12">
           <Ionicons name="scan-outline" size={80} color="#4ECDC4" />
           <StyledText className="mt-4 text-text-primary font-sans-bold text-xl">
-            Skanna eller filma ingredienslista
-          </StyledText>
-          <StyledText className="mt-2 text-text-secondary font-sans text-center">
-            Använd kameran för en stillbild eller spela in en video av ingredienslistan
+            Videoskanna ingredienslistan
           </StyledText>
         </StyledView>
         
-        <StyledView className="w-full gap-4">
-          <StyledPressable 
-            onPress={handleOpenCamera}
-            disabled={isCheckingPermissions}
-            className={`bg-primary px-8 py-4 rounded-xl ${isCheckingPermissions ? 'opacity-70' : 'active:opacity-80'}`}
-          >
-            <StyledView className="flex-row items-center justify-center">
-              {isCheckingPermissions ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="camera-outline" size={24} color="#fff" />
-              )}
-              <StyledText className="ml-2 text-white font-sans-medium text-base">
-                Ta bild
-              </StyledText>
-            </StyledView>
-          </StyledPressable>
-          
+        <StyledView className="w-full items-center">
           <StyledPressable 
             onPress={handleOpenVideo}
             disabled={isCheckingPermissions}
-            className={`bg-secondary px-8 py-4 rounded-xl ${isCheckingPermissions ? 'opacity-70' : 'active:opacity-80'}`}
+            className={`bg-primary px-8 py-4 rounded-xl w-full ${isCheckingPermissions ? 'opacity-70' : 'active:opacity-80'}`}
           >
             <StyledView className="flex-row items-center justify-center">
               {isCheckingPermissions ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color="#000" />
               ) : (
-                <Ionicons name="videocam-outline" size={24} color="#fff" />
+                <Ionicons name="scan-outline" size={24} color="#000" />
               )}
-              <StyledText className="ml-2 text-white font-sans-medium text-base">
-                Spela in video
+              <StyledText className="ml-2 text-black font-sans-medium text-base">
+                Starta videoskanning
               </StyledText>
             </StyledView>
           </StyledPressable>
+
+          <StyledView className="mt-8 w-full px-4">
+            <StyledView className="flex-row mb-2 items-start">
+               <StyledText className="text-text-secondary mr-2">•</StyledText>
+               <StyledText className="text-text-secondary font-sans text-sm flex-1">
+                 Panorera lugnt över <StyledText className="font-sans-bold">hela</StyledText> ingredienslistan.
+               </StyledText>
+            </StyledView>
+             <StyledView className="flex-row mb-2 items-start">
+               <StyledText className="text-text-secondary mr-2">•</StyledText>
+               <StyledText className="text-text-secondary font-sans text-sm flex-1">
+                 Inspelningen är <StyledText className="font-sans-bold">5 sekunder</StyledText> lång.
+               </StyledText>
+            </StyledView>
+             <StyledView className="flex-row items-start">
+               <StyledText className="text-text-secondary mr-2">•</StyledText>
+               <StyledText className="text-text-secondary font-sans text-sm flex-1">
+                 Analysen startar automatiskt när inspelningen är klar.
+               </StyledText>
+            </StyledView>
+            <StyledView className="flex-row items-start mt-2">
+               <StyledText className="text-text-secondary mr-2">•</StyledText>
+               <StyledText className="text-text-secondary font-sans text-sm flex-1">
+                 Du får sedan veta om produkten är <StyledText className="font-sans-bold">vegansk eller inte</StyledText>.
+               </StyledText>
+            </StyledView>
+          </StyledView>
         </StyledView>
       </StyledView>
     </StyledSafeAreaView>

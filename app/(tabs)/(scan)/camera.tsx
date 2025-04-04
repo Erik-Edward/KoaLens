@@ -30,13 +30,13 @@ export default function CameraScreen() {
   const camera = useRef<any>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingMode, setRecordingMode] = useState<'photo' | 'video'>('photo');
+  // Alltid videoläge
+  const [recordingMode, setRecordingMode] = useState<'video'>('video');
   const [videoElapsedTime, setVideoElapsedTime] = useState(0);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const recordingProgress = useSharedValue(0);
   const [showGuide, setShowGuide] = useState(false);
   const navigation = useNavigation();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
   
   // Referens för timer
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,14 +44,11 @@ export default function CameraScreen() {
   // Check for web browser environment
   const isWebEnvironment = Platform.OS === 'web';
   
-  // Ställ in kameraläge baserat på params
+  // Alltid ställ in videoläge oavsett params (ignorera mode)
   useEffect(() => {
-    if (mode === 'video') {
-      setRecordingMode('video');
-    } else {
-      setRecordingMode('photo');
-    }
-  }, [mode]);
+    // Inget behov av att kontrollera params eftersom vi låst till videoläge
+    setRecordingMode('video');
+  }, []);
 
   // Hantera videoinspelningstimer
   useEffect(() => {
@@ -157,16 +154,6 @@ export default function CameraScreen() {
     }
   };
 
-  // Toggle mellan foto- och videoläge
-  const toggleRecordingMode = async () => {
-    try {
-      await Haptics.selectionAsync();
-      setRecordingMode(prevMode => prevMode === 'photo' ? 'video' : 'photo');
-    } catch (error) {
-      console.error('Error toggling recording mode:', error);
-    }
-  };
-
   // Starta videoinspelning
   const startRecording = async () => {
     try {
@@ -260,8 +247,8 @@ export default function CameraScreen() {
   const handleRecordingFinished = async (video: any) => {
     console.log('Video recording finished callback received:', video);
 
-    // 1. Återställ inspelningstillstånd direkt
-    setIsCapturing(false);
+    // 1. Återställ ENDAST inspelningstillstånd direkt, behåll isCapturing
+    // setIsCapturing(false); // TA BORT DENNA RAD
     setIsRecording(false);
     setRecordingStartTime(null);
     recordingProgress.value = 0;
@@ -404,23 +391,27 @@ export default function CameraScreen() {
     }
   };
 
-  // Handle camera action based on current mode
+  // Hantera knapptryckning för foto/video
   const handleCameraAction = () => {
-    if (recordingMode === 'photo') {
-      capturePhoto();
+    addBreadcrumb(`Camera action triggered. Mode: ${recordingMode}, Recording: ${isRecording}`, 'camera');
+    // Förenklad logik eftersom recordingMode alltid är 'video'
+    if (isRecording) {
+      console.log('Stopping recording via button press');
+      stopRecording();
     } else {
-      if (isRecording) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
+      console.log('Starting recording via button press');
+      startRecording();
     }
+    // Borttagen else-gren för 'photo'
   };
 
   // Explicitly handle back navigation
   const handleBack = async () => {
     try {
       console.log('Handling back navigation from camera screen');
+      
+      // Återställ isCapturing när vi navigerar tillbaka
+      setIsCapturing(false); 
       
       // Ge haptisk feedback
       await Haptics.selectionAsync();
@@ -435,21 +426,48 @@ export default function CameraScreen() {
     }
   };
 
-  // Render camera guide overlay
-  const renderGuide = () => {
-    if (!showGuide) return null;
-    
+  // --- Flytta CameraControls definition INNANFÖR CameraScreen --- 
+  const CameraControls = () => {
+    // Calculate time left
+    const timeLeft = Math.max(0, Math.ceil((MAX_VIDEO_DURATION - videoElapsedTime) / 1000));
+
     return (
-      <CameraGuide 
-        onClose={() => {
-          setShowGuide(false);
-          AsyncStorage.setItem(GUIDE_KEY, 'true')
-            .catch(error => console.error('Failed to save guide status:', error));
-        }} 
-      />
+      <StyledView className="items-center">
+        {/* Progress bar för video */}
+        {isRecording && (
+          <StyledView className="w-full px-10 mb-3">
+            <StyledView className="h-2 bg-neutral-700 rounded-full overflow-hidden">
+              <StyledAnimatedView 
+                className="h-full bg-red-500"
+                style={progressStyle} 
+              />
+            </StyledView>
+            <StyledText className="text-white text-center mt-1 text-xs font-mono">
+              {timeLeft}s kvar
+            </StyledText>
+          </StyledView>
+        )}
+
+        {/* Inspelningsknapp - Säkerställ att den förblir inaktiv/transparent under bearbetning */}
+        <StyledPressable
+          onPress={handleCameraAction} 
+          // Inaktivera knappen helt så länge kameran är upptagen (spelar in ELLER bearbetar)
+          disabled={isCapturing} 
+          className={`w-20 h-20 rounded-full border-4 border-white items-center justify-center transition-opacity duration-200 
+            ${isCapturing ? 'opacity-50' : 'active:opacity-70'} // Opacity baserat på isCapturing
+            ${isCapturing ? 'bg-transparent' : 'bg-red-500'} // Bakgrund baserat på isCapturing (transparent när upptagen, annars röd)
+          `}
+        >
+          {/* Visa stopp-kvadrat *endast* när isRecording är aktivt. 
+              När isRecording=false men isCapturing=true (bearbetning), visa inget. */}
+          {isRecording ? <StyledView className="w-8 h-8 bg-red-500 rounded-md" /> : <></>} 
+        </StyledPressable>
+      </StyledView>
     );
   };
-
+  // --- Slut på CameraControls definition ---
+  
+  // Rendera kamera-UI
   if (isWebEnvironment) {
     // Special handling for web environment - show placeholder
     return (
@@ -506,102 +524,37 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         device={device}
         isActive={true}
-        photo={recordingMode === 'photo'}
-        video={recordingMode === 'video'}
+        video={true}
         audio={false}
       />
       
-      {/* Camera Controls Overlay */}
-      <StyledView className="absolute inset-0 pointer-events-none">
-        {/* Top Bar */}
-        <StyledView className="flex-row justify-between items-center p-4 pointer-events-auto">
-          <StyledPressable
+      {/* Overlays och kontroller */} 
+      <StyledView className="absolute inset-0 flex-1 justify-between items-center">
+        {/* Top Bar: Back button and potentially mode indicator */}
+        <StyledView className="w-full flex-row justify-between items-center p-4 pt-6 bg-black/30">
+          <StyledPressable 
             onPress={handleBack}
-            className="bg-black/50 rounded-full p-2"
+            disabled={isCapturing} // Disable back while processing
+            className="p-2"
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </StyledPressable>
-          
-          <StyledPressable
-            onPress={() => setShowGuide(true)}
-            className="bg-black/50 rounded-full p-2"
-          >
-            <Ionicons name="help-circle-outline" size={24} color="white" />
-          </StyledPressable>
+
+          {/* Tom container där text/indikator fanns */}
+          <StyledView className="w-10" /> 
+
         </StyledView>
+
+        {/* Middle Section: Borttaget */}
         
-        {/* Center guidance text */}
-        <StyledView className="flex-1 justify-center items-center p-4">
-          <StyledView className="bg-black/50 rounded-lg px-6 py-3">
-            <StyledText className="text-white text-center font-sans">
-              {recordingMode === 'photo' 
-                ? 'Placera ingredienslistan i mitten av skärmen' 
-                : 'Spela in hela ingredienslistan med kameran'}
-            </StyledText>
-          </StyledView>
-        </StyledView>
-        
-        {/* Recording timer overlay (only visible when recording) */}
-        {isRecording && (
-          <StyledView className="absolute top-20 left-0 right-0 items-center">
-            <StyledView className="bg-red-600/80 rounded-full px-4 py-1 flex-row items-center">
-              <View className="w-2 h-2 rounded-full bg-white mr-2" />
-              <StyledText className="text-white font-sans-medium">
-                {formatRecordingTime(videoElapsedTime)}
-              </StyledText>
-            </StyledView>
-            
-            {/* Recording progress bar */}
-            <StyledView className="mt-2 h-1 bg-white/30 rounded-full w-4/5 overflow-hidden">
-              <StyledAnimatedView className="h-full bg-red-600" style={progressStyle} />
-            </StyledView>
-          </StyledView>
-        )}
-        
-        {/* Bottom Bar */}
-        <StyledView className="w-full items-center pb-10 pointer-events-auto">
-          {/* Mode toggle */}
-          <StyledPressable 
-            onPress={toggleRecordingMode}
-            className="bg-white/20 rounded-full px-4 py-2 mb-5"
-            disabled={isRecording}
-          >
-            <StyledText className="text-white font-sans-medium">
-              {recordingMode === 'photo' ? 'Foto' : 'Video'}
-              <Ionicons 
-                name={recordingMode === 'photo' ? 'camera' : 'videocam'} 
-                size={16} 
-                color="white"
-                style={{ marginLeft: 5 }}
-              />
-            </StyledText>
-          </StyledPressable>
-          
-          {/* Capture Button */}
-          <StyledView className="w-full items-center mb-8">
-            <StyledPressable 
-              onPress={handleCameraAction}
-              disabled={isCapturing}
-              className={`w-20 h-20 rounded-full justify-center items-center ${
-                isCapturing ? 'opacity-50' : 'opacity-100'
-              } ${
-                isRecording ? 'bg-red-600' : 'bg-white'
-              }`}
-            >
-              {recordingMode === 'photo' ? (
-                <StyledView className="w-16 h-16 rounded-full border-2 border-gray-800" />
-              ) : isRecording ? (
-                <StyledView className="w-8 h-8 bg-white rounded-sm" />
-              ) : (
-                <StyledView className="w-16 h-16 rounded-full bg-red-600" />
-              )}
-            </StyledPressable>
-          </StyledView>
-        </StyledView>
+        {/* Bottom Section: Borttaget */}
       </StyledView>
       
-      {/* Instruction guide overlay */}
-      {renderGuide()}
+      {/* Flytta CameraControls till botten med absolute positionering */}
+      <StyledView className="absolute bottom-10 left-0 right-0 items-center">
+         <CameraControls />
+      </StyledView>
+      
     </StyledView>
   );
 }

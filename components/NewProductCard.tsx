@@ -54,6 +54,9 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
 
   // Få isVegan status från analysen
   const isVegan = product.analysis.isVegan;
+  // --- ADD isUncertain STATUS --- 
+  const isUncertain = product.analysis.isUncertain;
+  // -----------------------------
   
   // Få watchedIngredients från analysen
   const watchedIngredients = product.analysis.watchedIngredients || [];
@@ -63,67 +66,113 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
     .filter(item => item.reason === "non-vegan")
     .map(item => item.name);
 
+  // --- NEW: Function to get status details (color, icon, text) ---
+  const getStatusDetails = () => {
+    if (isUncertain) {
+      return {
+        bgColor: 'bg-amber-500',
+        icon: 'help-circle' as const, // Explicit type for Ionicons name
+        iconColor: '#ffffff', // White icon on amber bg
+        textColor: 'text-white',
+        text: 'Osäker'
+      };
+    } else if (isVegan) {
+      return {
+        bgColor: 'bg-emerald-500', // Use emerald for consistency
+        icon: 'checkmark-circle' as const,
+        iconColor: '#ffffff',
+        textColor: 'text-white',
+        text: 'Vegansk'
+      };
+    } else {
+      return {
+        bgColor: 'bg-red-500',
+        icon: 'close-circle' as const,
+        iconColor: '#ffffff',
+        textColor: 'text-white',
+        text: 'Ej vegansk'
+      };
+    }
+  };
+  const statusDetails = getStatusDetails();
+
+  // --- NEW: Function to get confidence level text ---
+  const getConfidenceLevelText = (confidence: number): string => {
+    if (confidence >= 0.8) return "Hög";
+    if (confidence >= 0.5) return "Medel";
+    return "Låg";
+  };
+  // ----------------------------------------------------
+
   return (
     <StyledPressable
       onPress={handlePress}
-      className="bg-[#232A35]/40 rounded-xl p-4 mb-4 border border-[#232A35]/60"
+      // Use a slightly lighter background for the card itself
+      className="bg-[#2a303c] rounded-xl mb-4 overflow-hidden" 
       style={({ pressed }) => ({
-        opacity: pressed ? 0.7 : 1,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
+        opacity: pressed ? 0.85 : 1,
+        // Removed transform scale for cleaner look
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        elevation: 3,
       })}
     >
       <StyledView className="flex-row">
-        {/* Product Image */}
-        <StyledImage
-          source={{ uri: product.metadata.imageUri }}
-          className="w-16 h-16 rounded-lg bg-background-dark border border-[#ffffff]/10"
-        />
+        {/* --- NEW: Status Indicator Block (Left Side) --- */}
+        <StyledView 
+          className={`w-24 ${statusDetails.bgColor} justify-center items-center p-3`}
+        >
+          <Ionicons 
+            name={statusDetails.icon} 
+            size={32} 
+            color={statusDetails.iconColor} 
+          />
+          <StyledText 
+            className={`mt-1 ${statusDetails.textColor} font-sans-bold text-center text-sm`}
+          >
+            {statusDetails.text}
+          </StyledText>
+        </StyledView>
+        {/* --------------------------------------------- */}
 
-        {/* Product Information */}
-        <StyledView className="flex-1 ml-4">
-          {/* Header with Status and Favorite */}
-          <StyledView className="flex-row justify-between items-center">
-            {/* Status Indicator */}
-            <StyledView className="flex-row items-center">
-              <StyledView
-                className={`w-3 h-3 rounded-full mr-2 ${
-                  isVegan ? 'bg-[#4CAF50]' : 'bg-[#ff6b6b]'
-                }`}
-              />
-              <StyledText className="text-text-primary font-sans-medium text-base">
-                {isVegan ? 'Vegansk' : 'Ej vegansk'}
-              </StyledText>
-            </StyledView>
+        {/* Product Information (Right Side) */}
+        <StyledView className="flex-1 p-4">
+          {/* Header - Name and Actions */}
+          <StyledView className="flex-row justify-between items-start mb-1">
+            {/* Product Name */}
+            <StyledText 
+              className="text-text-primary font-sans-bold text-lg flex-1 mr-2" 
+              numberOfLines={2}
+            >
+              {product.metadata.name}
+            </StyledText>
 
-            {/* Favorite Button */}
+            {/* Action Buttons */}
             <StyledView className="flex-row">
               <StyledPressable
                 onPress={handleToggleFavorite}
-                className="p-2"
+                className="p-1.5 ml-1" // Adjusted padding/margin
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
                   name={product.metadata.isFavorite ? 'star' : 'star-outline'}
-                  size={24}
-                  color={product.metadata.isFavorite ? '#ffcc00' : '#ffffff'}
+                  size={20} // Slightly smaller icon
+                  color={product.metadata.isFavorite ? '#ffcc00' : '#a0a0a0'} // Adjusted unfavorite color
                 />
               </StyledPressable>
               
               {onDelete && (
                 <StyledPressable
                   onPress={onDelete}
-                  className="p-2"
+                  className="p-1.5 ml-1"
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons
                     name="trash-outline"
-                    size={22}
-                    color="#ffffff"
+                    size={20} // Slightly smaller icon
+                    color="#a0a0a0" // Adjusted color
                   />
                 </StyledPressable>
               )}
@@ -131,26 +180,36 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
           </StyledView>
 
           {/* Timestamp */}
-          <StyledText className="text-text-secondary font-sans text-sm mt-1">
+          <StyledText className="text-text-secondary font-sans text-sm mb-1">
             {formattedDate}
           </StyledText>
 
-          {/* Non-vegan Ingredients */}
-          {!isVegan && nonVeganIngredients.length > 0 && (
+          {/* --- UPDATED: Confidence Level --- */}
+          <StyledView className="flex-row items-center">
+            <StyledText className="text-text-secondary font-sans text-sm">
+              Säkerhet: <StyledText className="font-sans-medium text-text-primary">{getConfidenceLevelText(product.analysis.confidence)}</StyledText>
+            </StyledText>
+          </StyledView>
+          {/* --------------------------------- */}
+
+          {/* Non-vegan Ingredients Info (Optional - Keep it concise) */}
+          {!isVegan && !isUncertain && nonVeganIngredients.length > 0 && (
             <StyledText 
-              numberOfLines={2}
-              className="text-[#ff6b6b]/90 font-sans text-sm mt-1"
+              numberOfLines={1} // More concise
+              className="text-red-400 font-sans text-xs mt-1"
             >
-              Innehåller: {nonVeganIngredients.join(', ')}
+              Innehåller icke-veganskt
+            </StyledText>
+          )}
+          {isUncertain && (
+             <StyledText 
+              numberOfLines={1} // More concise
+              className="text-amber-400 font-sans text-xs mt-1"
+            >
+              Innehåller osäkert
             </StyledText>
           )}
 
-          {/* Confidence */}
-          <StyledView className="flex-row items-center mt-1">
-            <StyledText className="text-text-secondary font-sans text-sm">
-              Konfidensgrad: <StyledText className="text-[#ffcc00]">{Math.round(product.analysis.confidence * 100)}%</StyledText>
-            </StyledText>
-          </StyledView>
         </StyledView>
       </StyledView>
     </StyledPressable>

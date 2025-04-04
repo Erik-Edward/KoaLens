@@ -1,5 +1,5 @@
 // app/(tabs)/(scan)/crop.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Platform, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 // Använd vår wrapper istället för direktimport
@@ -261,6 +261,27 @@ export default function CropScreen() {
     router.back();
   };
 
+  // Omdirigera direkt till videoskärmen
+  useEffect(() => {
+    logEvent('crop_screen_redirect', { reason: 'image_analysis_deprecated' });
+    
+    // Visa ett meddelande till användaren
+    Alert.alert(
+      "Bildanalys har inaktiverats",
+      "Bildanalys är inte längre tillgänglig. Använd videoanalysen för bättre resultat.",
+      [
+        { 
+          text: "OK", 
+          onPress: () => {
+            // Omdirigera till videoskärmen
+            router.replace('/(tabs)/(scan)/home');
+          }
+        }
+      ],
+      { cancelable: false }
+    );
+  }, []);
+
   // Visa ett informationsmeddelande i webbmiljön
   if (isWebEnvironment) {
     return (
@@ -358,43 +379,10 @@ export default function CropScreen() {
   }
 
   return (
-    <StyledView className="flex-1 bg-background-main justify-center items-center p-4">
-      {loading ? (
-        <>
-          <ActivityIndicator size="large" color="#ffd33d" />
-          <StyledText className="text-text-primary font-sans text-center mt-4">
-            Beskär och analyserar ingredienser...
-          </StyledText>
-        </>
-      ) : (
-        <>
-          <Ionicons name="crop-outline" size={48} color="#ffd33d" />
-          <StyledText className="text-text-primary font-sans-bold text-xl text-center mt-4 mb-2">
-            Beskärningsverktyget laddas...
-          </StyledText>
-          <StyledText className="text-text-secondary font-sans text-center mb-6">
-            Om beskärningsverktyget inte öppnas automatiskt, tryck på "Försök igen" nedan.
-          </StyledText>
-          <StyledView className="flex-row">
-            <StyledPressable 
-              onPress={handleCrop}
-              className="bg-primary px-6 py-3 rounded-lg mr-2"
-            >
-              <StyledText className="text-text-inverse font-sans-medium">
-                Försök igen
-              </StyledText>
-            </StyledPressable>
-            <StyledPressable 
-              onPress={handleDirectAnalysis}
-              className="bg-gray-700 px-6 py-3 rounded-lg"
-            >
-              <StyledText className="text-text-inverse font-sans-medium">
-                Analysera direkt
-              </StyledText>
-            </StyledPressable>
-          </StyledView>
-        </>
-      )}
+    <StyledView className="flex-1 justify-center items-center bg-background-main">
+      <StyledText className="text-text-primary text-lg">
+        Omdirigerar till videoanalys...
+      </StyledText>
     </StyledView>
   );
 }

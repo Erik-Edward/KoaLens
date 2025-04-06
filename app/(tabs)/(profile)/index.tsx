@@ -143,6 +143,9 @@ const ProfileScreen = () => {
     // Close modal
     setShowAvatarModal(false);
     
+    // Logga vad som skickas till hooken
+    console.log(`ProfileScreen: Calling updateAvatar hook with style: ${style}, filename: ${filename}`);
+    
     // Update in Supabase
     const success = await updateAvatar(style, filename);
     

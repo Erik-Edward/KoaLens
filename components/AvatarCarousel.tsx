@@ -77,7 +77,7 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
             <Avatar
               source={item.filename}
               size="large"
-              style="supporter"
+              style={item.style}
               variant={isSelected ? 'selected' : 'default'}
             />
           </StyledView>
@@ -125,7 +125,7 @@ export const AvatarCarousel: React.FC<AvatarCarouselProps> = ({
         ref={flatListRef}
         data={avatars}
         renderItem={renderAvatar}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => `${item.id}-${item.style}`}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={ITEM_WIDTH}

@@ -65,7 +65,5 @@ export const VEGAN_ENUMBERS_4: ENumberDatabase = {
   'E1452': { name: 'Stärkelseoktenylsuccinat', description: 'Modifierad stärkelse från växter', status: 'vegan' },
   'E1505': { name: 'Cellulosa', description: 'Modifierad cellulosa från växter', status: 'vegan' },
   'E1510': { name: 'Trietylcitrat', description: 'Växtbaserad emulgator', status: 'vegan' },
-  'E1517': { name: 'Glyceryldiacetat', description: 'Växtbaserad emulgator', status: 'vegan' },
-  'E1518': { name: 'Glyceryltriacetat', description: 'Växtbaserad emulgator', status: 'vegan' },
   'E1520': { name: 'Propylenglykol', description: 'Syntetisk fuktighetsbevarande medel', status: 'vegan' },
 }; 

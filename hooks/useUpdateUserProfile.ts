@@ -42,6 +42,9 @@ export const useUpdateUserProfile = () => {
     if (!user) return false;
     
     try {
+      // Logga vad som ska skickas till Supabase
+      console.log(`useUpdateUserProfile: Calling supabase.auth.updateUser with avatar_style: ${style}, avatar_id: ${avatarId}`);
+      
       // Uppdatera endast avatar-relaterad metadata
       const { error } = await supabase.auth.updateUser({
         data: {
@@ -71,8 +74,7 @@ export const useUpdateUserProfile = () => {
       // Uppdatera endast vegan status metadata
       const { error } = await supabase.auth.updateUser({
         data: {
-          vegan_status: status,
-          avatar_update: true // Add flag to prevent navigation
+          vegan_status: status
         }
       });
       

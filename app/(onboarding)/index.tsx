@@ -24,9 +24,9 @@ const AnimatedView = Animated.createAnimatedComponent(styled(View));
 const AnimatedText = Animated.createAnimatedComponent(styled(Text));
 
 const MESSAGES = [
-  "Identifiera veganska produkter direkt med din kamera",
-  "Rikta kameran mot ingredienslistan och få direkt svar",
-  "Vad innehåller den där franska chokladkakan?",
+  "Analysera produkter för att se om de är veganska",
+  "Panorera över ingredienslistan för fullständig analys",
+  "Få direkt besked om produkten är vegansk eller inte",
   "Inga språkbarriärer - fungerar på alla språk"
 ];
 

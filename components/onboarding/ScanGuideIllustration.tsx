@@ -42,27 +42,27 @@ export default function ScanGuideIllustration() {
 
     // Fullständig skanningsanimation med resultat
     const scanningSequence = Animated.sequence([
-      Animated.delay(1000), // Initial väntan
+      Animated.delay(500), // Initial väntan
       // Första skanningen
       Animated.timing(scanLineY, {
         toValue: 160,
-        duration: 1500,
+        duration: 1000,
         useNativeDriver: false,
       }),
       Animated.timing(scanLineY, {
         toValue: 60,
-        duration: 1500,
+        duration: 1000,
         useNativeDriver: false,
       }),
       // Andra skanningen
       Animated.timing(scanLineY, {
         toValue: 160,
-        duration: 1500,
+        duration: 1000,
         useNativeDriver: false,
       }),
       Animated.timing(scanLineY, {
         toValue: 60,
-        duration: 1500,
+        duration: 1000,
         useNativeDriver: false,
       }),
       // Visa resultat
@@ -128,7 +128,7 @@ export default function ScanGuideIllustration() {
 
         {/* Camera UI */}
         <G transform="translate(90, 70)">
-          {/* Scanning frame */}
+          {/* Video frame */}
           <AnimatedRect
             x="20"
             y="60"

@@ -441,86 +441,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
           break;
         case 'USER_UPDATED':
-          console.log('AuthProvider: Användare uppdaterad', {
-            emailConfirmed: session?.user.email_confirmed_at,
-            hasAvatar: !!session?.user.user_metadata?.avatar_id,
-            isAvatarUpdate: session?.user.user_metadata?.avatar_update === true,
-            isNavigationBlocked: global.isBlockingNavigation === true
-          })
-          
-          // VIKTIG FÖRBÄTTRING: Kontrollera avatarflaggan FÖRST, innan navigationsspärren
-          // Detta gör att även om navigationsspärren har inaktiverats, så avbryts
-          // ändå navigeringen om det är en avataruppdatering
-          if (session?.user.user_metadata?.avatar_update === true) {
-            console.log('AuthProvider: Avatar update detected, staying on current screen');
-            break;
-          }
-          
-          // Sekundär kontroll: Om navigationsspärren är aktiv, utför inte någon navigering
+          // Ta bort flagghantering helt
+          /*
+          let wasAvatarUpdate = false;
+          if (session?.user.user_metadata?.avatar_update === true) { ... }
+          */
+
+          // Ta bort den gamla (utkommenterade) synkroniseringslogiken helt
+          // Inget behöver göras här för avatar/status-uppdatering
+          // då ProfileScreen hanterar det direkt i storen.
+          console.log('AuthProvider: USER_UPDATED event received. Handled by ProfileScreen/other logic.');
+
+          // Behåll navigationslogiken för t.ex. e-postverifiering
+          // (Den körs nu alltid, men router.replace har inbyggd logik för att inte navigera om man redan är på målsidan)
+          console.log('AuthProvider: Checking navigation logic after USER_UPDATED.');
+          // Kontrollera navigationsblockering
           if (global.isBlockingNavigation === true) {
             console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
-            break;
-          }
-          
-          // Om användaren just har uppdaterats, synkronisera data från Supabase
-          if (session?.user) {
-            const userData = session.user;
-            const store = useStore.getState();
-            const metadata = userData.user_metadata;
-            
-            if (metadata) {
-              // Synkronisera avatar om den finns i metadata
-              if (metadata.avatar_id && metadata.avatar_style) {
-                console.log('AuthProvider: Synkroniserar avatar efter USER_UPDATED:', {
-                  style: metadata.avatar_style,
-                  id: metadata.avatar_id
-                });
-                
-                // Använd await för att säkerställa att denna operation slutförs
-                await store.setAvatar(
-                  metadata.avatar_style as AvatarStyle, 
-                  metadata.avatar_id as string
-                );
-              }
-              
-              // Synkronisera vegan-status och år
-              if (metadata.vegan_status) {
-                await store.setVeganStatus(metadata.vegan_status as VeganStatus);
-                
-                if (typeof metadata.vegan_years === 'number') {
-                  await store.setVeganYears(metadata.vegan_years);
-                }
-              }
-            }
-          }
-          
-          // Fortsätt med normal navigering för e-postverifiering
-          if (session?.user.email_confirmed_at) {
-            // Sätt onboarding som slutförd
-            await markOnboardingAsCompleted();
-            
-            // Avgör om det är första gången användaren loggar in efter verifiering
-            if (!session.user.last_sign_in_at) {
-              console.log('AuthProvider: First verification via auth state, redirecting to login')
-              // Skicka med användarens e-postadress
-              const userEmail = session.user.email;
-              if (userEmail) {
-                router.replace({
-                  pathname: '/(auth)/login',
-                  params: { 
-                    verified: 'true', 
-                    email: encodeURIComponent(userEmail)
+          } else {
+              // Fortsätt med normal navigering för e-postverifiering etc.
+              if (session?.user.email_confirmed_at) {
+                await markOnboardingAsCompleted();
+                if (!session.user.last_sign_in_at) {
+                  console.log('AuthProvider: First verification after USER_UPDATED, redirecting to login')
+                  const userEmail = session.user.email;
+                  if (userEmail) {
+                    router.replace({
+                      pathname: '/(auth)/login',
+                      params: { 
+                        verified: 'true', 
+                        email: encodeURIComponent(userEmail)
+                      }
+                    });
+                  } else {
+                    router.replace('/(auth)/login?verified=true');
                   }
-                });
+                } else {
+                  // Kommenterar bort denna omdirigering för att förhindra att appen navigerar till scan-sidan efter profiluppdateringar
+                  /*
+                  console.log('AuthProvider: User updated with verified email (not first time), redirecting to scan')
+                  router.replace('/(tabs)/(scan)')
+                  */
+                }
               } else {
-                router.replace('/(auth)/login?verified=true');
+                 console.log('AuthProvider: Användare uppdaterad men e-post ej verifierad, ingen navigering.');
               }
-            } else {
-              console.log('AuthProvider: User updated with verified email, redirecting to scan')
-              router.replace('/(tabs)/(scan)')
-            }
           }
-          break
+
+          break; // Slut på USER_UPDATED case
         case 'TOKEN_REFRESHED':
           console.log('AuthProvider: Token uppdaterad')
           break

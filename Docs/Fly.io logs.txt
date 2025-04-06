@@ -1,0 +1,87 @@
+$ fly logs -a koalens-backend
+
+Waiting for logs...
+
+2025-04-06T13:20:10.957 app[6e822504c7e598] arn [info] Hämtar räknare "analysis_count" för användare: 4cd091cc-f6cc-4f61-9bab-d20d784aafbc
+
+2025-04-06T13:20:10.970 app[6e822504c7e598] arn [info] Hämtar räknare "analysis_count" för användare: 4cd091cc-f6cc-4f61-9bab-d20d784aafbc
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] Räknarinformation hämtad: {
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] counter_id: '234561b6-73b7-4cde-afbe-b22662c6d273',
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] user_id: '4cd091cc-f6cc-4f61-9bab-d20d784aafbc',
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] counter_name: 'analysis_count',
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] value: 0,
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] limit: 15,
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] remaining: 15,
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] is_limited: true,
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] has_reached_limit: false,
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] reset_frequency: 'monthly',
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] last_reset: '2025-04-06T13:18:33.342071+00:00',
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] next_reset: '2025-05-06T13:18:33.342071+00:00'
+
+2025-04-06T13:20:11.063 app[6e822504c7e598] arn [info] }
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] Räknarinformation hämtad: {
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] counter_id: '234561b6-73b7-4cde-afbe-b22662c6d273',
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] user_id: '4cd091cc-f6cc-4f61-9bab-d20d784aafbc',
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] counter_name: 'analysis_count',
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] value: 0,
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] limit: 15,
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] remaining: 15,
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] is_limited: true,
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] has_reached_limit: false,
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] reset_frequency: 'monthly',
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] last_reset: '2025-04-06T13:18:33.342071+00:00',
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] next_reset: '2025-05-06T13:18:33.342071+00:00'
+
+2025-04-06T13:20:11.110 app[6e822504c7e598] arn [info] }
+
+2025-04-06T13:20:11.569 app[6e822504c7e598] arn [info] Hämtar räknare "analysis_count" för användare: 4cd091cc-f6cc-4f61-9bab-d20d784aafbc
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] Räknarinformation hämtad: {
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] counter_id: '234561b6-73b7-4cde-afbe-b22662c6d273',
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] user_id: '4cd091cc-f6cc-4f61-9bab-d20d784aafbc',
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] counter_name: 'analysis_count',
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] value: 0,
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] limit: 15,
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] remaining: 15,
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] is_limited: true,
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] has_reached_limit: false,
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] reset_frequency: 'monthly',
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] last_reset: '2025-04-06T13:18:33.342071+00:00',
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] next_reset: '2025-05-06T13:18:33.342071+00:00'
+
+2025-04-06T13:20:11.609 app[6e822504c7e598] arn [info] }

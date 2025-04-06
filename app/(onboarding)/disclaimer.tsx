@@ -28,9 +28,9 @@ const DISCLAIMER_POINTS = [
     iconBgColor: 'bg-primary/10'
   },
   {
-    title: 'Bildkvalitet påverkar',
-    description: 'Dålig belysning, suddiga bilder eller ofullständiga ingredienslistor kan påverka analysens tillförlitlighet.',
-    icon: 'image-outline',
+    title: 'Videokvalitet påverkar',
+    description: 'Dålig belysning, skakiga videoinspelningar eller ofullständiga ingredienslistor kan påverka analysens tillförlitlighet.',
+    icon: 'videocam-outline',
     iconBgColor: 'bg-green-500/10'
   },
   {

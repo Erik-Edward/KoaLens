@@ -324,16 +324,9 @@ export function useCounter(counterName: string = 'analysis_count') {
       // Lägg till en flag för att endast köra detta en gång per mount
       const loadData = async () => {
         try {
-          // Använd lastChecked för att förhindra onödiga hämtningar
-          const lastChecked = counterState.lastChecked ? new Date(counterState.lastChecked) : null;
-          const needsRefresh = !lastChecked || 
-            (new Date().getTime() - lastChecked.getTime() > 60 * 1000); // 1 minut cache
-            
-          if (needsRefresh) {
-            await fetchCounter();
-          } else {
-            console.log('Skipping counter fetch, using cached data from:', lastChecked?.toISOString());
-          }
+          // Tvinga alltid en uppdatering vid mount för att säkerställa färsk data
+          console.log('Forcing counter fetch on mount for:', userId, counterName);
+          await fetchCounter(true); // forceRefresh = true
         } catch (err) {
           console.error('Failed to fetch counter data on mount:', err);
         }
@@ -341,6 +334,7 @@ export function useCounter(counterName: string = 'analysis_count') {
       
       loadData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]); // Ta bort fetchCounter från beroenden för att undvika oändlig loop
   
   return {

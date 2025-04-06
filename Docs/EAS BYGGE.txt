@@ -1,0 +1,23 @@
+﻿1. cd C:\Projects\KoaLens
+
+2. $env:EAS_NO_VCS=1
+
+3. eas build --platform android --profile preview
+
+
+
+
+# Skapa en ny development build
+npm run build:dev
+
+
+# Uppdatera JavaScript/TypeScript-kod på en existerande build
+npm run update:dev
+
+
+# Starta en utvecklingsserver för dev-client
+npm run dev:client
+
+
+Dessa script kommer att automatiskt använda EAS_NO_VCS=1 flaggan för att undvika Git-relaterade problem.
+När du kör update-scripten, ska ändringar du gjort i JavaScript/TypeScript-koden skickas till ditt befintliga dev-bygge utan att behöva bygga en ny APK.

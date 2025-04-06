@@ -1,17 +1,16 @@
 // components/AvatarSelectorModal.tsx
-import React from 'react';
-import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Modal, Pressable } from 'react-native';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
-import { Avatar } from './Avatar';
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice';
 import * as Haptics from 'expo-haptics';
-import { getAvailableAvatars, getSupporterAvatars } from '@/utils/avatarUtils';
+import { getAvailableAvatars, getSupporterAvatars, type AvatarOption } from '@/utils/avatarUtils';
+import { AvatarCarousel } from './AvatarCarousel';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
-const StyledScrollView = styled(ScrollView);
 
 interface AvatarSelectorModalProps {
   visible: boolean;
@@ -22,7 +21,7 @@ interface AvatarSelectorModalProps {
 }
 
 // Combine all avatars into one array
-const ALL_AVATARS = [
+const ALL_AVATARS: AvatarOption[] = [
   ...getAvailableAvatars(5, 'cute'), // Get all cute avatars
   ...getAvailableAvatars(5, 'cool'), // Get all cool avatars
   ...getSupporterAvatars() // Get all supporter avatars
@@ -35,10 +34,40 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   currentAvatarId,
   currentAvatarStyle,
 }) => {
-  const handleSelectAvatar = async (avatarId: string, style: AvatarStyle) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelectAvatar(avatarId, style);
-    onClose();
+  // State för att hålla reda på den avatar som visas i karusellen
+  const [currentlyDisplayedAvatar, setCurrentlyDisplayedAvatar] = useState<AvatarOption | null>(null);
+
+  // Logga innehållet i ALL_AVATARS när komponenten renderas
+  console.log('AvatarSelectorModal: Rendering with ALL_AVATARS count:', ALL_AVATARS.length);
+  // console.log('AvatarSelectorModal: ALL_AVATARS data:', JSON.stringify(ALL_AVATARS)); // Avkommentera vid behov för mer detaljer
+
+  // Initialisera state när modalen blir synlig eller när den nuvarande avataren ändras
+  useEffect(() => {
+    if (visible) {
+      console.log('AvatarSelectorModal Effect: Finding initial avatar for', { currentAvatarId, currentAvatarStyle });
+      const initialAvatar = ALL_AVATARS.find(a => a.id === currentAvatarId && a.style === currentAvatarStyle);
+      console.log('AvatarSelectorModal Effect: Found initial avatar:', initialAvatar ? `${initialAvatar.id}-${initialAvatar.style}` : 'null');
+      
+      // Sätt state till den funna avataren, eller den första i listan om ingen matchades
+      const avatarToSet = initialAvatar || ALL_AVATARS[0];
+      console.log('AvatarSelectorModal Effect: Setting currentlyDisplayedAvatar to:', avatarToSet ? `${avatarToSet.id}-${avatarToSet.style}` : 'null');
+      setCurrentlyDisplayedAvatar(avatarToSet || null); // Säkerställ att vi inte sätter undefined
+    }
+  }, [visible, currentAvatarId, currentAvatarStyle]);
+
+  // Hantera när användaren swipar till en ny avatar i karusellen
+  const handleCarouselSelect = (avatar: AvatarOption) => {
+    setCurrentlyDisplayedAvatar(avatar);
+    // Ingen haptik här, karusellen hanterar det
+  };
+
+  // Hantera när användaren trycker på bekräftelseknappen
+  const handleConfirmSelection = async () => {
+    if (currentlyDisplayedAvatar) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onSelectAvatar(currentlyDisplayedAvatar.filename, currentlyDisplayedAvatar.style);
+      onClose(); // Stäng modalen efter val
+    }
   };
 
   return (
@@ -48,10 +77,11 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       visible={visible}
       onRequestClose={onClose}
     >
-      <StyledView className="flex-1 justify-end bg-black/70">
-        <StyledView className="bg-background-main rounded-t-3xl h-4/5">
-          {/* Header with close button */}
-          <StyledView className="flex-row justify-between items-center p-6 border-b border-background-light">
+      <StyledView className="flex-1 bg-black/70 pt-10 justify-end">
+        {/* Ge container flex-grow och max-height */}
+        <StyledView className="bg-background-main rounded-t-lg shadow-xl overflow-hidden pb-6 flex-grow max-h-[85vh]">
+          {/* Header med close button */}
+          <StyledView className="flex-row justify-between items-center p-6 border-b border-background-light mb-6">
             <StyledText className="text-text-primary font-sans-bold text-xl">
               Välj avatar
             </StyledText>
@@ -63,29 +93,34 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             </StyledPressable>
           </StyledView>
 
-          {/* Avatar grid */}
-          <StyledScrollView>
-            <StyledView className="flex-row flex-wrap justify-center p-4">
-              {ALL_AVATARS.map((avatar) => {
-                const isSelected = currentAvatarId === avatar.id && currentAvatarStyle === avatar.style;
-                
-                return (
-                  <StyledPressable
-                    key={`${avatar.id}-${avatar.style}`}
-                    onPress={() => handleSelectAvatar(avatar.id, avatar.style)}
-                    className="p-4"
-                  >
-                    <Avatar
-                      source={avatar.filename}
-                      size="medium"
-                      style={avatar.style}
-                      variant={isSelected ? 'selected' : 'default'}
-                    />
-                  </StyledPressable>
-                );
-              })}
-            </StyledView>
-          </StyledScrollView>
+          {/* Wrapper för Karusell med flex: 1 */}
+          <StyledView className="flex-1 mb-4">
+            {currentlyDisplayedAvatar && (
+              <AvatarCarousel
+                avatars={ALL_AVATARS}
+                onSelectAvatar={handleCarouselSelect} // Uppdatera lokalt state vid swipe
+                selectedAvatarId={currentlyDisplayedAvatar.id} // Visa vilken som är aktiv
+              />
+            )}
+          </StyledView>
+          
+          {/* Bekräftelseknapp (justerad padding) */}
+          <StyledView className="px-6 pt-4">
+            <StyledPressable
+              onPress={handleConfirmSelection}
+              disabled={!currentlyDisplayedAvatar}
+              className={`py-4 rounded-lg items-center ${
+                currentlyDisplayedAvatar ? 'bg-primary' : 'bg-background-light'
+              }`}
+            >
+              <StyledText className={`font-sans-bold text-lg ${
+                currentlyDisplayedAvatar ? 'text-text-inverse' : 'text-text-secondary'
+              }`}>
+                Välj denna avatar
+              </StyledText>
+            </StyledPressable>
+          </StyledView>
+          
         </StyledView>
       </StyledView>
     </Modal>

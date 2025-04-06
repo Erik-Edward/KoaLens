@@ -1,43 +1,42 @@
-# KoaLens MVP: Färdigställningsplan och Lanseringsstrategi (Uppdaterad Mars 2025)
+# KoaLens MVP: Färdigställningsplan och Lanseringsstrategi (Uppdaterad April 2025)
 
 ## 1. Projektöversikt
 
-**KoaLens** är en mobilapplikation som hjälper användare identifiera veganska produkter genom att analysera ingredienslistor via kamerabaserad skanning och AI-analys.
+**KoaLens** är en mobilapplikation som hjälper användare identifiera veganska produkter genom att analysera ingredienslistor via **videoinspelning** och AI-analys.
 
 ### Syfte
 Att hjälpa konsumenter enkelt avgöra om produkter är veganska genom att analysera ingredienslistor via kameran och artificiell intelligens.
 
 ### Nuvarande Status
 - ✅ Grundläggande apparkitektur implementerad (React Native, Expo, TypeScript)
-- ✅ Kamerafunktionalitet för bildtagning och beskärning
-- ✅ Claude Vision API-integration via backend
+- ✅ **Videoanalys via enhetens kamera och AI-backend (Gemini)**
 - ✅ Ingrediensanalys och produktvalidering
 - ✅ Historikfunktionalitet
 - ✅ Användarautentisering via Supabase
-- ✅ Profilhantering och avatarsystem
-- ✅ Onboarding-process
+- ✅ Profilhantering och avatarsystem (inkl. realtidsuppdatering)
+- ✅ Onboarding-process (uppdaterad för videoanalys)
+- ✅ E-nummersökning
 - ✅ Sentry crashrapportering implementerad och verifierad
 - ✅ Firebase Analytics för användarstatistik implementerad och verifierad
 - ✅ Supportfunktioner implementerade (kontakt, feedback, hjälpsektion)
-- ✅ Backend driftsatt på Fly.io i Stockholm-regionen
+- ✅ **Backend med nytt räknarsystem (Supabase/Node.js) driftsatt på Fly.io**
+- ✅ **Användningsgräns för analyser (15 per månad) implementerad och verifierad**
+- ✅ Förbättrad UX i skanningsfunktionen (kamera UI, inspelningsknapp)
 - ✅ EAS testbygge skapat och verifierat på fysisk Android-enhet
 - ✅ Font-rendering problem löst med expo-font plugin
-- ✅ Komplett end-to-end flöde från kamera till analys fungerar
-- ✅ Förbättrad UX i skanningsfunktionen med moderna animationer
-- ✅ Uppdaterad profilsida med möjlighet att ändra vegansk status i realtid
-- ✅ Förbättrad avatar-selektion med omedelbar visuell feedback
-- ✅ Uppgraderad till Claude 3.7 Sonnet för förbättrad analysnoggrannhet
-- ✅ Implementerat användningsgräns för analyser (15 per månad)
-- ⚠️ UI/layout- och fontproblem identifierade i testbygge (delvis åtgärdade)
-- ⚠️ Redundanta paketberoenden (minor)
+- ✅ Komplett end-to-end flöde från videoinspelning till analys fungerar
+- ✅ Fixat dubbletter i E-nummerdatabas (E1517, E1518)
+- ✅ Fixat onboarding-flödet (visas ej för befintliga användare)
+- ✅ Fixat navigeringsproblem efter profiluppdatering
+- ⚠️ UI/layout-tester på olika skärmstorlekar behövs (via Android Studio)
+- ⚠️ Feedback-systemets backend-integration behöver verifieras
 - 🔄 Lösenordsåterställning för användare (planerad)
-- 🔄 Professionell testdistribution via EAS Internal Distribution (planerad)
-- 🔄 Testardokumentation och användarguide (planerad)
+- 🔄 Testardokumentation och användarguide (behöver uppdateras)
 - 🔍 Förbättrad hantering av svårskannade förpackningar (långsiktig förbättring)
 
 ### Målplattformar
 - **Primär:** Android (implementerad och testad)
-- **Sekundär:** iOS (ska implementeras via Expo EAS)
+- **Sekundär:** iOS (planerad via Expo EAS)
 
 ## 2. Teknisk Arkitektur
 
@@ -48,7 +47,7 @@ Att hjälpa konsumenter enkelt avgöra om produkter är veganska genom att analy
 - **Styling:** NativeWind (Tailwind för React Native)
 - **State Management:** Zustand med persist middleware
 - **Autentisering:** Supabase Auth
-- **Bild/Kamerahantering:** React Native Vision Camera
+- **Video/Kamerahantering:** React Native Vision Camera
 - **Felrapportering:** Sentry
 - **Användaranalys:** Firebase Analytics
 - **Byggverktyg:** Expo EAS Build
@@ -57,302 +56,138 @@ Att hjälpa konsumenter enkelt avgöra om produkter är veganska genom att analy
 ### Backend
 - **Ramverk:** Node.js med Express
 - **Språk:** TypeScript
-- **AI-integration:** Claude Vision API (3.7 Sonnet)
-- **Databas:** Supabase för användarsessioner och feedback
-- **Hosting:** Fly.io med Stockholm-region för lägsta latens
+- **AI-integration:** **Google Gemini API (via anpassad backend-tjänst)**
+- **Databas:** Supabase (Auth, User Counters, Feedback etc.)
+- **Hosting:** Fly.io med Stockholm-region
 
-## 3. Slutförda förbättringar
+## 3. Slutförda förbättringar (Urval sedan Mars 2025)
 
-### 3.1. Förbättrat användargränssnitt för skannknappen
+### 3.1. Implementering av Videoanalys
 **Status: ✅ Slutförd**
+- Ersatt bildanalys (Claude) med videoanalys (Gemini).
+- Realtids-feedback under inspelning (även om analys sker efteråt).
+- Hantering av videoström och backend-kommunikation.
 
-**Implementerade förbättringar:**
-- Förbättrad shimmer-animation med bättre prestanda genom native driver
-- Moderniserad design med pulserande effekt och inre glöd
-- Optimerad kodstruktur för animationslogiken
-- Konsekvent namngivning för animation-variabler
-
-**Tekniska detaljer:**
-- Separata interpolationer för olika animationsaspekter (shimmer, glöd, pulsering)
-- Förbättrad användning av React Native's Animated API
-- Förbättrad kodläsbarhet och underhållbarhet
-
-### 3.2. Förbättrad profilsida med redigerbar vegansk status
+### 3.2. Implementering av Nytt Räknarsystem
 **Status: ✅ Slutförd**
+- Implementerat backend-baserat räknarsystem via Supabase stored procedures.
+- Frontend använder `useCounter`-hook för att hämta och uppdatera analysantal.
+- Gräns satt till 15 analyser/månad, med automatisk återställning.
+- UI-komponenter (`UsageLimitIndicator`, `UsageLimitModal`) integrerade.
+- Korrigerat initialt visningsvärde (15/15 visas korrekt nu).
 
-**Implementerade förbättringar:**
-- Användare kan nu uppdatera sin veganska status direkt från profilsidan
-- Moderniserad UI med tydligare interaktiva element
-- Modal-baserad selektion med samma alternativ som i onboarding
-- Haptisk feedback vid statusförändringar
-- Uppdateringar sparas både lokalt och i Supabase
-
-**Tekniska detaljer:**
-- Integration med useUpdateUserProfile-hook för att hantera databasens uppdateringar
-- Statusuppdateringar sparas omedelbart i Zustand-state
-- Förbättrad felhantering med tydliga användarmeddelanden
-- Omedelbar UI-uppdatering efter statusförändring
-
-### 3.3. Förbättrad avatarselektion med omedelbar visuell feedback
+### 3.3. Förbättrad Profilsida & Avatar
 **Status: ✅ Slutförd**
+- Användare kan uppdatera vegansk status.
+- Avatarbild uppdateras omedelbart.
+- Navigationsproblem efter uppdatering löst.
 
-**Implementerade förbättringar:**
-- Avatarbild uppdateras omedelbart i UI när en ny väljs
-- Förbättrad lokal state-hantering för snabbare feedback
-- Modal stängs automatiskt efter val för bättre UX
-- Robustare implementation med tydlig typning
-- Förbättrad felhantering för Supabase-uppdateringar
-
-**Tekniska detaljer:**
-- Lokal caching av avatardata för omedelbar visuell uppdatering
-- Realtidsuppdatering för konsekvent UI över hela appen
-- Förbättrad React hook-användning (useCallback, useEffect)
-- Separerade state-hantering för lokal och backend-data
-
-### 3.4. Uppgraderad till Claude 3.7 Sonnet
+### 3.4. Onboarding-flöde & Texter
 **Status: ✅ Slutförd**
+- Onboarding visas nu korrekt (endast för nya användare).
+- Texter och illustrationer uppdaterade för att reflektera videoanalys och panorering.
+- Information om landscape/portrait-läge tillagd.
 
-**Implementerade förbättringar:**
-- Uppgraderad från Claude 3.5 Sonnet till 3.7 Sonnet
-- Förbättrad analysnoggrannhet för ingredienslistor
-- Optimerade komprimeringsinställningar för den nya modellen
-- Snabbare svarstider för analyser
-
-**Tekniska detaljer:**
-- Uppdaterad modellversion i backend API-anrop
-- Anpassade prompt-optimeringar för den nya modellen
-- Behållit kompatibilitet med tidigare analyssvar
-- Förbättrad felhantering vid API-gränssnittet
-
-### 3.5. Implementerat användningsgräns för analyser
+### 3.5. E-nummer Databas
 **Status: ✅ Slutförd**
+- Korrigerat dubblettstatus för E1517 och E1518 (visas nu endast som "Osäker").
 
-**Implementerade förbättringar:**
-- Begränsning av gratisanvändare till 15 analyser per månad
-- Skapad ny tabell i Supabase för att spåra användarstatistik
-- Visuell indikator för återstående analyser i användargränssnittet
-- Automatisk återställning av räknare den första dagen varje månad
+## 4. Återstående prioriterade uppgifter (Inför MVP)
 
-**Tekniska detaljer:**
-- Implementerad kontrolllogik i claudeVisionService
-- Integration med Supabase för spårning av analyser
-- Uppdaterad UI för att visa återstående analyser
-- Användarmeddelanden när gränsen närmar sig
-
-## 4. Återstående prioriterade uppgifter
-
-### 4.1. Förbättra testdistribution och dokumentation
+### 4.1. UI/Layout-testning på Virtuella Enheter
 **Status: Prioriterad**
+- **Mål:** Säkerställa UI-konsistens över olika skärmstorlekar/upplösningar.
+- **Åtgärd:** Använd Android Studio Emulator för att testa layout, textbrytning, elementpositionering på olika virtuella enheter.
 
-Nuvarande situation: EAS-byggen distribueras manuellt via Google Drive-länkar, vilket fungerar för begränsad testning men inte ger en optimal erfarenhet för testare.
-
-**Lösningsstrategi:**
-- Implementera EAS Update/Internal Distribution för professionell app-distribution
-- Skapa tydlig dokumentation för testare
-- Strukturera namngivning av APK-filer
-
-**Implementeringsplan:**
-```bash
-# Konfigurera EAS Update i projektet
-eas update:configure
-
-# Skapa en intern distributionskanal
-eas channel:create internal
-
-# Bjud in testare via e-post
-eas channel:add internal --build-profile preview --email tester1@example.com tester2@example.com
-```
-
-**Testardokumentation:**
-- Skapa en PDF-guide med:
-  - Kort introduktion till KoaLens
-  - Installationsanvisningar med skärmbilder
-  - Instruktioner för huvudfunktionaliteten
-  - Hur man lämnar feedback och rapporterar problem
-  - Kontaktinformation för support
-
-**APK-namngivning:**
-- Standardisera namngivning: "KoaLens-v[version].apk" (t.ex. "KoaLens-v1.0.1.apk")
-- Inkludera version för enkel spårning
-
-### 4.2. Åtgärda kvarvarande UI/layout- och fontproblem
-**Status: Delvis slutförd, fortsatt prioriterad**
-
-Nuvarande problem: Vissa UI/layout-problem kvarstår i testbygget:
-1. Element (knappar) placeras för långt ner på skärmen och är delvis osynliga på vissa enheter
-2. Font-rendering skiljer sig på vissa skärmar från förväntad design
-
-**Lösningsstrategi:**
-- Implementera skärmstorlek-responsiv layout med anpassade SafeArea-komponenter
-- Felsöka font-laddning och CSS-klasstilldelning på resultat-sidan
-- Testa på olika skärmstorlekar för att säkerställa konsekvent design
-
-**Implementeringsplan:**
-```typescript
-// Förbättrad layout med bättre SafeArea-hantering
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-function ResultScreen() {
-  const insets = useSafeAreaInsets();
-  
-  return (
-    <View style={[
-      styles.container,
-      {
-        // Anpassa padding baserat på enhetens "notch"
-        paddingTop: insets.top,
-        paddingBottom: Math.max(insets.bottom, 20),
-        paddingLeft: insets.left + 10,
-        paddingRight: insets.right + 10,
-      }
-    ]}>
-      {/* Övriga komponenter */}
-      
-      {/* Placera knappar med hänsyn till padding-bottom */}
-      <View style={styles.buttonContainer}>
-        <Button title="Fortsätt" onPress={handleContinue} />
-      </View>
-    </View>
-  );
-}
-```
-
-### 4.3. Fixa onboarding-flödet
+### 4.2. Verifiera Backend Deployment & Live Testning
 **Status: Prioriterad**
+- **Mål:** Säkerställa att appen fungerar korrekt mot den deployade backend-miljön på Fly.io.
+- **Åtgärd:**
+    - Dubbelkolla Fly.io konfiguration (miljövariabler, secrets för Gemini etc.).
+    - Utför tester på fysisk enhet mot live backend (videoanalys, räknare, prestanda, felhantering).
 
-Nuvarande problem: Onboarding-skärmen visas för alla användare vid varje app-start, även för befintliga användare.
-
-**Lösningsstrategi:**
-- Implementera AsyncStorage-baserad spårning av onboarding-status
-- Integrera med Supabase användarstatus för att avgöra om användaren är ny
-- Visa login-skärmen direkt för återvändande användare
-- Behåll onboarding endast för nya installationer
-
-**Implementeringsplan:**
-```typescript
-// Skapa en användbar hook för att kontrollera onboarding-status
-export function useOnboardingStatus() {
-  // Kontrollera AsyncStorage och användarstatus
-  // Returnera { hasCompletedOnboarding, isLoading, markOnboardingComplete }
-}
-
-// Uppdatera navigationlogiken i app/_layout.tsx
-```
-
-### 4.4. Lösa feedback-systemet
+### 4.3. Verifiera Feedback-systemet
 **Status: Prioriterad**
+- **Mål:** Säkerställa att användarfeedback sparas korrekt i Supabase.
+- **Åtgärd:** Skicka test-feedback från appen och verifiera att den dyker upp i Supabase-tabellen. Debugga vid behov (RLS, anslutning).
 
-Nuvarande problem: Feedback från appen sparas inte korrekt i Supabase.
-
-**Lösningsstrategi:**
-- Debugga anslutningen till Supabase för feedback-tabellen
-- Kontrollera Row Level Security-inställningar i Supabase
-- Verifiera att supabase-klienten initialiseras korrekt
-- Lägg till detaljerad loggning för felsökning
-
-### 4.5. Implementera lösenordsåterställning
+### 4.4. Implementera Lösenordsåterställning
 **Status: Prioriterad**
+- **Mål:** Ge användare möjlighet att återställa glömt lösenord.
+- **Åtgärd:** Implementera flöde med Supabase Auth och UI-formulär i appen.
 
-Nuvarande problem: Användare kan registrera sig via e-post men saknar möjlighet att återställa sitt lösenord om de glömmer det.
+### 4.5. Uppdatera Testardokumentation
+**Status: Prioriterad**
+- **Mål:** Ge testare aktuell och korrekt information.
+- **Åtgärd:** Uppdatera `Docs/koalens-test-guide.md` för att reflektera videoanalys.
 
-**Lösningsstrategi:**
-- Implementera lösenordsåterställning via Supabase Auth
-- Skapa ett användarvänligt formulär i appen
-- Hantera återställningsprocessen från begäran till bekräftelse
+### 4.6. Förbättra Testdistribution (Valfritt för MVP, bra för beta)
+**Status: Lägre Prioritet (MVP)**
+- **Mål:** Effektivisera distribution av testversioner.
+- **Åtgärd:** Utvärdera/implementera EAS Update/Internal Distribution.
 
-### 4.6. Optimera Fly.io-kostnader
-**Status: Under utvärdering**
-
-För att optimera driftskostnader under testfasen kan vi överväga att minska antalet maskiner.
-
-**Lösningsstrategi:**
-- Minska från 2 maskiner till 1 maskin under testfasen
-- Övervaka prestanda och tillgänglighet
-- Införa autoskalning när användarbasen växer
+### 4.7. Rensa Redundanta Paket (Underhåll)
+**Status: Lägre Prioritet (MVP)**
+- **Mål:** Förbättra kodkvalitet och minska appstorlek.
+- **Åtgärd:** Identifiera och ta bort oanvända npm-paket.
 
 ## 5. Kostnadsanalys
 
-### 5.1. API-kostnad (Claude Vision)
-- Nuvarande kostnad per analys: ~$0.01 (baserat på verklig användning)
-- Uppskattad månadskostnad per gratisanvändare (15 analyser): $0.15
-- Påverkan av modelluppgradering: Behöver utvärderas, men förväntas vara likvärdig
+### 5.1. API-kostnad (Google Gemini)
+- **Uppskattning:** Behöver följas upp baserat på verklig användning av Gemini API för video. Kostnaden kan skilja sig från Claude. Initiala tester i loggar indikerar en viss token-användning per analys.
+- **Uppskattad månadskostnad per gratisanvändare (15 analyser):** **TBD** (Monitorera via Google Cloud Console).
 
 ### 5.2. Infrastrukturkostnad (Fly.io)
-- Nuvarande konfiguration (2 maskiner): ~$13-15/månad
-- Optimerad konfiguration (1 maskin): ~$7/månad
-- Kostnad per analys: Beror på volym, cirka $0.01 med nuvarande konfiguration vid 1500 analyser/månad
+- Nuvarande konfiguration (2 maskiner): ~$13-15/månad (kan behöva justeras uppåt beroende på Geminis resurskrav).
+- Optimerad konfiguration (1 maskin, testfas): ~$7/månad.
+- **Rekommendation:** Börja med 1 maskin för beta, skala upp vid behov.
 
 ## 6. Lanseringsplan
 
-### 6.1. Tidslinje (Uppdaterad)
+### 6.1. Tidslinje (Uppdaterad April 2025)
 
-**Mars 2025: Komplettering av MVP**
-- ✅ Backend driftsatt på Fly.io
-- ✅ EAS testbygge för Android skapat och verifierat
-- ✅ Förbättrad UX i skanningsfunktionen med moderna animationer
-- ✅ Uppdaterad profilsida med möjlighet att ändra vegansk status
-- ✅ Förbättrad avatar-selektion med omedelbar visuell feedback
-- ✅ Uppgraderat till Claude 3.7 Sonnet för bättre analysnoggrannhet
-- ✅ Implementerat användningsgräns för analyser (15 per månad)
-- 🔄 Åtgärda kvarvarande UI/layout- och fontproblem
-- 🔄 Fixa onboarding-flödet
-- 🔄 Lösa feedback-systemet
-- 🔄 Implementera lösenordsåterställning
-- 🔄 Förbättra testdistributionsmetod
-- 🔄 Skapa testardokumentation
-- 🔄 Rensa redundanta paketberoenden
+**April 2025: Slutförande av MVP & Förberedelse för Beta**
+- 🔄 UI/Layout-testning på virtuella enheter
+- 🔄 Verifiera Backend Deployment & Live Testning
+- 🔄 Verifiera Feedback-systemet
+- 🔄 Implementera Lösenordsåterställning
+- 🔄 Uppdatera Testardokumentation (`koalens-test-guide.md`)
+- 🔄 Förbered distribution för beta-testare (t.ex. via manuell APK eller EAS)
 
-**April 2025: Beta-testning**
-- Distribuera till 5-10 externa testare via EAS Internal Distribution
-- Samla in och analysera feedback
-- Implementera kritiska förbättringar
-- Optimera kostnader baserat på användarmönster
-- Lägg till informativa meddelanden om scanning-begränsningar
+**Maj 2025: Beta-testning**
+- Distribuera till 5-10 externa testare
+- Samla in och analysera feedback (via det verifierade feedback-systemet)
+- Implementera kritiska förbättringar baserat på feedback
+- Monitorera API-kostnader (Gemini) och backend-prestanda (Fly.io)
 
-**Maj 2025: Slutförberedelser**
+**Juni 2025: Slutförberedelser**
 - Slutliga prestandaoptimeringar
-- Validera alla funktioner
-- Förbereda marknadsföringsmaterial
+- Validera alla funktioner baserat på betatester
+- Förbereda marknadsföringsmaterial (ikoner, skärmdumpar för butik)
 - Finalisera integritetspolicy och användarvillkor
-- Analysera feasibility för multi-bild analys för svårskannade förpackningar
 
-**Juni 2025: Lansering**
+**Juli 2025 (Preliminärt): Lansering**
 - Publicera i Google Play Store (Android)
 - Börja planera för App Store (iOS)
-- Aktivera all lanseringsrelaterad infrastruktur
-- Implementera monetiseringsstrategi
+- Implementera monetiseringsstrategi (om premium-tier ska finnas vid lansering)
 
 **Post-lansering (Q3-Q4 2025)**
-- Utforska avancerade bildhanteringstekniker för cylindriska förpackningar
-- Utveckla prototyp för panorama/bildstitching-lösning
-- Testa och implementera multi-bild analys baserat på betafeedback
+- Utforska avancerade bildhanteringstekniker för svårskannade förpackningar (panorama/stitching)
+- Iterera baserat på användarfeedback och analysdata
 
-## 7. Monetiseringsstrategi
+## 7. Monetiseringsstrategi (Oförändrad Plan)
 
 ### 7.1. Fasbaserad Implementering
 
 #### Fas 1: Gratis MVP (Lansering)
-- **Begränsningar:** 15 skanningar/månad per användare (nu implementerad)
+- **Begränsningar:** 15 analyser/månad per användare (verifierad)
 - **Fokus:** Bygga användarbas och samla feedback
-- **Tidsram:** Första 1-2 månaderna
-- **Kostnad per användare:** ~$0.15/månad API + infrastruktur
 
 #### Fas 2: Freemium-modell (Post-lansering)
-- **Gratis tier:** 15 skanningar/månad
-- **Premium tier:** 50 skanningar/månad
-- **Pris:** 39 SEK/månad eller 349 SEK/år
-- **Backend-skalning:** Skala Fly.io-resurser baserat på användning
+- **Gratis tier:** 15 analyser/månad
+- **Premium tier:** **Obegränsat** eller högre antal analyser/månad (TBD)
+- **Pris:** TBD (ex. 39 SEK/månad eller 349 SEK/år)
 
-## 8. Nästa steg
+## 8. Nästa steg (April 2025)
 
-Under mars-april 2025 fokuserar vi på att slutföra följande uppgifter i prioritetsordning:
-
-1. **Åtgärda kvarvarande UI/layout- och fontproblem** - Kritisk förbättring för konsekvent användarupplevelse
-2. **Fixa onboarding-flödet** - Viktig användarupplevelseförbättring för nya och befintliga användare
-3. **Lösa feedback-systemet** - För att samla in värdefull användarfeedback
-4. **Implementera lösenordsåterställning** - För att förbättra användarupplevelsen vid inloggningsproblem
-5. **Förbättra testdistribution och dokumentation** - För att förbereda för en professionell beta-testning
-6. **Adressera begränsningar med svårskannade förpackningar** - Börja med information till användare och planera för mer avancerade lösningar
-7. **Rensa redundanta paketberoenden** - Underhållsåtgärd för bättre kodkvalitet
-
-Med de senaste framstegen i användarinteraktionen, AI-modellen och användarstatistik är vi nu väl positionerade att nå MVP-målet i tid för betafasen i april.
+Fokus ligger nu på att slutföra uppgifterna under **Punkt 4 (Återstående prioriterade uppgifter)**, med start i UI-testning och backend-verifiering, för att kunna påbörja beta-testning i maj.

@@ -43,8 +43,8 @@ export const ScanGuideContent: React.FC<GuideStepProps> = ({ title, description 
 
 export default function ScanGuideStep() {
   const content = {
-    title: "Skanna ingredienslistan",
-    description: "Ta ett foto och justera bilden så att ingredienslistan syns tydligt. KoaLens analyserar sedan innehållet.",
+    title: "Analysera ingredienslistan",
+    description: "Rikta telefonen mot ingredienslistan (stående eller liggande) och panorera vid behov för att fånga alla ingredienser. Efter några sekunder får du resultatet av analysen.",
   };
 
   return <ScanGuideContent {...content} />;

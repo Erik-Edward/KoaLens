@@ -1,0 +1,18 @@
+Running "expo doctor"
+Running 15 checks on your project...
+13/15 checks passed. 2 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check dependencies for packages that should not be installed directly
+The package  "@types/react-native" should not be installed directly in your project, as types are included with the "react-native" package.
+
+✖ Validate packages against React Native Directory package metadata
+  The following issues were found when validating your dependencies against React Native Directory:
+  Unsupported on New Architecture: react-native-image-crop-picker
+No metadata available: @anthropic-ai/sdk, @tanstack/query-async-storage-persister, @tanstack/react-query-persist-client, sentry-expo, uuid
+Advice: 
+  - Use libraries that are actively maintained and support the New Architecture. Find alternative libraries with https://reactnative.directory.
+  - Add packages to expo.doctor.reactNativeDirectoryCheck.exclude in package.json to selectively skip validations, if the warning is not relevant.
+  - Update React Native Directory to include metadata for unknown packages. Alternatively, set expo.doctor.reactNativeDirectoryCheck.listUnknownPackages in package.json to false to skip warnings about packages with no metadata, if the warning is not relevant.
+2 checks failed, indicating possible issues with the project.
+Command "expo doctor" failed.

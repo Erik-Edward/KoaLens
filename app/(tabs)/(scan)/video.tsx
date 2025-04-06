@@ -18,6 +18,8 @@ import { AnalysisService } from '@/services/analysisService';
 // import LottieView from 'lottie-react-native';
 import { useApiStatus } from '@/contexts/ApiStatusContext';
 import { API_BASE_URL } from '@/constants/config';
+import { useCounter } from '@/hooks/useCounter';
+import { UsageLimitModal } from '@/components/UsageLimitModal';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -53,6 +55,12 @@ function VideoScreen() {
   const MIN_REQUEST_INTERVAL = 3000;
   const processedVideoPathRef = useRef<string | null>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
+  const [isLimitModalVisible, setLimitModalVisible] = useState(false);
+  const {
+    checkLimit,
+    recordAnalysis,
+    loading: counterLoading
+  } = useCounter('analysis_count');
 
   useEffect(() => {
     const initializeFromParams = async () => {
@@ -248,103 +256,100 @@ function VideoScreen() {
       processingRef.current = false;
       return;
     }
-    
-    if (analysisState !== 'analyzing') {
-       console.warn('analyzeVideo anropad när state inte är "analyzing". Aktuell state:', analysisState);
-       setAnalysisState('analyzing');
-    }
-    
-    setError(null);
 
+    // ---- NY KOD: Kontrollera användningsgräns ----
     try {
-      console.log('Analyserar video:', currentVideoUri);
+      console.log('Kontrollerar användningsgräns...');
+      const limitCheck = await checkLimit();
       
-      if (videoApiStatus === 'unavailable') {
-        throw new Error('Videoanalys-API är inte tillgängligt för tillfället. Försök igen senare eller kontakta support.');
+      if (!limitCheck.allowed) {
+        console.log('Användningsgräns nådd.');
+        setLimitModalVisible(true); // Visa modal
+        setAnalysisState('idle');
+        processingRef.current = false;
+        return; // Avbryt analysen
+      }
+      console.log('Användningsgräns OK, återstående:', limitCheck.remaining);
+    } catch (limitError) {
+      console.error('Fel vid kontroll av användningsgräns:', limitError);
+      // Fortsätt ändå, men logga felet
+      // Alternativt, visa ett felmeddelande
+      // setError('Kunde inte kontrollera användningsgränsen.');
+      // setAnalysisState('error');
+      // processingRef.current = false;
+      // return;
+    }
+    // ---- SLUT PÅ NY KOD ----
+
+    console.log('Validerad video sökväg för analys:', currentVideoUri);
+    setAnalysisState('analyzing');
+    setRetryCount(0); 
+    
+    try {
+      console.log('Skickar begäran med requestId:', requestIdRef.current);
+      
+      if (requestCancelled) {
+        console.log('Analys avbruten innan API-anrop skickades.');
+        processingRef.current = false;
+        setAnalysisState('idle');
+        return; 
       }
       
-      if (currentVideoUri.includes('/mock_video_path_after')) {
-        throw new Error('Videoinspelningen misslyckades. Försök spela in igen med bättre ljus och fokus på ingredienslistan.');
+      const result = await analysisService.analyzeVideo(currentVideoUri, requestIdRef.current);
+      
+      if (requestCancelled) {
+         console.log('Analys avbruten efter API-anrop slutfördes men innan navigering.');
+         processingRef.current = false;
+         setAnalysisState('idle');
+         return; 
       }
       
+      if (!result || !result.ingredientList || result.ingredientList.length === 0) {
+         throw new Error('Kunde inte identifiera några ingredienser i videon. Kontrollera att hela ingredienslistan var synlig och välbelyst i videon. Försök igen.');
+      }
+      
+      console.log('Analysresultat:', JSON.stringify(result).substring(0, 100) + '...');
+      setAnalysisState('preparing_results');
+
+      // ---- NY KOD: Registrera analys ----
       try {
-        const fileInfo = await FileSystem.getInfoAsync(currentVideoUri);
-        if (!fileInfo.exists) {
-          throw new Error(`Videofil på sökväg ${currentVideoUri} hittades inte precis före analys.`);
-        }
-      } catch (validationError: any) {
-         console.error('Fel vid sista validering av videofil:', validationError);
-         throw new Error('Problem att komma åt videofilen för analys. Försök igen.');
+        console.log('Registrerar analys...');
+        await recordAnalysis(); 
+        console.log('Analys registrerad!');
+      } catch (recordError) {
+        console.error('Fel vid registrering av analys:', recordError);
+        // Fortsätt ändå, men logga felet
+      }
+      // ---- SLUT PÅ NY KOD ----
+
+      navigateToResults(result, currentVideoUri);
+      
+    } catch (err: any) {
+      console.error('Fel under analysprocessen:', err);
+      
+      if (requestCancelled) {
+        console.log('Fel inträffade, men analysen var redan avbruten.');
+        processingRef.current = false;
+        setAnalysisState('idle');
+        return;
+      }
+
+      let errorMessage = err.message || 'Ett okänt fel uppstod under analysen.';
+
+      // Lägg till specifik felhantering för duplicerad begäran
+      if (errorMessage.includes('Duplicate request') || errorMessage.includes('Analysen pågår redan')) {
+        errorMessage = 'Analysen pågår redan för denna video. Vänta ett ögonblick.';
+        // Behåll analysläget som 'analyzing'?
+        setAnalysisState('analyzing'); 
+      } else {
+        setError(errorMessage);
+        setAnalysisState('error');
       }
       
-      try {
-        console.log('Skickar begäran med requestId:', requestIdRef.current);
-        
-        if (requestCancelled) {
-          console.log('Analys avbruten innan API-anrop skickades.');
-          processingRef.current = false;
-          setAnalysisState('idle');
-          return; 
-        }
-        
-        const result = await analysisService.analyzeVideo(currentVideoUri, requestIdRef.current);
-        
-        if (requestCancelled) {
-           console.log('Analys avbruten efter API-anrop slutfördes men innan navigering.');
-           processingRef.current = false;
-           setAnalysisState('idle');
-           return; 
-        }
-        
-        if (!result || !result.ingredientList || result.ingredientList.length === 0) {
-           throw new Error('Kunde inte identifiera några ingredienser i videon. Kontrollera att hela ingredienslistan var synlig och välbelyst i videon. Försök igen.');
-        }
-        
-        console.log('Analysresultat:', JSON.stringify(result).substring(0, 100) + '...');
-        setAnalysisState('preparing_results');
-        navigateToResults(result, currentVideoUri);
-        
-      } catch (analysisError: any) {
-        if (requestCancelled) {
-           console.log('Analys avbruten, ignorerar analysfel.');
-           processingRef.current = false;
-           setAnalysisState('idle'); 
-           return;
-        }
-        
-        console.error('Analysfel:', analysisError);
-        
-        let errorMsg = 'Kunde inte analysera video. ' + (analysisError.message || '');
-        
-        if (analysisError.message?.includes('Duplicate request') || 
-            analysisError.message?.includes('429') ||
-            analysisError.message?.includes('Too many requests')) {
-          
-          errorMsg = 'En analys pågår redan. Vänta tills den är klar eller försök igen senare.';
-        } else if (analysisError.message?.includes('network') || 
-            analysisError.message?.includes('timeout') ||
-            analysisError.message?.includes('No response from server')) {
-          errorMsg = 'Nätverksfel: Kontrollera din internetanslutning och försök igen.';
-        } else if (analysisError.message?.includes('Failed to convert video')) {
-           errorMsg = 'Problem med att bearbeta videofilen. Försök spela in igen.';
-        }
-        throw new Error(errorMsg); 
+      // Reset processingRef only if it's not a duplicate request error
+      if (!errorMessage.includes('Analysen pågår redan')) {
+        processingRef.current = false;
       }
-    } catch (error: any) {
-       if (requestCancelled) {
-          console.log('Analys avbruten, ignorerar yttre fel.');
-          processingRef.current = false;
-          setAnalysisState('idle');
-          return;
-       }
-       
-       console.error('Fel i analyzeVideo funktionen:', error);
-       setError(error.message || 'Ett okänt fel uppstod vid analys.');
-       setAnalysisState('error');
-    } finally {
-       if (analysisState !== 'idle') {
-           processingRef.current = false;
-       }
     }
   };
   
@@ -556,6 +561,13 @@ function VideoScreen() {
           )}
         </StyledView>
       )}
+
+      {/* Modal för användningsgräns */}
+      <UsageLimitModal 
+        visible={isLimitModalVisible} 
+        onClose={() => setLimitModalVisible(false)} 
+      />
+      
     </SafeAreaView>
   );
 }

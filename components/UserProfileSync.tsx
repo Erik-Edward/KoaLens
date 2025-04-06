@@ -90,22 +90,9 @@ export const UserProfileSync: React.FC = () => {
         
         // Kontrollera om det finns metadata att synkronisera
         if (metadata && (
-          (metadata.avatar_id && metadata.avatar_id !== avatarId) || 
           (metadata.vegan_status && metadata.vegan_status !== veganStatus)
         )) {
-          console.log('UserProfileSync: Synkroniserar användarprofil från metadata');
-          
-          // Uppdatera avatar-information
-          if (metadata.avatar_style && metadata.avatar_id) {
-            await store.setAvatar(
-              metadata.avatar_style as AvatarStyle, 
-              metadata.avatar_id as string
-            );
-            
-            if (typeof metadata.vegan_years === 'number') {
-              await store.setVeganYears(metadata.vegan_years);
-            }
-          }
+          console.log('UserProfileSync: Synkroniserar användarprofil från metadata (exkl. avatar)');
           
           // Uppdatera vegan-status
           if (metadata.vegan_status) {

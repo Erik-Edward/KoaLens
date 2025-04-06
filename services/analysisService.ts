@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system';
 import { API_BASE_URL } from '@/constants/config';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Importera AsyncStorage
 
 // Lokal definition av modeller
 interface WatchedIngredient {
@@ -603,11 +604,33 @@ export class AnalysisService {
       // Get mime type from URI
       const mimeType = this.getMimeTypeFromUri(videoUri) || 'video/mp4';
       
+      // --- Hämta språkpreferens direkt från AsyncStorage ---
+      let languageToSend = 'sv'; // Default fallback
+      const storageKey = 'KOALENS_LANGUAGE_PREFERENCE'; // Korrekt nyckel
+      try {
+          const storedLanguage = await AsyncStorage.getItem(storageKey);
+          if (storedLanguage) {
+              languageToSend = storedLanguage;
+              console.log('AnalysisService: Fetched language from storage:', languageToSend);
+          } else {
+              console.log(`AnalysisService: No language found in storage (key: ${storageKey}), using default "sv".`);
+              // Behåll default 'sv'
+          }
+      } catch (e) {
+          console.error("AnalysisService: Failed to fetch language preference from storage:", e);
+          this.logEvent('Failed to fetch language preference', { error: e });
+          // Fallback till 'sv' hanteras av initialiseringen
+      }
+      // --- Slut på hämtning från AsyncStorage ---
+      
+      // Logga språket som *faktiskt* kommer att skickas
+      console.log('AnalysisService: Language being sent in API request:', languageToSend); 
+      
       // Prepare API request - anpassa till det format som förväntas av backend
       const requestData = {
         base64Data: base64Video,
         mimeType: mimeType,
-        preferredLanguage: "sv", // Alltid sätt preferredLanguage till svenska
+        preferredLanguage: languageToSend, // Använd det hämtade språket
         requestId: requestId || undefined // Inkludera request ID om det finns
       };
       
@@ -1131,35 +1154,42 @@ export class AnalysisService {
     userId: string;
     timestamp: string;
   }): Promise<boolean> {
+    this.logEvent('Rapporterar ingredienssuggestion...', reportData);
+    
     try {
-      console.log('AnalysisService: Rapporterar ingredienssuggestiom', reportData);
+      // Korrigera API-endpointen här
+      const apiUrl = `${API_ENDPOINT}/api/report/ingredient`; 
+      // Gammal felaktig URL: const apiUrl = `${API_ENDPOINT}/api/feedback/suggest`; 
       
-      // Endpoints för ingredienssuggestion
-      const SUGGEST_ENDPOINT = `${API_ENDPOINT}/api/ingredients/suggest`;
+      console.log('AnalysisService: Skickar ingrediensrapport till:', apiUrl);
       
-      // Anropa API
-      const response = await axios.post(SUGGEST_ENDPOINT, reportData, {
+      const response = await axios.post(apiUrl, reportData, {
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        timeout: 10000
+        timeout: 15000, // 15 sekunders timeout
       });
       
-      // Kontrollera svaret
-      if (response.status >= 200 && response.status < 300) {
-        console.log('AnalysisService: Ingredienssuggestion mottagen', response.data);
+      if (response.status === 200 || response.status === 201) { // Acceptera 201 Created också
+        this.logEvent('Ingrediensrapport skickad framgångsrikt');
+        console.log('AnalysisService: Rapport skickad.');
         return true;
       } else {
-        console.error('AnalysisService: Fel vid rapportering av ingrediens', response.status, response.data);
-        return false;
+        throw new Error(`API returnerade oväntad status: ${response.status}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AnalysisService: Kunde inte rapportera ingrediens', error);
+      this.logEvent('Fel vid rapportering av ingrediens', { error: error.message });
       
-      // Om API inte är tillgängligt simulerar vi en framgångsrik rapportering
-      console.log('AnalysisService: Simulerar framgångsrik rapportering', reportData);
-      return true;
+      // Temporär fallback för att simulera framgång - Ta bort när backend fungerar?
+      // Om felet är 404 (Not Found), simulera framgång för att inte blockera användaren
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        console.warn('AnalysisService: Backend endpoint (404) ej hittad, simulerar framgångsrik rapportering...');
+        this.logEvent('Simulerad framgångsrik rapportering (404)');
+        return true; // Behåll denna för demo?
+      }
+      
+      return false; // Returnera false vid andra typer av fel
     }
   }
 }

@@ -8,6 +8,7 @@ import { AuthProvider } from '../providers/AuthProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { UserProfileSync } from '@/components/UserProfileSync';
 import { AppInitializer } from '@/components/AppInitializer';
+import { UpdateHandler } from '@/components/UpdateHandler';
 import theme from '@/constants/theme';
 import { styled } from 'nativewind';
 import { supabase } from '@/lib/supabase';
@@ -26,21 +27,22 @@ LogBox.ignoreLogs([
 const RootLayout = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [updateChecked, setUpdateChecked] = useState(false);
 
   // Hantera fördröjd laddning och initialization
   useEffect(() => {
     // Minsta laddningstiden är 1 sekund för att visa splash-skärmen
     const timer = setTimeout(() => {
-      // Om appen är initialiserad, fortsätt
-      if (isInitialized) {
+      // Om appen är initialiserad och uppdatering kontrollerad, fortsätt
+      if (isInitialized && updateChecked) {
         setIsLoading(false);
       }
     }, 1000);
 
     // Om initialiseringen inte är klar inom 5 sekunder, fortsätt ändå
     const fallbackTimer = setTimeout(() => {
-      if (!isInitialized) {
-        console.warn('App initialization timed out, proceeding anyway');
+      if (!isInitialized || !updateChecked) {
+        console.warn('App initialization or update check timed out, proceeding anyway');
         setIsLoading(false);
       }
     }, 5000);
@@ -49,17 +51,32 @@ const RootLayout = () => {
       clearTimeout(timer);
       clearTimeout(fallbackTimer);
     };
-  }, [isInitialized]);
+  }, [isInitialized, updateChecked]);
 
   // Hantera slutförd initialisering
   const handleInitialized = () => {
     console.log('App initialization complete');
     setIsInitialized(true);
     
-    // Om minsta laddningstiden har passerat, avsluta laddningsskärmen
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
+    // Om minsta laddningstiden har passerat och uppdatering är kontrollerad, avsluta laddningsskärmen
+    if (updateChecked) {
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 300);
+    }
+  };
+  
+  // Hantera slutförd uppdateringskontroll
+  const handleUpdateComplete = () => {
+    console.log('Update check complete');
+    setUpdateChecked(true);
+    
+    // Om minsta laddningstiden har passerat och appen är initialiserad, avsluta laddningsskärmen
+    if (isInitialized) {
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 300);
+    }
   };
 
   if (isLoading) {
@@ -81,6 +98,7 @@ const RootLayout = () => {
       <Providers>
         <ErrorBoundary>
           <AuthProvider>
+            <UpdateHandler onUpdateComplete={handleUpdateComplete} />
             <AppInitializer onInitialized={handleInitialized} />
             <StatusBar 
               style="light"

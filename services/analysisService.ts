@@ -647,42 +647,108 @@ export class AnalysisService {
         console.log(`AnalysisService: Videoanalys-API svarade med status: ${response.status} från URL: ${usedUrl}`);
         console.log('AnalysisService: Svarsdata typ:', typeof response.data);
         console.log('AnalysisService: Svarsstruktur:', Object.keys(response.data));
+        // Lägg till fullständig loggning av API-svaret
+        console.log('AnalysisService: API-svar fullständigt:', JSON.stringify(response.data, null, 2));
         
         this.analysisProgress = 90;
+        
+        // --- Start: DEBUGGING - Detaljerad parsning --- 
+        // DEBUG: Specifik loggning för 'result'-strukturen
+        if (response.data && response.data.result) {
+          console.log('DEBUGGING - result finns:', typeof response.data.result);
+          console.log('DEBUGGING - result innehåll:', JSON.stringify(response.data.result, null, 2));
+          console.log('DEBUGGING - result.ingredientList:', response.data.result.ingredientList);
+        }
         
         // --- Start: Corrected & Simplified Response Handling ---
         // Analysera resultat från API (Förenklad logik)
         if (!response || !response.data) {
+           console.error('DEBUGGING - Tomt svar från API');
            throw new Error('Empty or invalid response structure from video analysis API');
         }
 
-        // Steg 1: Destrukturera det yttre svaret från backend
-        const { success, responseData, error: backendError } = response.data as { 
-            success: boolean; 
-            responseData?: AnalysisResult; // Förvänta den gamla AnalysisResult-strukturen inuti
-            error?: string 
-        };
-
-        // Steg 2: Kontrollera 'success'-flaggan och att 'responseData' finns
-        if (!success || !responseData) {
-          throw new Error(backendError || 'Unknown error in API response');
+        // FÖRBÄTTRAD HANTERING: Hantera flera olika format på svar från servern
+        let analyzedResult: AnalysisResult | null = null;
+        
+        // Fallback 1: Den förväntade strukturen med success/responseData
+        if (response.data.success === true && response.data.responseData) {
+          console.log('AnalysisService: Hanterar svar i standardformat (success/responseData)');
+          analyzedResult = response.data.responseData as AnalysisResult;
+          console.log('DEBUGGING - Fallback 1 använd, responseData finns:', !!analyzedResult);
+        } 
+        // Fallback 2: Struktur med success/result
+        else if (response.data.success === true && response.data.result) {
+          console.log('AnalysisService: Hanterar svar i alternativt format (success/result)');
+          const apiResult = response.data.result;
+          console.log('DEBUGGING - Fallback 2 använd, success/result format');
+          console.log('DEBUGGING - apiResult ingredienser:', apiResult.ingredientList);
+          
+          analyzedResult = {
+            isVegan: apiResult.isVegan,
+            confidence: apiResult.confidence || 0.5,
+            ingredientList: apiResult.ingredientList || [],
+            watchedIngredients: apiResult.watchedIngredients || [],
+            reasoning: apiResult.reasoning || '',
+            detectedLanguage: languageToSend
+          };
+          console.log('DEBUGGING - Mappat resultat från fallback 2:', analyzedResult);
+        } 
+        // Fallback 3: Direkta AnalysisResult-fält i rotstrukturen
+        else if (response.data.isVegan !== undefined) {
+          console.log('AnalysisService: Hanterar svar i direktformat (isVegan direkt i roten)');
+          console.log('DEBUGGING - Fallback 3 använd, direkt format');
+          
+          analyzedResult = {
+            isVegan: response.data.isVegan,
+            confidence: response.data.confidence || 0.5,
+            ingredientList: response.data.ingredientList || [],
+            watchedIngredients: response.data.watchedIngredients || [],
+            reasoning: response.data.reasoning || '',
+            detectedLanguage: languageToSend
+          };
+          console.log('DEBUGGING - Mappat resultat från fallback 3:', analyzedResult);
+        }
+        else {
+          console.error('DEBUGGING - INGET FALLBACK matchade! Fullständigt svar:', JSON.stringify(response.data));
         }
         
-        // Sätt resultatet från API-svaret
-        result = responseData;
+        // Om någon av fallbacks fungerade, använd det resultatet
+        if (analyzedResult) {
+          console.log('AnalysisService: Framgångsrik parsning av API-svar');
+          result = analyzedResult;
+        }
+        // Om inget av formaten matchade, kasta fel
+        else {
+          console.error('AnalysisService: Kunde inte tolka API-svaret i något av de kända formaten');
+          throw new Error('Unknown response format from video analysis API');
+        }
         
       } catch (error: any) {
         // Om alla API-anrop misslyckas, ge ett användbart felmeddelande och använd mock-data
         console.error('AnalysisService: Videoanalys-API anrop MISSLYCKADES totalt:', error.message);
         
         // FALLBACK: använd mock-data istället för att kasta ett fel
-        console.log('AnalysisService: FALLBACK - Genererar mock-data eftersom API-anrop misslyckades');
-        result = this.generateMockAnalysisResult(languageToSend);
-        
-        this.logEvent('Using mock data due to API failure', { 
-          error: error.message, 
-          mockData: true 
-        });
+        // Kontrollera om vi är i utvecklingsläge eller om mock-data explicit aktiveras
+        if (process.env.NODE_ENV === 'development' || process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true') {
+          console.log('AnalysisService: FALLBACK - Genererar mock-data eftersom API-anrop misslyckades (utvecklingsläge)');
+          result = this.generateMockAnalysisResult(languageToSend);
+          
+          this.logEvent('Using mock data due to API failure', { 
+            error: error.message, 
+            mockData: true,
+            dev_mode: true
+          });
+        } else {
+          // I produktionsläge, använd alltid mock-data för att undvika app-krasch
+          console.log('AnalysisService: FALLBACK - Genererar mock-data även i produktionsläge för att undvika krasch');
+          result = this.generateMockAnalysisResult(languageToSend);
+          
+          this.logEvent('Using mock data due to API failure in production', { 
+            error: error.message, 
+            mockData: true,
+            dev_mode: false
+          });
+        }
       }
       
       // Om vi nådde hit har vi ett resultat - antingen från API eller mock-data

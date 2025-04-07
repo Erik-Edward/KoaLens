@@ -6,6 +6,7 @@ import { styled } from 'nativewind';
 import * as Haptics from 'expo-haptics';
 import { logEvent, Events, logScreenView } from '@/lib/analytics';
 import { useCameraPermission } from '@/lib/visionCameraWrapper';
+import { useRouter } from 'expo-router';
 
 // Styling med nativewind
 const StyledView = styled(View);
@@ -15,6 +16,9 @@ const StyledSafeAreaView = styled(SafeAreaView);
 
 // Enkel hemskärm för skanna-fliken
 export default function HomeScreen() {
+  const router = useRouter();
+  
+  // Status för tillståndskontrollen
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(false);
   const { hasPermission, requestPermission } = useCameraPermission();
 
@@ -47,11 +51,8 @@ export default function HomeScreen() {
       console.log('Camera permission request result:', result);
       
       if (!result.granted) {
-        Alert.alert(
-          "Kameratillstånd krävs",
-          "För att kunna använda denna funktion behöver appen tillstånd att använda din kamera.",
-          [{ text: "OK" }]
-        );
+        // Låt systemets behörighetsbegäran hantera detta
+        // Vi visar ingen extra dialog här
         return false;
       }
       

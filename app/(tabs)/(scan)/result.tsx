@@ -110,6 +110,18 @@ const styles = StyleSheet.create({
   nonVeganText: {
     // ... existing styles ...
   },
+  mockDataBanner: {
+    backgroundColor: '#FF9800',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  mockDataText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   // ... existing styles ...
 });
 
@@ -152,21 +164,6 @@ function SafeText({
     </StyledText>
   );
 }
-
-// Mock data för fallback
-const mockAnalysisResult = {
-  isVegan: false,
-  confidence: 0.75,
-  watchedIngredients: [
-    {
-      name: "Mjölk",
-      reason: "Mjölk är en animalisk produkt",
-      description: "Mjölk kommer från kor och är därför inte veganskt."
-    }
-  ],
-  ingredientList: ["Socker", "Vetemjöl", "Mjölk", "Salt"],
-  reasoning: "OBS! DETTA ÄR DEMO-DATA. Produkten innehåller mjölk vilket gör den icke-vegansk."
-};
 
 // Funktion för att parse JSON säkert
 function safeJsonParse(jsonString: string | undefined, fallback: any = null) {
@@ -405,7 +402,6 @@ export default function ResultScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showVideoThumbnail, setShowVideoThumbnail] = useState(false);
-  const [isDemo, setIsDemo] = useState(false); // Indikator för demo-data
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportingIngredient, setReportingIngredient] = useState<string | null>(null);
   const [reportFeedback, setReportFeedback] = useState<string>('');
@@ -513,8 +509,7 @@ export default function ResultScreen() {
           console.log('[DEBUG] Parsed analysis result:', resultData);
 
           if (!resultData) {
-            setErrorMessage('Kunde inte läsa analysresultatet.');
-            // setIsLoading(false); // Flyttad till finally
+            setErrorMessage('Analysen kunde inte slutföras. Vänligen försök igen.');
             return; // Avbryt om parsning misslyckades
           }
 
@@ -523,15 +518,13 @@ export default function ResultScreen() {
           setProduct(productObject); // Sätt produkten
           console.log('[DEBUG] Product state updated after creation');
 
-          // Borttaget automatiskt sparande
-
         } else {
           console.log('[DEBUG] Inga analysResult params, sätter felmeddelande.');
-          setErrorMessage('Ingen analys att visa. Starta en ny analys.');
+          setErrorMessage('Analysen kunde inte slutföras. Vänligen försök att skanna produkten igen.');
         }
       } catch (error) {
          console.error('Error initializing ResultScreen:', error);
-         setErrorMessage(`Fel vid initiering: ${error instanceof Error ? error.message : String(error)}`);
+         setErrorMessage('Ett fel uppstod vid analysen. Vänligen försök igen.');
       } finally {
         setIsLoading(false); // Sätt alltid till false i finally
         console.log('[DEBUG] ResultScreen initialize end, isLoading set to false');
@@ -837,28 +830,6 @@ export default function ResultScreen() {
     }
   };
   
-  // Skapar en mock videoanalys för demo
-  const createMockVideoAnalysis = (): any => {
-    return {
-      isVegan: false,
-      isUncertain: true,
-      confidence: 0.65,
-      ingredients: [
-        { name: "Socker", isVegan: true },
-        { name: "Vetemjöl", isVegan: true },
-        { name: "E471", isVegan: false, isUncertain: true },
-        { name: "Arom", isVegan: true },
-        { name: "Lecitin", isVegan: false, isUncertain: true }
-      ],
-      reasoning: "Produkten innehåller ingredienser som kan vara icke-veganska, men det går inte att avgöra med säkerhet utan mer information.",
-      detectedLanguage: "sv",
-      uncertainReasons: [
-        "E471 kan vara både animaliskt och vegetabiliskt ursprung",
-        "Lecitin kan vara utvunnet från ägg eller soja"
-      ]
-    };
-  };
-  
   // --- Filter product ingredients based on user's watch list (for new section) ---
   const watchedProductIngredients = useMemo(() => {
     if (!product || !product.ingredients) return [];
@@ -939,10 +910,10 @@ export default function ResultScreen() {
           <StyledView className="bg-white p-8 rounded-2xl shadow-lg items-center w-4/5">
             <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
             <StyledText className="mt-4 text-text-primary text-center font-sans-bold text-lg">
-              Något gick fel
+              Analysen misslyckades
             </StyledText>
             <StyledText className="mt-2 text-text-secondary text-center font-sans">
-              {errorMessage || 'Kunde inte analysera ingredienserna'}
+              {errorMessage || 'Det gick inte att analysera produkten. Vänligen försök igen med en annan vinkel eller belysning.'}
             </StyledText>
             
             <StyledPressable 
@@ -950,7 +921,7 @@ export default function ResultScreen() {
               className="mt-6 bg-primary-main py-3 px-6 rounded-lg"
             >
               <StyledText className="text-white font-sans-bold">
-                Tillbaka
+                Försök igen
               </StyledText>
             </StyledPressable>
           </StyledView>
@@ -977,15 +948,6 @@ export default function ResultScreen() {
       
       {/* Säker område för innehållet som tar hänsyn till statusbar */}
       <StyledSafeAreaView className="flex-1">
-        {/* Visa demobanner om det är demodata */}
-        {isDemo && (
-          <StyledView className="bg-amber-500 px-4 py-2">
-            <StyledText className="text-white text-center font-medium">
-              Detta är demo-data. Videoanalys-API är för närvarande i beta.
-            </StyledText>
-          </StyledView>
-        )}
-
         {/* Header med centrerad rubrik i eget utrymme, med extra marginal baserat på plattform */}
         <StyledView 
           className="px-4 pb-4 border-b border-gray-100 mb-2"

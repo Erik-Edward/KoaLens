@@ -100,8 +100,8 @@ export class AnalysisService {
   private VIDEO_ANALYSIS_ENDPOINT = `${API_ENDPOINT}/api/video/analyze-video`;
   private VIDEO_STATUS_ENDPOINT = `${API_ENDPOINT}/api/video/status`; // Ny endpoint för statuscheck
   
-  // Språkinställningar
-  private currentLanguage: string = 'sv';
+  // Språkinställningar - Tvinga Svenska
+  private currentLanguage: string = 'sv'; // Alltid Svenska
   
   // Cachning
   private cachingEnabled: boolean = true;
@@ -163,31 +163,10 @@ export class AnalysisService {
   }
 
   /**
-   * Set the preferred language for analysis
-   */
-  setPreferredLanguage(language: string): void {
-    this.currentLanguage = language;
-    console.log(`Analysis language set to: ${language}`);
-  }
-
-  /**
-   * Get the current language setting
+   * Get the current language setting - Returnerar alltid 'sv'
    */
   getPreferredLanguage(): string {
-    return this.currentLanguage;
-  }
-
-  /**
-   * Detect language of ingredient text
-   */
-  async detectLanguage(text: string): Promise<string> {
-    try {
-      const hasSwedishChars = /[åäöÅÄÖ]/.test(text);
-      return hasSwedishChars ? 'sv' : 'en';
-    } catch (error) {
-      console.error('Error detecting language:', error);
-      return 'sv'; // Fallback to Swedish
-    }
+    return 'sv'; // Alltid Svenska
   }
 
   /**
@@ -198,12 +177,9 @@ export class AnalysisService {
     this.logEvent('Starting text analysis');
     
     try {
-      // Detect language if needed and setup is on auto
-      let language = this.currentLanguage;
-      if (language === 'auto') {
-        language = await this.detectLanguage(ingredientsText);
-        this.logEvent('Detected language', { language });
-      }
+      // Språk är nu alltid 'sv'
+      const language = 'sv';
+      this.logEvent('Using forced language', { language });
       
       this.analysisProgress = 30;
       
@@ -558,24 +534,8 @@ export class AnalysisService {
       // Get mime type from URI
       const mimeType = this.getMimeTypeFromUri(videoUri) || 'video/mp4';
       
-      // --- Hämta språkpreferens direkt från AsyncStorage ---
-      let languageToSend = 'sv'; // Default fallback
-      const storageKey = 'KOALENS_LANGUAGE_PREFERENCE'; // Korrekt nyckel
-      try {
-          const storedLanguage = await AsyncStorage.getItem(storageKey);
-          if (storedLanguage) {
-              languageToSend = storedLanguage;
-              console.log('AnalysisService: Fetched language from storage:', languageToSend);
-          } else {
-              console.log(`AnalysisService: No language found in storage (key: ${storageKey}), using default "sv".`);
-              // Behåll default 'sv'
-          }
-      } catch (e) {
-          console.error("AnalysisService: Failed to fetch language preference from storage:", e);
-          this.logEvent('Failed to fetch language preference', { error: e });
-          // Fallback till 'sv' hanteras av initialiseringen
-      }
-      // --- Slut på hämtning från AsyncStorage ---
+      // Tvinga alltid Svenska
+      const languageToSend = 'sv';
       
       // Logga språket som *faktiskt* kommer att skickas
       console.log('AnalysisService: Language being sent in API request:', languageToSend); 

@@ -83,17 +83,17 @@ function VideoScreen() {
       setCurrentStep('uploading');
       setStepMessage('Laddar upp och förbereder video...');
       
-      // Animera progress och uppdatera steg automatiskt
+      // Animera progress och uppdatera steg automatiskt - snabbare för att matcha 10-12 sekunders analys
       animationInterval = setInterval(() => {
         setProgressValue(prev => {
-          // Snabbare progress i början för att visa tydlig förändring
-          const increment = prev < 30 ? 3 : prev < 60 ? 2 : 1;
+          // Högre ökningshastighet för att matcha 10-12 sekunders analys
+          const increment = prev < 30 ? 6 : prev < 60 ? 4 : 3;
           const nextValue = Math.min(prev + increment, 95);
           return nextValue;
         });
-      }, 250); // Snabbare uppdateringar för smidigare animation
+      }, 200); // Snabbare uppdateringar
       
-      // Schemalägg stegtransitioner
+      // Kortare tidsintervall mellan faser
       stepChangeTimeout = setTimeout(() => {
         setCurrentStep('optimizing');
         setStepMessage('Optimerar video för analys...');
@@ -105,9 +105,9 @@ function VideoScreen() {
           setTimeout(() => {
             setCurrentStep('processing');
             setStepMessage('Bearbetar analysresultat...');
-          }, 8000);
-        }, 5000);
-      }, 3000);
+          }, 3000); // 3 sekunder istället för 8
+        }, 2000); // 2 sekunder istället för 5
+      }, 1500); // 1.5 sekunder istället för 3
     } else if (analysisState === 'preparing_results') {
       setProgressValue(95);
       setCurrentStep('complete');
@@ -116,10 +116,10 @@ function VideoScreen() {
       // Avsluta animationen vid 100%
       animationInterval = setInterval(() => {
         setProgressValue(prev => {
-          const nextValue = Math.min(prev + 1, 100);
+          const nextValue = Math.min(prev + 2, 100); // Snabbare slutförande
           return nextValue;
         });
-      }, 100);
+      }, 50); // Snabbare slutanimation
     } else {
       // Återställ progress när vi inte analyserar
       setProgressValue(0);

@@ -197,6 +197,17 @@ function IngredientsList({
   const StyledPressable = styled(Pressable);
   const StyledText = styled(Text);
   
+  // Lägg till utökad loggning för felsökning
+  useEffect(() => {
+    console.log('[DEBUG] IngredientsList props:', {
+      ingredientsCount: ingredients?.length || 0,
+      watchedIngredientsCount: watchedIngredients?.length || 0,
+      detectedNonVeganCount: detectedNonVeganIngredients?.length || 0,
+      watchedIngredients: watchedIngredients,
+      detectedNonVegan: detectedNonVeganIngredients
+    });
+  }, [ingredients, watchedIngredients, detectedNonVeganIngredients]);
+  
   // Funktion för att ta bort duplicerade ingredienser (samma namn oavsett skiftläge)
   const deduplicateIngredients = (ingredientList: string[]): string[] => {
     const normalizedSet = new Set<string>();
@@ -223,66 +234,64 @@ function IngredientsList({
     
     try {
       const lowerCaseIngredient = ingredient.toLowerCase().trim();
-
-      // Logga varje gång funktionen körs för Arom
-      if (lowerCaseIngredient === 'arom') {
-        console.log(`[getStyle] Körs för ingrediens: "${ingredient}" (lowercase: "${lowerCaseIngredient}")`);
-      }
+      console.log(`\n[getStyle] ---- Utvärderar: "${ingredient}" (Lower: "${lowerCaseIngredient}") ----`);
+      console.log(`[getStyle] DETECTED NON-VEGAN LIST:`, detectedNonVeganIngredients);
+      console.log(`[getStyle] WATCHED LIST:`, watchedIngredients);
 
       // Steg 1: Kolla om ingrediensen finns i den slutgiltiga icke-veganska listan från backend
       if (Array.isArray(detectedNonVeganIngredients) && detectedNonVeganIngredients.length > 0) {
+        console.log(`[getStyle] Kollar mot detectedNonVeganIngredients...`);
         const isNonVegan = detectedNonVeganIngredients.some(nonVegan => {
           if (!nonVegan) return false;
-          return nonVegan.toLowerCase().trim() === lowerCaseIngredient;
+          const nonVeganLower = nonVegan.toLowerCase().trim();
+          const match = nonVeganLower === lowerCaseIngredient;
+          console.log(`[getStyle]   -> Jämför "${lowerCaseIngredient}" med nonVegan: "${nonVegan}" (Lower: "${nonVeganLower}") -> Match: ${match}`);
+          return match;
         });
         
         if (isNonVegan) {
+          console.log(`[getStyle] ---> Resultat: ICKE-VEGANSK (från detectedNonVegan)`);
           return { textColor: '#b91c1c', statusColor: '#ef4444' }; // Röd
         }
       }
       
-      // Steg 2: Om inte markerad som icke-vegansk, kolla watchedIngredients för osäker status
+      // Steg 2: Om inte markerad som icke-vegansk, kolla watchedIngredients för osäker eller non-vegan status
       if (Array.isArray(watchedIngredients) && watchedIngredients.length > 0) {
+         console.log(`[getStyle] Kollar mot watchedIngredients...`);
         const matchingWatchedIngredient = watchedIngredients.find(watched => {
           if (!watched || !watched.name) return false;
           const watchedNameLower = watched.name.toLowerCase().trim();
           const isEqual = watchedNameLower === lowerCaseIngredient;
-          
-          // Detaljerad loggning *endast* när vi letar efter "arom"
-          if (lowerCaseIngredient === 'arom') {
-            console.log(`[getStyle] Jämför "${lowerCaseIngredient}" med watched "${watched.name}" (lowercase: "${watchedNameLower}"). Match: ${isEqual}`);
-          }
-          
+          console.log(`[getStyle]   -> Jämför "${lowerCaseIngredient}" med watched "${watched.name}" (Lower: "${watchedNameLower}") -> Match: ${isEqual}, Status: ${watched.status || 'N/A'}, Reason: ${watched.reason || 'N/A'}`);
           return isEqual;
         });
         
-        // Logga om vi hittade en match för "arom"
-        if (lowerCaseIngredient === 'arom') {
-           console.log(`[getStyle] Hittade matchande watchedIngredient för "arom"?`, matchingWatchedIngredient ? 'JA' : 'NEJ', matchingWatchedIngredient);
-        }
-        
         if (matchingWatchedIngredient) { 
+           console.log(`[getStyle]   -> Hittade matchande watchedIngredient:`, matchingWatchedIngredient);
           const isUncertain = 
             matchingWatchedIngredient.status === 'uncertain' || 
             matchingWatchedIngredient.reason === 'uncertain' || 
             matchingWatchedIngredient.reason === 'maybe-non-vegan';
             
-          // Logga resultatet av isUncertain-kontrollen för "arom"
-          if (lowerCaseIngredient === 'arom') {
-             console.log(`[getStyle] Är matchingWatchedIngredient osäker? ${isUncertain}`);
-          }
+          console.log(`[getStyle]   -> Är osäker? ${isUncertain}`);
 
           if (isUncertain) {
-            console.log(`[getStyle] Ingrediens "${ingredient}" markerad som OSÄKER (orange)`);
+            console.log(`[getStyle] ---> Resultat: OSÄKER`);
             return { textColor: '#d97706', statusColor: '#f59e0b' }; // Orange
+          }
+          
+          // Kolla om non-vegan via watched (redundant men säker fallback)
+          const isNonVeganWatched = matchingWatchedIngredient.reason === 'non-vegan' || matchingWatchedIngredient.status === 'non-vegan';
+           console.log(`[getStyle]   -> Är non-vegan via watched? ${isNonVeganWatched}`);
+          if (isNonVeganWatched) {
+            console.log(`[getStyle] ---> Resultat: ICKE-VEGANSK (från watched)`);
+            return { textColor: '#b91c1c', statusColor: '#ef4444' }; // Röd
           }
         }
       }
       
-      // Fallback till grön för veganska ingredienser (tidigare grå)
-      if (lowerCaseIngredient === 'arom') {
-        console.log(`[getStyle] Fallback till grön för "${ingredient}"`);
-      }
+      // Fallback till grön för veganska ingredienser
+      console.log(`[getStyle] ---> Resultat: VEGANSK (Fallback)`);
       return { textColor: '#22c55e', statusColor: '#10b981' }; // Grön
     } catch (error) {
       console.error('[getStyle] Fel vid avgörande av ingrediensstatus:', error, ingredient);
@@ -1041,7 +1050,6 @@ export default function ResultScreen() {
             </StyledText> 
             
             {/* ----- START: Ny villkorlig sammanfattning ----- */}
-            {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
             {product.analysis.isVegan && (
               <StyledView className="mt-3 mb-4 bg-green-100 p-3 rounded-lg border border-green-200">
                 <StyledText className="text-green-800 text-center">
@@ -1061,7 +1069,8 @@ export default function ResultScreen() {
               </StyledView>
             )}
 
-            {!product.analysis.isVegan && !product.analysis.isUncertain && product.analysis.detectedNonVeganIngredients && product.analysis.detectedNonVeganIngredients.length > 0 && (
+            {/* Uppdaterat villkor: Visa om det finns några detekterade icke-veganska ingredienser */}
+            {product.analysis.detectedNonVeganIngredients && product.analysis.detectedNonVeganIngredients.length > 0 && (
               <StyledView className="mt-3 mb-4 bg-red-100 p-3 rounded-lg border border-red-200">
                 <StyledText className="font-sans-bold text-red-800 mb-1">
                   Innehåller icke-veganska ingredienser:

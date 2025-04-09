@@ -613,6 +613,11 @@ export default function ResultScreen() {
     const detectedNonVeganNames = backendWatchedIngredients
       .filter(item => item.reason === 'non-vegan' || item.status === 'non-vegan')
       .map(item => item.name);
+      
+    // 3.5 NEW: Extrahera osäkra ingredienser från watchedIngredients
+    const maybeNonVeganNames = backendWatchedIngredients
+      .filter(item => item.reason === 'maybe-non-vegan' || item.status === 'uncertain')
+      .map(item => item.name);
 
     // 4. Om icke-veganska ingredienser skickades direkt från backend, använd dem
     if (Array.isArray(analysisResult.detectedNonVeganIngredients) && analysisResult.detectedNonVeganIngredients.length > 0) {
@@ -630,8 +635,10 @@ export default function ResultScreen() {
       allNamesCount: allIngredientNames.length,
       backendWatchedCount: backendWatchedIngredients.length,
       detectedNonVeganCount: detectedNonVeganNames.length,
+      maybeNonVeganCount: maybeNonVeganNames.length,
       backendWatchedIngredients: JSON.stringify(backendWatchedIngredients), // Logga hela listan för att se innehållet
-      detectedNonVeganNames
+      detectedNonVeganNames,
+      maybeNonVeganNames
     });
 
     // Returnera en produktmodell med korrekt data
@@ -641,7 +648,10 @@ export default function ResultScreen() {
       ingredients: allIngredientNames, // Använd listan med alla namn
       analysis: {
         isVegan: analysisResult.isVegan === true,
-        isUncertain: analysisResult.isUncertain === true,
+        isUncertain: (analysisResult.isUncertain === true || maybeNonVeganNames.length > 0) && 
+                     (detectedNonVeganNames.length === 0 && 
+                      (!Array.isArray(analysisResult.detectedNonVeganIngredients) || 
+                       analysisResult.detectedNonVeganIngredients.length === 0)),
         confidence: analysisResult.confidence || 0.7,
         watchedIngredients: backendWatchedIngredients, // Använd den *faktiska* listan från backend
         reasoning: analysisResult.reasoning || analysisResult.explanation || '',
@@ -649,7 +659,8 @@ export default function ResultScreen() {
         detectedNonVeganIngredients: Array.isArray(analysisResult.detectedNonVeganIngredients) ? 
           analysisResult.detectedNonVeganIngredients : detectedNonVeganNames, // Använd backend-listan eller vår egna beräknade
         uncertainReasons: analysisResult.uncertainReasons || [],
-        uncertainIngredients: analysisResult.uncertainIngredients || []
+        uncertainIngredients: Array.isArray(analysisResult.uncertainIngredients) && analysisResult.uncertainIngredients.length > 0 ?
+          [...new Set([...analysisResult.uncertainIngredients, ...maybeNonVeganNames])] : maybeNonVeganNames
       },
       metadata: {
         userId: userId || 'anonymous',
@@ -1046,37 +1057,37 @@ export default function ResultScreen() {
             <StyledView className="flex-row items-center justify-center mb-4">
               <Ionicons 
                 name={
-                  product.analysis.isUncertain
-                    ? 'help-circle' // Osäker har högst prioritet
-                    : product.analysis.isVegan
-                      ? 'checkmark-circle' 
-                      : 'close-circle'
+                  !product.analysis.isVegan
+                    ? 'close-circle' // Non-vegan has highest priority
+                    : product.analysis.isUncertain
+                      ? 'help-circle' // Uncertain has second priority
+                      : 'checkmark-circle' // Vegan has lowest priority
                 }
                 size={36}
                 color={
-                  product.analysis.isUncertain
-                    ? '#f59e0b' // Orange för osäker - högst prioritet
-                    : product.analysis.isVegan
-                      ? '#10b981' // Grön
-                      : '#ef4444' // Röd
+                  !product.analysis.isVegan
+                    ? '#ef4444' // Red for non-vegan - highest priority
+                    : product.analysis.isUncertain
+                      ? '#f59e0b' // Orange for uncertain - second priority 
+                      : '#10b981' // Green for vegan - lowest priority
                 }
                 style={{ marginRight: 10 }}
               />
               <StyledText 
                 className={`text-2xl font-sans-bold ${
-                  product.analysis.isUncertain
-                    ? 'text-amber-600' // Osäker har högst prioritet
-                    : product.analysis.isVegan
-                      ? 'text-emerald-600'
-                      : 'text-red-600'
+                  !product.analysis.isVegan
+                    ? 'text-red-600' // Non-vegan has highest priority
+                    : product.analysis.isUncertain
+                      ? 'text-amber-600' // Uncertain has second priority
+                      : 'text-emerald-600' // Vegan has lowest priority
                 }`}
               >
                 {
-                  product.analysis.isUncertain
-                    ? 'Osäker' // Osäker har högst prioritet
-                    : product.analysis.isVegan
-                      ? 'Vegansk'
-                      : 'Ej vegansk'
+                  !product.analysis.isVegan
+                    ? 'Ej vegansk' // Non-vegan has highest priority
+                    : product.analysis.isUncertain
+                      ? 'Osäker' // Uncertain has second priority
+                      : 'Vegansk' // Vegan has lowest priority
                 }
               </StyledText> 
             </StyledView> 
@@ -1142,19 +1153,42 @@ export default function ResultScreen() {
 
             {/* Visa osäkerhetsanledningar om det är osäkert (befintlig kod, men nu mer relevant) */}
             {/* --- RE-ENABLE THIS BLOCK FOR DEBUGGING --- */}
-            {product.analysis.isUncertain && product.analysis.uncertainReasons && product.analysis.uncertainReasons.length > 0 && (
+            {product.analysis.isUncertain && (
               <StyledView className="mb-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
                 <StyledText className="font-sans-bold text-amber-800 mb-2">
                   Osäkerhet beror på:
                 </StyledText>
-                {product.analysis.uncertainReasons.map((reason, index) => (
-                  <StyledView key={index} className="flex-row mb-1 items-start">
-                    <Ionicons name="alert-circle-outline" size={16} color="#d97706" style={{ marginTop: 2, marginRight: 4 }} />
-                    <StyledText className="text-amber-800 flex-1">
-                      {reason}
-                    </StyledText>
-                  </StyledView>
-                ))}
+
+                {/* Om vi har specifika anledningar, visa dem */}
+                {product.analysis.uncertainReasons && product.analysis.uncertainReasons.length > 0 ? (
+                  product.analysis.uncertainReasons.map((reason, index) => (
+                    <StyledView key={index} className="flex-row mb-1 items-start">
+                      <Ionicons name="alert-circle-outline" size={16} color="#d97706" style={{ marginTop: 2, marginRight: 4 }} />
+                      <StyledText className="text-amber-800 flex-1">
+                        {reason}
+                      </StyledText>
+                    </StyledView>
+                  ))
+                ) : (
+                  /* Fallback om vi inte har specifika anledningar */
+                  product.analysis.uncertainIngredients && product.analysis.uncertainIngredients.length > 0 ? (
+                    product.analysis.uncertainIngredients.map((ingredient, index) => (
+                      <StyledView key={index} className="flex-row mb-1 items-start">
+                        <Ionicons name="alert-circle-outline" size={16} color="#d97706" style={{ marginTop: 2, marginRight: 4 }} />
+                        <StyledText className="text-amber-800 flex-1">
+                          {ingredient} kan vara antingen växt- eller djurbaserad, beroende på källa.
+                        </StyledText>
+                      </StyledView>
+                    ))
+                  ) : (
+                    <StyledView className="flex-row mb-1 items-start">
+                      <Ionicons name="alert-circle-outline" size={16} color="#d97706" style={{ marginTop: 2, marginRight: 4 }} />
+                      <StyledText className="text-amber-800 flex-1">
+                        Vissa ingredienser kan vara växt- eller djurbaserade beroende på källa.
+                      </StyledText>
+                    </StyledView>
+                  )
+                )}
               </StyledView>
             )}
           </StyledView>

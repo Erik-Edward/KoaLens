@@ -173,15 +173,21 @@ export function scannedProductsToProducts(scannedProducts: ScannedProduct[] | Pr
       return {
         id: scannedProduct.id,
         timestamp: scannedProduct.timestamp,
-        ingredients: Array.isArray(scannedProduct.allIngredients) 
-          ? scannedProduct.allIngredients 
+        // Map string[] to IngredientListItem[]
+        ingredients: Array.isArray(scannedProduct.allIngredients)
+          ? scannedProduct.allIngredients.map(name => ({
+              name: name,
+              status: 'unknown' as const, // Assign a default status
+              statusColor: '#607D8B' // Default color for unknown
+            }))
           : [],
         analysis: {
-          isVegan: typeof scannedProduct.isVegan === 'boolean' 
-            ? scannedProduct.isVegan 
+          isVegan: typeof scannedProduct.isVegan === 'boolean'
+            ? scannedProduct.isVegan
             : false,
-          confidence: typeof scannedProduct.confidence === 'number' 
-            ? scannedProduct.confidence 
+          isUncertain: false,
+          confidence: typeof scannedProduct.confidence === 'number'
+            ? scannedProduct.confidence
             : 0,
           watchedIngredients: [],
           reasoning: scannedProduct.reasoning

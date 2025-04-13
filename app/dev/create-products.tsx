@@ -4,7 +4,7 @@ import { styled } from 'nativewind';
 import { useProducts } from '@/hooks/useProducts';
 import { useStore } from '@/stores/useStore';
 import { Stack, useRouter } from 'expo-router';
-import { Product } from '@/models/productModel';
+import { Product, WatchedIngredient, IngredientListItem } from '@/models/productModel';
 
 // Styled komponenter
 const StyledView = styled(View);
@@ -35,12 +35,12 @@ export default function CreateProductsScreen() {
       
       if (!userId) {
         setError('Ingen användare inloggad. Logga in först.');
+        setIsCreating(false); // Stop creation if no user
         return;
       }
       
       console.log(`Skapar ${count} testprodukter för användare ${userId}...`);
       
-      // Spara produkterna en efter en
       let createdCount = 0;
       for (let i = 0; i < count; i++) {
         const product = generateTestProduct(userId, i);
@@ -48,8 +48,7 @@ export default function CreateProductsScreen() {
         createdCount++;
       }
       
-      // Uppdatera produktlistan
-      await refreshProducts();
+      // await refreshProducts(); // Refresh might happen automatically via hook
       
       setResult({
         success: true,
@@ -179,64 +178,132 @@ export default function CreateProductsScreen() {
 // Hjälpfunktion för att generera testprodukter
 function generateTestProduct(userId: string, index: number): Product {
   const isVegan = Math.random() > 0.3; // 70% chans att vara vegansk
+  // Introduce uncertainty
+  const isUncertain = !isVegan && Math.random() > 0.5; // 50% chance of being uncertain if non-vegan
+  const actualIsVegan = isUncertain ? null : isVegan;
+
   const now = new Date();
   const id = `test-${now.getTime()}-${index}`;
   const timestamp = now.toISOString();
-  
-  const ingredients = [
-    'Vatten',
-    'Socker',
-    'Salt',
-    'Mjöl',
-    'Jäst',
-    'Vegetabiliskt fett',
-    'Majsstärkelse',
-    'Äpple',
-    'Apelsinjuice',
-    'Kakao',
+
+  const baseIngredients = [
+    'Vatten', 'Socker', 'Salt', 'Mjöl', 'Jäst', 'Vegetabiliskt fett',
+    'Majsstärkelse', 'Äpple', 'Apelsinjuice', 'Kakao', 'Arom'
   ];
-  
-  // Lägg till potentiellt icke-veganska ingredienser
-  const nonVeganIngredients = ['Mjölk', 'Ägg', 'Honung', 'Gelatin', 'Vassle'];
-  
-  // Slumpa fram ingredienser
-  const productIngredients = [...ingredients];
-  if (!isVegan) {
-    // Lägg till 1-2 icke-veganska ingredienser om produkten inte är vegansk
-    const count = Math.floor(Math.random() * 2) + 1;
-    for (let i = 0; i < count; i++) {
-      const rndIndex = Math.floor(Math.random() * nonVeganIngredients.length);
-      productIngredients.push(nonVeganIngredients[rndIndex]);
+
+  const nonVeganIngredientPool = ['Mjölk', 'Ägg', 'Honung', 'Gelatin', 'Vassle'];
+  const uncertainIngredientPool = ['Arom', 'E471', 'Lecitin', 'Glycerin'];
+
+  let productIngredientNames = [...baseIngredients];
+  const watched: WatchedIngredient[] = [];
+
+  if (!isVegan && !isUncertain) {
+    const nonVeganCount = 1; // Add one non-vegan
+    for (let i = 0; i < nonVeganCount; i++) {
+      const rndIndex = Math.floor(Math.random() * nonVeganIngredientPool.length);
+      const name = nonVeganIngredientPool[rndIndex];
+      if (!productIngredientNames.includes(name)) {
+        productIngredientNames.push(name);
+        watched.push({
+          name: name,
+          description: 'Icke-vegansk ingrediens',
+          reason: 'non-vegan',
+          status: 'non-vegan' // Fix: Add status
+        });
+      }
     }
+  } else if (isUncertain) {
+      const uncertainCount = 1;
+      for (let i = 0; i < uncertainCount; i++) {
+        const rndIndex = Math.floor(Math.random() * uncertainIngredientPool.length);
+        const name = uncertainIngredientPool[rndIndex];
+        if (!productIngredientNames.includes(name)) {
+           productIngredientNames.push(name);
+        }
+         // Ensure the uncertain ingredient is in watched list
+         if (!watched.some(w => w.name === name)) {
+             watched.push({
+                 name: name,
+                 description: 'Potentiellt icke-vegansk / Osäker status',
+                 reason: 'uncertain-source',
+                 status: 'uncertain' // Fix: Add status
+             });
+         }
+      }
   }
-  
-  // Skapa produkten
+
+  // Shuffle ingredients for more variety
+  productIngredientNames.sort(() => Math.random() - 0.5);
+
+  // Fix: Map ingredient names to IngredientListItem[]
+  const ingredientsListItems: IngredientListItem[] = productIngredientNames.map(name => {
+      const watchedItem = watched.find(w => w.name === name);
+      let status: IngredientListItem['status'] = 'vegan'; // Default to vegan if not watched
+      let color = STATUS_COLORS.vegan;
+
+      if (watchedItem) {
+          status = watchedItem.status;
+          color = STATUS_COLORS[watchedItem.status] || STATUS_COLORS.unknown;
+      } else if (uncertainIngredientPool.includes(name) && !watchedItem) {
+          // Handle base ingredients that might be uncertain but not explicitly added as non-vegan
+          status = 'uncertain';
+          color = STATUS_COLORS.uncertain;
+          // Optionally add to watched list here if needed elsewhere, but status is set for display
+          if (!watched.some(w => w.name === name)) {
+               watched.push({ name: name, status: 'uncertain', description: 'Osäkert ursprung' });
+          }
+      }
+
+      return {
+          name: name,
+          status: status,
+          statusColor: color,
+          description: watchedItem?.description
+      };
+  });
+
+  let reasoning = '';
+  if (actualIsVegan === true) {
+      reasoning = 'Produkten bedöms vara vegansk baserat på ingredienserna.';
+  } else if (actualIsVegan === null) {
+      reasoning = `Produkten har osäker status på grund av ingrediensen/ingredienserna: ${watched.filter(w=>w.status === 'uncertain').map(w=>w.name).join(', ')}.`;
+  } else {
+      reasoning = `Produkten är inte vegansk på grund av ingrediensen/ingredienserna: ${watched.filter(w=>w.status === 'non-vegan').map(w=>w.name).join(', ')}.`;
+  }
+
   return {
     id,
     timestamp,
-    ingredients: productIngredients,
+    // Fix: Assign IngredientListItem[]
+    ingredients: ingredientsListItems,
     analysis: {
-      isVegan,
-      confidence: 0.7 + Math.random() * 0.3, // 70-100% konfidensgrad
-      watchedIngredients: isVegan ? [] : [
-        {
-          name: nonVeganIngredients[Math.floor(Math.random() * nonVeganIngredients.length)],
-          description: 'Icke-vegansk ingrediens',
-          reason: 'non-vegan'
-        }
-      ],
-      reasoning: isVegan 
-        ? 'Produkten innehåller inga icke-veganska ingredienser.'
-        : 'Produkten innehåller ingredienser som inte är veganska.'
+      // Fix: Assign boolean | null
+      isVegan: actualIsVegan,
+      isUncertain: isUncertain,
+      confidence: 0.7 + Math.random() * 0.3,
+      // Fix: Assign WatchedIngredient[] (already correct)
+      watchedIngredients: watched,
+      reasoning: reasoning,
+      // Add optional fields if needed
+      detectedLanguage: 'sv',
+      uncertainReasons: isUncertain ? watched.filter(w=>w.status === 'uncertain').map(w => w.description || 'Osäkert ursprung') : []
     },
     metadata: {
       userId,
       scanDate: timestamp,
-      isFavorite: Math.random() > 0.7, // 30% chans att vara favorit
+      isFavorite: Math.random() > 0.7,
       isSavedToHistory: true,
       source: 'Testprodukt',
       imageUri: `https://picsum.photos/400/400?random=${index}`,
       name: `Testprodukt ${index + 1}`
     }
   };
-} 
+}
+
+// Add STATUS_COLORS constant needed by generateTestProduct
+const STATUS_COLORS: Record<IngredientListItem['status'], string> = {
+  vegan: '#4CAF50', // Grön
+  'non-vegan': '#F44336', // Röd
+  uncertain: '#FF9800', // Orange
+  unknown: '#607D8B', // Gråblå
+}; 

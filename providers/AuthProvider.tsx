@@ -1,21 +1,26 @@
 // providers/AuthProvider.tsx
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Session, AuthError, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { Alert, AppState } from 'react-native'
-import { router } from 'expo-router'
+import { router, useRouter, useSegments } from 'expo-router'
 import { useStore } from '@/stores/useStore'
 import * as Linking from 'expo-linking';
 import { FirstLoginOverlay } from '@/components/FirstLoginOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Lägg till denna import för Sentry
 import { setUserContext, clearUserContext, captureException, addBreadcrumb } from '@/lib/sentry';
-// Lägg till import för ProductRepository
 import { ProductRepository } from '@/services/productRepository'
-
-// Imports för avatar och vegan-status
 import { AvatarStyle } from '@/stores/slices/createAvatarSlice'
 import { VeganStatus } from '@/stores/slices/createVeganStatusSlice'
+import * as SecureStore from 'expo-secure-store';
+import { useRootNavigation } from 'expo-router';
+import * as Sentry from '@sentry/react-native'
+import { SupabaseHelper, UserProfile } from '../lib/supabase/supabase.service'
+import { userSlice } from '../state/userSlice/user.slice'
+import { veganStatusSlice } from '../state/veganStatusSlice/veganStatusSlice'
+import { LoadingState } from '../types/loading'
+import { DateTime } from 'luxon'
+import { getStatusFromSupporterType } from '../utils/userProfile'
 
 interface SignUpResult {
   data: {
@@ -29,10 +34,23 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  loadingState: LoadingState;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  isInPasswordResetFlow: boolean;
+  profile: UserProfile | null;
+  anonymousSessionId: string | null;
+  resendConfirmation: (email: string) => Promise<{
+    success: boolean;
+    error: any | null;
+  }>;
+  updateProfile: (
+    data: Partial<UserProfile>
+  ) => Promise<{ success: boolean; error: any | null }>;
+  getNewNotificationsList: () => Promise<string[]>;
+  isNavigatingToReset: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -45,11 +63,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.LOADING)
   const [showFirstLoginOverlay, setShowFirstLoginOverlay] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const segments = useSegments();
+  const router = useRouter();
+  const rootNavigation = useRootNavigation();
+  
+  // Lägg till en räknare för att begränsa initialiseringar
+  const initCountRef = useRef<number>(0);
+  // Lägg till en flagga för att spåra om komponenten är monterad
+  const isMountedRef = useRef<boolean>(false);
+  const isNavigatingToResetPasswordRef = useRef<boolean>(false);
 
-  // Hjälpfunktion för att markera onboarding som slutförd
-  const markOnboardingAsCompleted = async () => {
+  // Markera komponenten som monterad i första render
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Cleanup vid unmount
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Hjälpfunktion för att markera onboarding som slutförd - använd useCallback för att memoizera
+  const markOnboardingAsCompleted = useCallback(async () => {
+    if (!isMountedRef.current) return false;
+    
     const store = useStore.getState();
     if (!store.onboarding.hasCompletedOnboarding) {
       console.log('AuthProvider: Setting onboarding as completed');
@@ -57,10 +97,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return true;
     }
     return false;
-  };
+  }, []);
 
-  // Uppdatera store med användardata när vi har en session
+  // Uppdatera store med användardata när vi har en session - använd useCallback för att memoizera
   const updateStoreWithUserData = useCallback(async (userData: User | null) => {
+    if (!isMountedRef.current) return;
+    
     if (!userData) {
       console.log('AuthProvider: Inget användar-objekt att uppdatera store med');
       return;
@@ -98,9 +140,85 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Lyssna på djuplänkar - placera denna useEffect EFTER updateStoreWithUserData deklarationen
   useEffect(() => {
-    // Hantera deep links
+    // Begränsa antal initialiseringar för att undvika oändliga loopar
+    initCountRef.current += 1;
+    if (initCountRef.current > 2) {
+      console.log(`AuthProvider: Skipping deep link listener initialization (count: ${initCountRef.current})`);
+      return;
+    }
+    
+    console.log('AuthProvider: Lyssnar på deep links');
+    
+    // Funktion för att hantera deep links
     const handleDeepLink = async (event: { url: string }) => {
-      console.log('AuthProvider: Deep link detected:', event.url);
+      console.log('[handleDeepLink] Handling deep link:', event.url);
+      
+      // NYTT: Hantera lösenordsåterställningslänkar (PKCE-flöde)
+      if (event.url.includes('type=recovery')) {
+        console.log('AuthProvider: Password reset deep link detected (type=recovery)');
+        
+        // Extrahera tokens från URL-fragmentet (#)
+        let accessToken = null;
+        let refreshToken = null;
+        
+        if (event.url.includes('#')) {
+          const hashParams = new URLSearchParams(event.url.split('#')[1]);
+          accessToken = hashParams.get('access_token');
+          refreshToken = hashParams.get('refresh_token');
+        }
+        
+        if (accessToken && refreshToken) {
+          console.log('AuthProvider: Found tokens in URL fragment, attempting to set session...');
+          try {
+            // Sätt ref FÖRE setSession
+            isNavigatingToResetPasswordRef.current = true;
+            console.log('AuthProvider: Setting isNavigatingToResetPasswordRef to true');
+            
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (sessionError) {
+              console.error('AuthProvider: Error setting session from recovery link:', sessionError);
+              Alert.alert('Fel', 'Kunde inte verifiera återställningslänken. Försök igen eller begär en ny länk.');
+              isNavigatingToResetPasswordRef.current = false; // Återställ vid fel
+              router.replace('/(auth)/login'); // Skicka till login vid fel
+            } else {
+              console.log('AuthProvider: Session set successfully from recovery link. Navigating to reset password screen.');
+              
+              // Navigera till den dedikerade reset-password skärmen
+              if (rootNavigation?.isReady()) {
+                 router.replace('/(auth)/reset-password');
+              } else {
+                 console.log('AuthProvider: Navigation not ready, scheduling redirect to reset-password');
+                 // Schemalägg navigering när navigation blir redo
+                 const unsubscribe = rootNavigation?.addListener('state', () => {
+                    if (rootNavigation?.isReady()) {
+                       router.replace('/(auth)/reset-password');
+                       unsubscribe?.();
+                    }
+                 });
+              }
+              // Återställ ref efter en kort stund så att AuthLayout hinner reagera
+              setTimeout(() => {
+                 isNavigatingToResetPasswordRef.current = false;
+                 console.log('AuthProvider: Resetting isNavigatingToResetPasswordRef to false');
+              }, 1000); // 1 sekund bör räcka
+            }
+          } catch (err) {
+            console.error('AuthProvider: Unexpected error setting session from recovery link:', err);
+            Alert.alert('Fel', 'Ett oväntat fel inträffade. Försök igen.');
+            isNavigatingToResetPasswordRef.current = false; // Återställ vid fel
+            router.replace('/(auth)/login');
+          }
+        } else {
+          console.warn('AuthProvider: Recovery link detected but no tokens found in fragment.');
+          Alert.alert('Fel', 'Ogiltig återställningslänk. Saknar nödvändig information.');
+          router.replace('/(auth)/login');
+        }
+        return; // Avsluta hanteringen här för recovery-länkar
+      }
       
       // Hantera felmeddelanden i länken (vanligtvis utgångna länkar)
       if (event.url.includes('error=') && (event.url.includes('error_code=otp_expired') || event.url.includes('error_code=access_denied'))) {
@@ -259,7 +377,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const subscription = Linking.addEventListener('url', handleDeepLink);
     
     // Kontrollera initialt URL när appen öppnas
-    Linking.getInitialURL().then(url => {
+    Linking.getInitialURL().then((url) => {
       if (url) {
         console.log('AuthProvider: Initial URL detected:', url);
         handleDeepLink({ url });
@@ -268,239 +386,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       subscription.remove();
+      console.log('AuthProvider: Städar upp deep link lyssnare');
     };
-  }, [updateStoreWithUserData]);
-
-  // Huvudsaklig auth-setup
-  useEffect(() => {
-    console.log('AuthProvider: Initial setup');
-    
-    // VIKTIGT: Kontrollera omedelbart om det finns en djuplänk
-    Linking.getInitialURL().then(async (url) => {
-      if (url && url.includes('access_token') && url.includes('type=signup')) {
-        console.log('AuthProvider: Initial URL is verification link:', url);
-        
-        // Sätt onboarding som slutförd
-        await markOnboardingAsCompleted();
-        
-        // Omdirigera till inloggning
-        console.log('AuthProvider: Redirecting to login from initial URL handler');
-        router.replace('/(auth)/login?verified=true');
-        setLoading(false);
-        return; // Avbryt resten av useEffect-koden
-      }
-    }).catch(error => {
-      console.error('AuthProvider: Error checking initial URL:', error);
-      // Lägg till Sentry-rapportering
-      captureException(error instanceof Error ? error : new Error('Initial URL check error'));
-    });
-    
-    // Initial session check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('AuthProvider: Initial session check', { 
-        hasSession: !!session,
-        emailConfirmed: session?.user?.email_confirmed_at,
-        hasAvatar: !!session?.user?.user_metadata?.avatar_id
-      })
-
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      // Sätt användarkontext i Sentry om vi har en session
-      if (session?.user) {
-        setUserContext(session.user.id, session.user.email || undefined);
-        addBreadcrumb('Initial session check', 'auth', {
-          email_confirmed: !!session.user.email_confirmed_at
-        });
-      }
-
-      // Vänta tills Zustand store är redo
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      // VIKTIG ÄNDRING: Hantera verifierad e-post först
-      if (session?.user?.email_confirmed_at) {
-        console.log('AuthProvider: Session has verified email')
-        
-        // Sätt onboarding som slutförd om användaren har verifierad e-post
-        await markOnboardingAsCompleted();
-
-        // Synkronisera avatardata från Supabase (om den finns)
-        const userData = session.user;
-        const store = useStore.getState();
-        const metadata = userData.user_metadata;
-        
-        if (metadata) {
-          // Om det finns avatar-information i metadata, uppdatera Zustand store
-          if (metadata.avatar_id && metadata.avatar_style) {
-            console.log('AuthProvider: Synkroniserar avatar vid session check:', {
-              style: metadata.avatar_style,
-              id: metadata.avatar_id
-            });
-            
-            await store.setAvatar(
-              metadata.avatar_style as AvatarStyle, 
-              metadata.avatar_id as string
-            );
-            
-            if (typeof metadata.vegan_years === 'number') {
-              await store.setVeganYears(metadata.vegan_years);
-            }
-          }
-          
-          // Synkronisera vegan-status
-          if (metadata.vegan_status) {
-            await store.setVeganStatus(metadata.vegan_status as VeganStatus);
-          }
-        }
-        
-        // Om detta är första inloggningen efter verifiering
-        if (!session.user.last_sign_in_at) {
-          console.log('AuthProvider: First verification, redirecting to login')
-          router.replace('/(auth)/login?verified=true')
-        } else {
-          console.log('AuthProvider: Verified user with previous login, redirecting to scan')
-          router.replace('/(tabs)/(scan)')
-        }
-        setLoading(false)
-        return
-      }
-
-      // Om vi kommer hit har vi ingen session eller en ej verifierad session
-      
-      // Kontrollera om onboarding har slutförts
-      const store = useStore.getState()
-      const onboardingStatus = store.onboarding
-      console.log('AuthProvider: Checking onboarding status:', onboardingStatus)
-
-      if (!onboardingStatus.hasCompletedOnboarding) {
-        console.log('AuthProvider: Onboarding not completed, redirecting to onboarding')
-        router.replace('/(onboarding)')
-        setLoading(false)
-        return
-      }
-
-      if (!session) {
-        console.log('AuthProvider: No session, redirecting to login')
-        router.replace('/(auth)/login')
-        setLoading(false)
-        return
-      }
-
-      if (!session.user.email_confirmed_at) {
-        console.log('AuthProvider: Email not verified')
-        Alert.alert(
-          'E-post ej verifierad',
-          'Ett verifieringsmail har skickats till din e-post. Vänligen verifiera din e-postadress för att fortsätta.',
-          [{ text: 'OK', style: 'cancel' }]
-        )
-        await supabase.auth.signOut()
-        return
-      }
-
-      console.log('AuthProvider: Valid session, redirecting to tabs')
-      router.replace('/(tabs)/(scan)')
-      setLoading(false)
-    })
-  }, []);
-  
-  // Hantera auth-ändringar från Supabase - flyttad utanför den andra useEffect för att undvika nästlade useEffect
-  useEffect(() => {
-    console.log('AuthProvider: Konfigurerar auth-ändringshanterare');
-    
-    // Lyssna på auth-ändringar
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthProvider: Auth state change:', event, {
-        hasSession: !!session,
-        userId: session?.user?.id
-      });
-      
-      switch (event) {
-        case 'SIGNED_IN':
-          if (session) {
-            console.log('AuthProvider: User signed in, updating session');
-            setSession(session);
-            setUser(session.user);
-            
-            // Uppdatera store direkt vid inloggning
-            await updateStoreWithUserData(session.user);
-            
-            // Lägg till Sentry-rapportering
-            setUserContext(session.user.id, session.user.email || undefined);
-            addBreadcrumb('User signed in', 'auth');
-          }
-          break;
-        case 'SIGNED_OUT':
-          console.log('AuthProvider: Användare loggad ut')
-          // Rensa användarkontext i Sentry
-          clearUserContext();
-          addBreadcrumb('User signed out', 'auth');
-          
-          // Ta bort router.replace-anropet härifrån eftersom det också finns i signOut-funktionen
-          // vilket kan orsaka navigationsproblem
-          setSession(null);
-          setUser(null);
-          break;
-        case 'USER_UPDATED':
-          // Ta bort flagghantering helt
-          /*
-          let wasAvatarUpdate = false;
-          if (session?.user.user_metadata?.avatar_update === true) { ... }
-          */
-
-          // Ta bort den gamla (utkommenterade) synkroniseringslogiken helt
-          // Inget behöver göras här för avatar/status-uppdatering
-          // då ProfileScreen hanterar det direkt i storen.
-          console.log('AuthProvider: USER_UPDATED event received. Handled by ProfileScreen/other logic.');
-
-          // Behåll navigationslogiken för t.ex. e-postverifiering
-          // (Den körs nu alltid, men router.replace har inbyggd logik för att inte navigera om man redan är på målsidan)
-          console.log('AuthProvider: Checking navigation logic after USER_UPDATED.');
-          // Kontrollera navigationsblockering
-          if (global.isBlockingNavigation === true) {
-            console.log('AuthProvider: Navigationsspärr aktiv, ignorerar navigationsförsök');
-          } else {
-              // Fortsätt med normal navigering för e-postverifiering etc.
-              if (session?.user.email_confirmed_at) {
-                await markOnboardingAsCompleted();
-                if (!session.user.last_sign_in_at) {
-                  console.log('AuthProvider: First verification after USER_UPDATED, redirecting to login')
-                  const userEmail = session.user.email;
-                  if (userEmail) {
-                    router.replace({
-                      pathname: '/(auth)/login',
-                      params: { 
-                        verified: 'true', 
-                        email: encodeURIComponent(userEmail)
-                      }
-                    });
-                  } else {
-                    router.replace('/(auth)/login?verified=true');
-                  }
-                } else {
-                  // Kommenterar bort denna omdirigering för att förhindra att appen navigerar till scan-sidan efter profiluppdateringar
-                  /*
-                  console.log('AuthProvider: User updated with verified email (not first time), redirecting to scan')
-                  router.replace('/(tabs)/(scan)')
-                  */
-                }
-              } else {
-                 console.log('AuthProvider: Användare uppdaterad men e-post ej verifierad, ingen navigering.');
-              }
-          }
-
-          break; // Slut på USER_UPDATED case
-        case 'TOKEN_REFRESHED':
-          console.log('AuthProvider: Token uppdaterad')
-          break
-        default:
-          console.log('AuthProvider: Hanterar ej auth event', event)
-      }
-    });
-
-    return () => {
-      console.log('AuthProvider: Städar upp - avregistrerar prenumeration')
-      subscription.unsubscribe()
-    }
   }, [updateStoreWithUserData, markOnboardingAsCompleted]);
 
   // Lyssna på route-ändringar indirekt via en timer
@@ -534,6 +421,97 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     return () => clearInterval(checkInterval);
   }, []);
+
+  // Huvudsaklig auth-setup
+  useEffect(() => {
+    // Begränsa antal initialiseringar för att undvika oändliga loopar
+    if (initCountRef.current > 2) {
+      console.log(`AuthProvider: Skipping auth state change listener (count: ${initCountRef.current})`);
+      return () => {};
+    }
+    
+    console.log('AuthProvider: Sätter upp autentiseringshantering');
+    
+    // Prenumerera på autentiseringshändelser
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('AuthProvider: Auth state change:', event, {
+          hasSession: !!session, 
+          userId: session?.user?.id
+        });
+        
+        if (event === 'INITIAL_SESSION') {
+          // Initialt tillstånd vid appstart
+          if (session) {
+            setSession(session);
+            setUser(session.user);
+            setLoading(false);
+          } else {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
+        } 
+        else if (event === 'PASSWORD_RECOVERY') {
+          console.log('AuthProvider: PASSWORD_RECOVERY event detected - ignored in this version');
+        }
+        else if (event === 'SIGNED_IN') {
+          console.log('AuthProvider: User signed in, updating session');
+          
+          setUser(session?.user || null);
+          // updateUser returnerar vanligtvis inte en session, så vi behöver hämta den aktuella sessionen
+          supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+            if (currentSession) {
+              setSession(currentSession);
+            }
+          });
+        } 
+        else if (event === 'SIGNED_OUT') {
+          console.log('AuthProvider: User signed out, clearing context');
+          setSession(null);
+          setUser(null);
+          setLoading(true);
+        } 
+        else if (event === 'USER_UPDATED') {
+          console.log('AuthProvider: User updated:', session?.user?.id);
+          if (session && session.user) {
+            // Uppdatera användarinformation
+            setSession(session);
+            setUser(session.user);
+            
+            // Kolla om användaren har verifierat sin e-post
+            if (session.user.email_confirmed_at && !session.user.confirmed_at) {
+              console.log('AuthProvider: User confirmed email for the first time');
+              
+              try {
+                // Markera användarens e-post som bekräftad i databasen
+                const { error } = await supabase.auth.updateUser({
+                  data: { confirmed_at: new Date().toISOString() }
+                });
+                
+                if (error) {
+                  console.error('AuthProvider: Error updating confirmed_at:', error);
+                  captureException(error);
+                }
+              } catch (error) {
+                console.error('AuthProvider: Error in USER_UPDATED handling:', error);
+                captureException(error instanceof Error ? error : new Error('USER_UPDATED handling error'));
+              }
+            }
+          }
+        } 
+        else if (event === 'TOKEN_REFRESHED') {
+          console.log('AuthProvider: Token refreshed');
+        }
+      }
+    );
+    
+    // Rensa prenumerationen när komponenten avmonteras
+    return () => {
+      console.log('AuthProvider: Städar upp auth state change lyssnare');
+      subscription.unsubscribe();
+    };
+  }, [rootNavigation, router, markOnboardingAsCompleted, updateStoreWithUserData]);
 
   // Polling av sessionen när appen blir aktiv
   useEffect(() => {
@@ -587,20 +565,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       appStateSubscription.remove()
     }
   }, [])
-
-  // Extra useEffect: Om inloggningen är klar men ingen session finns, tvinga användaren till login
-  useEffect(() => {
-    if (!loading && !session) {
-      // Kontrollera onboarding-status innan omdirigering
-      const store = useStore.getState()
-      if (!store.onboarding.hasCompletedOnboarding) {
-        console.log('AuthProvider: No session but onboarding not completed, staying in onboarding')
-        return
-      }
-      console.log('AuthProvider: Ingen giltig session, tvingar omdirigering till login')
-      router.replace('/(auth)/login')
-    }
-  }, [loading, session])
 
   // Funktioner för att hantera användarautentisering
   
@@ -772,15 +736,152 @@ export function AuthProvider({ children }: AuthProviderProps) {
     Alert.alert('Inaktiverad', 'Google inloggning är inte tillgänglig i denna MVP-version.')
   }
 
-  const value = {
-    session: session,
-    user: user,
-    loading: loading,
-    signIn: signIn,
-    signUp: signUp,
-    signOut: signOut,
-    signInWithGoogle: signInWithGoogle
-  };
+  // Asynkron funktion för att skicka bekräftelsemailet igen
+  const resendConfirmation = async (email: string) => {
+    try {
+      setLoading(true)
+      setLoadingState(LoadingState.LOADING)
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      })
+
+      if (error) {
+        setLoading(false)
+        setLoadingState(LoadingState.IDLE)
+        console.error('AuthProvider: Resend confirmation error:', error.message)
+        Sentry.captureException(error)
+        return { success: false, error: error.message }
+      }
+
+      setLoading(false)
+      setLoadingState(LoadingState.IDLE)
+      return { success: true, error: null }
+    } catch (err) {
+      console.error('AuthProvider: Resend confirmation error:', err)
+      Sentry.captureException(err)
+      setLoading(false)
+      setLoadingState(LoadingState.IDLE)
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  // Asynkron funktion för att uppdatera användarens profil
+  const updateProfile = async (data: Partial<UserProfile>) => {
+    try {
+      if (!user) {
+        throw new Error('Cannot update profile - no user logged in')
+      }
+
+      setLoading(true)
+      setLoadingState(LoadingState.LOADING)
+
+      // Först: hämta den aktuella profilen för att se vad som behöver uppdateras
+      const currentProfile = await SupabaseHelper.getFullProfile(user.id)
+      if (!currentProfile) {
+        throw new Error('Could not find user profile')
+      }
+
+      // Merge befintlig profil med nya data
+      const updatedProfile = {
+        ...currentProfile,
+        ...data,
+        updated_at: new Date().toISOString(),
+      }
+
+      // Uppdatera profilen i databasen
+      const { error } = await SupabaseHelper.updateProfile(updatedProfile)
+
+      if (error) {
+        throw error
+      }
+
+      // Uppdatera lokal state
+      setUser(updatedProfile as User);
+
+      // Uppdatera app state
+      const store = useStore.getState()
+
+      setLoading(false)
+      setLoadingState(LoadingState.IDLE)
+      return { success: true, error: null }
+    } catch (err) {
+      console.error('AuthProvider: Update profile error:', err)
+      Sentry.captureException(err)
+      setLoading(false)
+      setLoadingState(LoadingState.IDLE)
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  // Funktion för att hämta användarens nya notifikationer
+  const getNewNotificationsList = async () => {
+    try {
+      if (!user) {
+        return []
+      }
+
+      // Hämta användarens notifikationer från databasen
+      const { data, error } = await SupabaseHelper.getNotifications(user.id)
+
+      if (error) {
+        throw error
+      }
+
+      // Filtrera och mappa till en lista av meddelanden från olästa notifikationer
+      const newNotifications =
+        data
+          ?.filter((n) => !n.is_read)
+          .map((n) => n.message) || []
+
+      return newNotifications
+    } catch (err) {
+      console.error('AuthProvider: Get notifications error:', err)
+      Sentry.captureException(err)
+      return [] // Returnera en tom lista vid fel
+    }
+  }
+
+  const value = useMemo(
+    () => ({
+      session,
+      user,
+      loading,
+      loadingState,
+      signIn,
+      signUp,
+      signOut,
+      signInWithGoogle,
+      resendConfirmation,
+      updateProfile,
+      getNewNotificationsList,
+      isInPasswordResetFlow: false,
+      profile: null,
+      anonymousSessionId: null,
+      isNavigatingToReset: isNavigatingToResetPasswordRef.current,
+    }),
+    [
+      session,
+      user,
+      loading,
+      loadingState,
+      signIn,
+      signUp,
+      signOut,
+      signInWithGoogle,
+      resendConfirmation,
+      updateProfile,
+      getNewNotificationsList,
+      isNavigatingToResetPasswordRef.current,
+    ]
+  );
 
   return (
     <AuthContext.Provider value={value}>
@@ -797,4 +898,95 @@ export function useAuth() {
     throw new Error('useAuth måste användas inom en AuthProvider')
   }
   return context
+}
+
+// Funktion som skyddar rutter som kräver autentisering
+export function useProtectedRoute() {
+  const segments = useSegments();
+  const { session, loading } = useAuth();
+  const router = useRouter();
+  const isNavigatingRef = useRef(false); // Förhindra dubbla navigeringar
+
+  useEffect(() => {
+    // För att förhindra oändliga loopar, kontrollera om vi redan navigerar
+    if (isNavigatingRef.current) {
+      return;
+    }
+
+    // Logga alla aktuella värden för felsökning
+    console.log('useProtectedRoute kördes med segments:', segments);
+    console.log('useProtectedRoute session status:', session ? 'inloggad' : 'inte inloggad');
+    console.log('useProtectedRoute loading status:', loading);
+
+    // Kontrollera onboarding-status
+    const store = useStore.getState();
+    const hasCompletedOnboarding = store.onboarding.hasCompletedOnboarding;
+    console.log('useProtectedRoute hasCompletedOnboarding:', hasCompletedOnboarding);
+
+    // Kontrollera om nuvarande segment är en auth-route
+    const isAuthGroup = segments[0] === '(auth)';
+    // Kontrollera om nuvarande segment är en onboarding-route
+    const isOnboardingGroup = segments[0] === '(onboarding)';
+
+    // Nya kontroller för specifika auth-sidor
+    const isForgotPasswordPage = segments[0] === '(auth)' && segments[1] === 'forgot-password';
+    const isLoginPage = segments[0] === '(auth)' && segments[1] === 'login';
+
+    console.log('useProtectedRoute routes:', {
+      isAuthGroup,
+      isOnboardingGroup,
+      isForgotPasswordPage,
+      isLoginPage
+    });
+
+    // Skapa en lista över tillåtna sidor som inte kräver autentisering
+    const allowedUnauthenticatedPages = isForgotPasswordPage || isLoginPage;
+    console.log('useProtectedRoute allowedUnauthenticatedPages:', allowedUnauthenticatedPages);
+
+    // Första navigeringsprioritet: Onboarding om den inte är klar
+    if (!hasCompletedOnboarding && !isOnboardingGroup && !loading) {
+      console.log('useProtectedRoute: Redirecting to onboarding');
+      isNavigatingRef.current = true;
+      router.replace('/(onboarding)');
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 500);
+      return;
+    }
+
+    // Andra prioriteten: Om onboarding är klar men användaren inte är inloggad
+    if (hasCompletedOnboarding && !session && !loading && !isAuthGroup) {
+      console.log('useProtectedRoute: Redirecting to login');
+      isNavigatingRef.current = true;
+      router.replace('/(auth)/login');
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 500);
+      return;
+    }
+
+    // Tredje prioriteten: Om användaren inte är inloggad och befinner sig på en skyddad auth-route
+    if (hasCompletedOnboarding && !session && !loading && isAuthGroup && !allowedUnauthenticatedPages) {
+      console.log('useProtectedRoute: På en skyddad auth-sida utan inloggning, omdirigerar till login');
+      isNavigatingRef.current = true;
+      router.replace('/(auth)/login');
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 500);
+      return;
+    }
+
+    // Fjärde prioriteten: Om användaren är inloggad men fortfarande på en auth-route,
+    // omdirigera ENDAST om det INTE är forgot-password eller reset-password (reset hanteras av AuthLayout)
+    if (hasCompletedOnboarding && session && !loading && isAuthGroup && !isForgotPasswordPage) {
+      // Vi behöver inte kontrollera isResetPasswordPage här eftersom AuthLayout redan skyddar den.
+      console.log('useProtectedRoute: Redirecting to scan from auth page (not forgot-password)');
+      isNavigatingRef.current = true;
+      router.replace('/(tabs)');
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 500);
+      return;
+    }
+  }, [segments, session, loading, router]);
 }

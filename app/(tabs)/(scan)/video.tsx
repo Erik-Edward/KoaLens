@@ -492,17 +492,16 @@ function VideoScreen() {
           processingRef.current = false;
 
           console.log('Försöker navigera till resultatskärm med params:', {
-            analysisResult: JSON.stringify(result),
-            videoPath: videoPath,
+            productAnalysis: JSON.stringify(result),
+            mediaUri: videoPath,
             analysisType: 'video'
           });
           
           router.push({
             pathname: '/(tabs)/(scan)/result',
             params: { 
-              analysisResult: JSON.stringify(result),
-              videoPath: videoPath,
-              analysisType: 'video'
+              productAnalysis: JSON.stringify(result),
+              mediaUri: videoPath,
             }
           });
         } catch (routeError) {
@@ -520,12 +519,11 @@ function VideoScreen() {
               { 
                 text: 'Försök igen', 
                 onPress: () => {
-                  router.navigate({
+                  router.push({
                     pathname: '/(tabs)/(scan)/result',
                     params: {
-                      analysisResult: JSON.stringify(result),
-                      videoPath: videoPath,
-                      analysisType: 'video'
+                      productAnalysis: JSON.stringify(result),
+                      mediaUri: videoPath,
                     }
                   });
                 }

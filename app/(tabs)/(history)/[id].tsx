@@ -12,7 +12,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts } from '../../../hooks/useProducts';
-import { Product } from '../../../models/productModel';
+import { Product, IngredientListItem } from '../../../models/productModel';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { useStore } from '@/stores/useStore';
@@ -55,7 +55,9 @@ const STRINGS = {
   CONFIDENCE: 'Säkerhet',
   ANALYSIS_DATE: 'Analyserad',
   NO_INGREDIENTS: 'Inga ingredienser av denna typ hittades',
-  EMPTY_REASONING: 'Ingen analysgrund tillgänglig'
+  EMPTY_REASONING: 'Ingen analysgrund tillgänglig',
+  UNKNOWN_RESULT: 'Okänd status',
+  UNCERTAIN_RESULT: 'Osäker'
 };
 
 // Sektion-rubrik komponent
@@ -70,7 +72,7 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
 // Ingrediens-lista komponent
 const IngredientList: React.FC<{
   title: string;
-  ingredients: string[];
+  ingredients: IngredientListItem[];
   type: 'vegan' | 'non-vegan' | 'watch' | 'unknown' | 'user-watch';
 }> = ({ title, ingredients, type }) => {
   // Färgkodning för olika typer av ingredienser
@@ -85,7 +87,7 @@ const IngredientList: React.FC<{
     }
   };
   
-  if (ingredients.length === 0) {
+  if (!ingredients || ingredients.length === 0) {
     return null;
   }
   
@@ -108,7 +110,7 @@ const IngredientList: React.FC<{
               key={index} 
               className="text-text-primary font-sans mb-1"
             >
-              • {ingredient}
+              • {ingredient.name}
             </StyledText>
           ))}
         </StyledView>
@@ -177,13 +179,37 @@ export default function ProductDetailScreen() {
   
   // --- Filter product ingredients based on user's watch list ---
   const watchedProductIngredients = useMemo(() => {
-    if (!product) return [];
-    return product.ingredients.filter(ing => 
-      userWatchedIngredientNames.includes(ing.toLowerCase().trim())
+    if (!product || !Array.isArray(product.ingredients)) return [];
+    // Filter IngredientListItem by comparing item.name
+    return product.ingredients.filter(item =>
+      userWatchedIngredientNames.includes(item.name.toLowerCase().trim())
     );
+    // Returnerar nu IngredientListItem[]
   }, [product, userWatchedIngredientNames]);
   // -----------------------------------------------------------
   
+  // --- Separate ingredients by status for rendering --- 
+  const { veganIngredients, nonVeganIngredients, uncertainIngredients } = useMemo(() => {
+    if (!product || !Array.isArray(product.ingredients)) {
+      return { veganIngredients: [], nonVeganIngredients: [], uncertainIngredients: [] };
+    }
+    const result = {
+      veganIngredients: [] as IngredientListItem[],
+      nonVeganIngredients: [] as IngredientListItem[],
+      uncertainIngredients: [] as IngredientListItem[],
+    };
+    product.ingredients.forEach(item => {
+      if (item.status === 'vegan') {
+        result.veganIngredients.push(item);
+      } else if (item.status === 'non-vegan') {
+        result.nonVeganIngredients.push(item);
+      } else { // Assume uncertain or unknown
+        result.uncertainIngredients.push(item);
+      }
+    });
+    return result;
+  }, [product]);
+
   // Hantera favorit-knapp
   const handleToggleFavorite = async () => {
     if (!product) return;
@@ -241,65 +267,60 @@ export default function ProductDetailScreen() {
     if (!product) return;
     
     try {
-      const result = product.analysis.isVegan 
-        ? `${STRINGS.VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`
-        : `${STRINGS.NON_VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`;
-      
+      // Fix: Handle isVegan: null for result string
+      let result = STRINGS.UNKNOWN_RESULT; // Default to unknown
+      if (product.analysis.isVegan === true) {
+        result = `${STRINGS.VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`;
+      } else if (product.analysis.isVegan === false && !product.analysis.isUncertain) {
+        result = `${STRINGS.NON_VEGAN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`;
+      } else { // isVegan is null or isUncertain is true
+         result = `${STRINGS.UNCERTAIN_RESULT} (${Math.round(product.analysis.confidence * 100)}% säkerhet)`;
+      }
+
       const message = `${STRINGS.SHARE_TITLE}\n\nProdukt analyserad med KoaLens: ${result}\n\nLaddade ner KoaLens-appen för att analysera dina egna produkter!`;
       
       await Share.share({
         message,
-        // På iOS kan vi ange både titel och meddelande
-        ...(Platform.OS === 'ios' ? { title: STRINGS.SHARE_TITLE } : {})
+        title: STRINGS.SHARE_TITLE
       });
-    } catch (err) {
-      console.error('Fel vid delning:', err);
-      Alert.alert('Fel', STRINGS.SHARE_ERROR);
+    } catch (error) {
+      console.error(STRINGS.SHARE_ERROR, error);
+      Alert.alert(STRINGS.ERROR_TITLE, STRINGS.SHARE_ERROR);
     }
   };
   
-  // Visa laddningsindikator
+  // --- Loading/Error States --- (remain the same)
   if (loading) {
+    return <StyledView className="flex-1 justify-center items-center"><ActivityIndicator size="large" /></StyledView>;
+  }
+
+  if (error) {
     return (
-      <StyledSafeAreaView className="flex-1 bg-background-main">
-        <StyledView className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#6366f1" />
-        </StyledView>
+      <StyledSafeAreaView className="flex-1 justify-center items-center bg-background p-4">
+        <StyledText className="text-status-error font-sans-bold text-xl mb-4">{STRINGS.ERROR_TITLE}</StyledText>
+        <StyledText className="text-text-secondary font-sans text-center mb-6">{error}</StyledText>
+        <StyledPressable onPress={() => router.back()} className="bg-primary px-6 py-3 rounded-lg">
+          <StyledText className="text-white font-sans-bold">{STRINGS.ERROR_BUTTON}</StyledText>
+        </StyledPressable>
       </StyledSafeAreaView>
     );
   }
-  
-  // Visa felmeddelande
-  if (error || !product) {
+
+  // --- Fix: Explicit check for null product after loading/error --- 
+  if (!product) {
+    // This handles the case where loading is false, error is null, but product is still null
     return (
-      <StyledSafeAreaView className="flex-1 bg-background-main">
-        <StyledView className="flex-1 justify-center items-center p-4">
-          <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-          <StyledText className="text-text-primary font-sans-medium text-lg mt-4 text-center">
-            {STRINGS.ERROR_TITLE}
-          </StyledText>
-          <StyledText className="text-text-secondary font-sans text-center mt-2 mb-4">
-            {error || STRINGS.ERROR_MESSAGE}
-          </StyledText>
-          <StyledPressable
-            onPress={() => router.back()}
-            className="bg-primary py-2 px-4 rounded"
-          >
-            <StyledText className="text-text-inverse font-sans">
-              {STRINGS.ERROR_BUTTON}
-            </StyledText>
-          </StyledPressable>
-        </StyledView>
+      <StyledSafeAreaView className="flex-1 justify-center items-center bg-background p-4">
+        <StyledText className="text-text-secondary font-sans text-center">{STRINGS.ERROR_MESSAGE}</StyledText>
+        <StyledPressable onPress={() => router.back()} className="bg-primary px-6 py-3 rounded-lg mt-6">
+          <StyledText className="text-white font-sans-bold">{STRINGS.ERROR_BUTTON}</StyledText>
+        </StyledPressable>
       </StyledSafeAreaView>
     );
   }
-  
-  // Formatterat datum
-  const formattedDate = format(new Date(product.timestamp), 'PPP', {
-    locale: sv,
-  });
-  
-  // Huvudinnehåll
+  // --- TypeScript now knows product is not null below this line ---
+
+  // --- Start Rendering --- (can now safely assume product is not null)
   return (
     <StyledSafeAreaView 
       className="flex-1 bg-background-main"
@@ -390,46 +411,28 @@ export default function ProductDetailScreen() {
           <StyledView>
             <SectionHeader title={STRINGS.SECTION_INGREDIENTS} />
             
-            <IngredientList
-              title={STRINGS.VEGAN_INGREDIENTS}
-              ingredients={product.ingredients.filter(
-                ing => !product.analysis.watchedIngredients.some(w => w.name === ing && w.reason === 'non-vegan') &&
-                       !product.analysis.watchedIngredients.some(w => w.name === ing)
-              )}
-              type="vegan"
-            />
-            
-            <IngredientList
+            {/* Updated IngredientList usage */}
+            <IngredientList 
               title={STRINGS.NON_VEGAN_INGREDIENTS}
-              ingredients={product.analysis.watchedIngredients
-                .filter(w => w.reason === 'non-vegan')
-                .map(w => w.name)}
-              type="non-vegan"
+              ingredients={nonVeganIngredients} 
+              type="non-vegan" 
             />
-            
-            <IngredientList
+            <IngredientList 
               title={STRINGS.UNCERTAIN_INGREDIENTS}
-              ingredients={product.analysis.watchedIngredients
-                .filter(w => w.reason !== 'non-vegan')
-                .map(w => w.name)}
-              type="watch"
+              ingredients={uncertainIngredients} 
+              type="watch" 
+            />
+            <IngredientList 
+              title={STRINGS.WATCH_INGREDIENTS} // Use existing watch title
+              ingredients={watchedProductIngredients} // Pass the filtered user-watched list
+              type="user-watch" // Use a distinct type for user-watched
+            />
+            <IngredientList 
+              title={STRINGS.VEGAN_INGREDIENTS}
+              ingredients={veganIngredients} 
+              type="vegan" 
             />
             
-            {/* --- NEW: User's Watched Ingredients Section --- */}
-            {watchedProductIngredients.length > 0 && (
-              <IngredientList
-                title={STRINGS.WATCH_INGREDIENTS}
-                ingredients={watchedProductIngredients}
-                type="user-watch"
-              />
-            )}
-            {/* ------------------------------------------------- */}
-            
-            <IngredientList
-              title={STRINGS.UNKNOWN_INGREDIENTS}
-              ingredients={[]} // Vi har inte unknown i vår nuvarande modell
-              type="unknown"
-            />
           </StyledView>
           
           {/* Utrymme i botten */}

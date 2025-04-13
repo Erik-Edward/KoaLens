@@ -1,6 +1,6 @@
 // app/(auth)/login.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -10,8 +10,12 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { signIn } = useAuth();
+  
+  // Tillstånd för att hantera vyn för "glömt lösenord"
+  const [showForgotPasswordForm, setShowForgotPasswordForm] = useState(false);
   
   // Hämta URL-parametrar för att se om användaren kommer från verifiering
   const params = useLocalSearchParams();
@@ -89,84 +93,196 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
+  
+  // Funktion för att hantera begäran om glömt lösenord (visar formuläret)
+  const handlePasswordResetRequest = async () => {
+    if (!email) {
+      Alert.alert('E-post saknas', 'Var god ange din e-postadress.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Nu använder vi standardflödet utan redirectTo
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+      if (error) {
+        console.error('Error requesting password reset:', error);
+      }
+      
+      // Visa alltid samma meddelande för att inte avslöja om e-posten finns
+      Alert.alert(
+        'Begäran skickad',
+        'Om ett konto med den angivna e-postadressen finns, har ett återställningsmail skickats. Kolla din inkorg (och skräppost).',
+        [{ text: 'OK', onPress: () => setShowForgotPasswordForm(false) }]
+      );
+    } catch (err) {
+      console.error('Unexpected error during password reset request:', err);
+      Alert.alert(
+        'Ett fel inträffade',
+        'Kunde inte skicka begäran om lösenordsåterställning. Försök igen senare.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.formContainer}>
-        {/* Email Input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>E-post</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color="#ffffff" />
-            <TextInput
-              style={styles.input}
-              placeholder="din@email.com"
-              placeholderTextColor="#9ca3af"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-          </View>
-        </View>
-        {/* Password Input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Lösenord</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#ffffff" />
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor="#9ca3af"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="password"
-              textContentType="password"
-            />
-          </View>
-        </View>
-        {/* Login Button */}
-        <Pressable 
-          style={({pressed}) => [
-            styles.button,
-            pressed && styles.buttonPressed,
-            isLoading && styles.buttonDisabled
-          ]}
-          onPress={handleLogin}
-          disabled={isLoading}
-        >
-          <View style={styles.buttonContent}>
-            <Ionicons name="log-in-outline" size={20} color="#ffffff" />
-            <Text style={styles.buttonText}>
-              {isLoading ? 'Loggar in...' : 'Logga in'}
+        {!showForgotPasswordForm ? (
+          // Vanliga inloggningsformuläret
+          <>
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>E-post</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#ffffff" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="din@email.com"
+                  placeholderTextColor="#9ca3af"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                />
+              </View>
+            </View>
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Lösenord</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color="#ffffff" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9ca3af"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  textContentType="password"
+                />
+                <TouchableOpacity 
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons 
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                    size={24} 
+                    color="#9ca3af" 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+            {/* Login Button */}
+            <Pressable 
+              style={({pressed}) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                isLoading && styles.buttonDisabled
+              ]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="log-in-outline" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>
+                  {isLoading ? 'Loggar in...' : 'Logga in'}
+                </Text>
+              </View>
+            </Pressable>
+            
+            {/* Forgot Password Link */}
+            <View style={styles.linkContainer}> 
+              <Pressable onPress={() => {
+                console.log('ForgotPassword knapp klickad - visar inline formulär');
+                setShowForgotPasswordForm(true);
+              }}>
+                <Text style={styles.linkButton}>Glömt lösenord?</Text>
+              </Pressable>
+            </View>
+            
+            {/* Register Link */}
+            <View style={styles.linkContainer}>
+              <Text style={styles.linkText}>Har du inte ett konto?</Text>
+              <Link href="/(auth)/register" asChild>
+                <Pressable>
+                  <Text style={styles.linkButton}>Registrera</Text>
+                </Pressable>
+              </Link>
+            </View>
+            
+            {/* Resend verification section - only shown when needed */}
+            {(justRegistered || verified || emailFromParams) && (
+              <View style={styles.resendContainer}>
+                <Text style={styles.resendText}>Fick du inget verifieringsmail?</Text>
+                <Pressable onPress={resendVerificationEmail} disabled={isLoading}>
+                  <Text style={[styles.linkButton, isLoading && styles.disabledText]}>
+                    Skicka igen
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </>
+        ) : (
+          // Formulär för glömt lösenord
+          <>
+            <Text style={styles.title}>Glömt lösenord?</Text>
+            <Text style={styles.subtitle}>
+              Ange din e-postadress nedan så skickar vi en länk för att återställa ditt lösenord.
             </Text>
-          </View>
-        </Pressable>
-        
-        {/* Register Link */}
-        <View style={styles.linkContainer}>
-          <Text style={styles.linkText}>Har du inte ett konto?</Text>
-          <Link href="/(auth)/register" asChild>
-            <Pressable>
-              <Text style={styles.linkButton}>Registrera</Text>
+            
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>E-post</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#ffffff" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="din@email.com"
+                  placeholderTextColor="#9ca3af"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                />
+              </View>
+            </View>
+            
+            {/* Submit Button */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+                isLoading && styles.buttonDisabled,
+              ]}
+              onPress={handlePasswordResetRequest}
+              disabled={isLoading}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="send-outline" size={20} color="#ffffff" />
+                <Text style={styles.buttonText}>
+                  {isLoading ? 'Skickar...' : 'Skicka återställningslänk'}
+                </Text>
+              </View>
             </Pressable>
-          </Link>
-        </View>
-        
-        {/* Resend verification section - only shown when needed */}
-        {(justRegistered || verified || emailFromParams) && (
-          <View style={styles.resendContainer}>
-            <Text style={styles.resendText}>Fick du inget verifieringsmail?</Text>
-            <Pressable onPress={resendVerificationEmail} disabled={isLoading}>
-              <Text style={[styles.linkButton, isLoading && styles.disabledText]}>
-                Skicka igen
-              </Text>
-            </Pressable>
-          </View>
+            
+            {/* Back Button */}
+            <View style={styles.linkContainer}>
+              <Pressable onPress={() => setShowForgotPasswordForm(false)}>
+                <Text style={styles.linkButton}>Tillbaka till inloggning</Text>
+              </Pressable>
+            </View>
+          </>
         )}
       </View>
     </View>
@@ -204,6 +320,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 16,
+    paddingRight: 30,
   },
   button: {
     backgroundColor: '#3B82F6',
@@ -261,5 +378,24 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     opacity: 0.7,
-  }
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans-Regular',
+    color: '#d1d5db', // Ljusare grå
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 5,
+  },
 });

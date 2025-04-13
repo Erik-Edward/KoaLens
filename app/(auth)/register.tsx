@@ -1,5 +1,5 @@
 // app/(auth)/register.tsx
-import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { useAuth } from '../../providers/AuthProvider';
 import { Link, router } from 'expo-router';
@@ -12,6 +12,8 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const { signUp, loading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -132,11 +134,22 @@ export default function RegisterScreen() {
               placeholderTextColor="#9ca3af"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoComplete="password-new"
               textContentType="newPassword"
             />
+            <TouchableOpacity 
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons 
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                size={24} 
+                color="#9ca3af" 
+              />
+            </TouchableOpacity>
           </View>
           {/* Hjälptext för lösenordskrav */}
           <View style={styles.helpTextContainer}>
@@ -156,11 +169,22 @@ export default function RegisterScreen() {
               placeholderTextColor="#9ca3af"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              secureTextEntry
+              secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
               autoComplete="password-new"
               textContentType="newPassword"
             />
+            <TouchableOpacity 
+              style={styles.eyeIcon}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons 
+                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} 
+                size={24} 
+                color="#9ca3af" 
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -224,6 +248,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 16,
+    paddingRight: 30,
   },
   // Nya stilar för hjälptext
   helpTextContainer: {
@@ -271,5 +296,10 @@ const styles = StyleSheet.create({
   linkButton: {
     color: '#3B82F6',
     fontFamily: 'PlusJakartaSans-Medium',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 5,
   },
 });

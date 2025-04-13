@@ -10,10 +10,14 @@ import { AnalysisService } from './analysisService';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.koalens.app';
 
 interface AnalyzeIngredientsResponse {
-  isVegan: boolean;
+  isVegan: boolean | null; // Allow null from API
+  isUncertain: boolean; // Expect this from API now
   confidence: number;
   watchedIngredients: WatchedIngredient[];
   reasoning?: string;
+  // Add other potential fields from ProductAnalysis if the API returns them
+  detectedLanguage?: string;
+  uncertainReasons?: string[];
 }
 
 export class ProductApiService {
@@ -56,17 +60,64 @@ export class ProductApiService {
       
       const data: AnalyzeIngredientsResponse = await response.json();
       
+      const isUncertainApi = data.isUncertain ?? (data.isVegan === null);
+
       return {
         isVegan: data.isVegan,
+        isUncertain: isUncertainApi,
         confidence: data.confidence,
-        watchedIngredients: data.watchedIngredients,
-        reasoning: data.reasoning
+        watchedIngredients: data.watchedIngredients || [],
+        reasoning: data.reasoning,
+        detectedLanguage: data.detectedLanguage,
+        uncertainReasons: data.uncertainReasons
       };
     } catch (error) {
       console.warn('Kunde inte analysera med backend, använder lokal fallback:', error);
       
-      // Om backend-anropet misslyckas, använd lokal analyslogik som fallback
-      return this.fallbackAnalysisService.analyzeIngredients(ingredients);
+      // Fix: Use await to get the result from the promise
+      try {
+          const fallbackResult = await this.fallbackAnalysisService.analyzeIngredients(ingredients);
+          
+          // Map legacy watched ingredients (missing status) to the new type
+          const mappedWatchedIngredients: WatchedIngredient[] = (fallbackResult.watchedIngredients || []).map(legacyWatched => {
+            let status: 'vegan' | 'non-vegan' | 'uncertain' = 'uncertain'; // Default to uncertain
+            if (legacyWatched.reason === 'non-vegan') {
+              status = 'non-vegan';
+            } else if (legacyWatched.reason === 'maybe-non-vegan') {
+              status = 'uncertain';
+            } // Add other mappings if legacy service used different reasons
+            
+            return {
+               ...legacyWatched,
+               status: status // Add the required status field
+            };
+          });
+
+          const isUncertainFallback = fallbackResult.isVegan === false && 
+              (fallbackResult.reasoning?.toLowerCase().includes('osäker') || 
+              mappedWatchedIngredients.some(w => w.status === 'uncertain')); // Check mapped status
+          
+          return {
+            isVegan: isUncertainFallback ? null : fallbackResult.isVegan,
+            isUncertain: isUncertainFallback,
+            confidence: fallbackResult.confidence ?? 0.5,
+            // Use the mapped watched ingredients
+            watchedIngredients: mappedWatchedIngredients,
+            reasoning: fallbackResult.reasoning,
+            detectedLanguage: undefined,
+            uncertainReasons: isUncertainFallback ? [fallbackResult.reasoning || 'Osäker status från lokal analys'] : undefined
+          };
+      } catch (fallbackError) {
+           console.error('Lokal fallback-analys misslyckades också:', fallbackError);
+           // Return a default uncertain result if fallback also fails
+           return { 
+                isVegan: null, 
+                isUncertain: true, 
+                confidence: 0, 
+                watchedIngredients: [], 
+                reasoning: 'Kunde inte analysera ingredienser (API och lokal fallback misslyckades).' 
+           };
+      }
     }
   }
   

@@ -1,0 +1,81 @@
+Delivered-To: erik.edvardson@gmail.com
+Received: by 2002:a05:6a10:ce82:b0:5e9:fe5:7086 with SMTP id jh2csp42675pxb;
+        Sun, 13 Apr 2025 01:18:23 -0700 (PDT)
+X-Received: by 2002:a05:622a:491:b0:478:f755:95ab with SMTP id d75a77b69052e-47977551edfmr129733041cf.18.1744532063138;
+        Sun, 13 Apr 2025 01:14:23 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IHK8uLl8FeLw3NjO4MmkiYxPYO6p/U/m6MPDsrwSriT55KSKoLouxsUCVLyRR64GYxdA7WW
+X-Received: by 2002:a05:622a:491:b0:478:f755:95ab with SMTP id d75a77b69052e-47977551edfmr129732681cf.18.1744532061864;
+        Sun, 13 Apr 2025 01:14:21 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1744532061; cv=none;
+        d=google.com; s=arc-20240605;
+        b=REiax8pgGYk2/BeAjbWYvL85MPpTjJuvzfJzaIMccx5pVn/6m30/VMCIiY74sH+6r4
+         Y75AYGqP+lr9mKGC04U2ZDaFvvjSiygd2Ki4USCQe/eRWzoP7uMen2LjpuYStebMR/Ek
+         aG3CwiW4XSw7QXLrZQDIXjJE1moEiNoOZnKLuWs9AoJ1HbAvzdowHy3xLJ+rLz//qQ9S
+         noVCbb/vCaHyGDTE1r0kq1f4u3ivLc6b7Mf0n+AR1Dy+2+SksA0TsYO1pkBsdpXLAQFe
+         TwQ5+GzM2FRb//34IJ8BZEQrsbOIM2uxltrKsSamA20NPhSdJl4koaKkCKs9+vTBXxvK
+         AcGA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=feedback-id:mime-version:date:message-id:subject:to:from
+         :dkim-signature:dkim-signature;
+        bh=mrWTx31pcoI/N90TdVzdha+fcHK4i+KRpHq6JA0Fcfg=;
+        fh=Evd10nQPA9vqkp8oYkryg6E2P6VHH7ry83p9KqglE2c=;
+        b=g+dazGxaTvGeH5dFL5HY7SZUUQuAUwOKNSzmH/idZl1kk4aOcakXF/GXb5J/fsvP9e
+         OAG651i1I5BEQaPfeHG2x5MImC5b4vkJVtBBuyqyWr7nRnEiUe28SfwpVBdsvNcHFqSB
+         +HF1hfJf2I7ykbgpoxeHEnNiGdYaofnovWDhIcng6nOZ3epiX7D7TjRA/PLRjDdiQPjp
+         RZXas1/r5D+yzRLN8IXymD7lBr/l99hWuG6asG9+3qWya7KjIz3YjjpGUhqJYY5/rkaB
+         +e/Rm7JmLvLFuObFQ9rvIDu273Hof5sm5wn0+NSVaYvcJo8ICMC0kQrb/WNtt9hPRS0Z
+         MuOA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@koalens.live header.s=resend header.b="SlipZYO/";
+       dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b="k/bN2veX";
+       spf=pass (google.com: domain of 010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live designates 54.240.9.107 as permitted sender) smtp.mailfrom=010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=koalens.live
+Return-Path: <010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live>
+Received: from a9-107.smtp-out.amazonses.com (a9-107.smtp-out.amazonses.com. [54.240.9.107])
+        by mx.google.com with ESMTPS id d75a77b69052e-4796ede5919si65538251cf.500.2025.04.13.01.14.21
+        for <erik.edvardson@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Sun, 13 Apr 2025 01:14:21 -0700 (PDT)
+Received-SPF: pass (google.com: domain of 010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live designates 54.240.9.107 as permitted sender) client-ip=54.240.9.107;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@koalens.live header.s=resend header.b="SlipZYO/";
+       dkim=pass header.i=@amazonses.com header.s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw header.b="k/bN2veX";
+       spf=pass (google.com: domain of 010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live designates 54.240.9.107 as permitted sender) smtp.mailfrom=010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@send.koalens.live;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=koalens.live
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple; s=resend; d=koalens.live; t=1744532061; h=From:To:Subject:Message-ID:Date:MIME-Version:Content-Type; bh=mrWTx31pcoI/N90TdVzdha+fcHK4i+KRpHq6JA0Fcfg=; b=SlipZYO/nyFCoz4SSCHY+ZedJ7sLFG9jVXbAG3QT3hKY8Ix3hmUZAeProcH7ZGeL dx6xBnjFGjVeIeykxaDWk7GlzXxPKlRJotWVuCTdqJuxrzY04dB3+wfKNGC+CYGeLe0 I4zMM4J0ChNbbwflYmmbP6idrDPtMbAk5aIqc+ZI=
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/simple; s=6gbrjpgwjskckoa6a5zn6fwqkn67xbtw; d=amazonses.com; t=1744532061; h=From:To:Subject:Message-ID:Date:MIME-Version:Content-Type:Feedback-ID; bh=mrWTx31pcoI/N90TdVzdha+fcHK4i+KRpHq6JA0Fcfg=; b=k/bN2veX/v8I0F0Za420tkZF0usmWIFDxwILNbCFQV2/r4pwVk5DRwHCzia4oJ+K +GuS1eo0BBk77kRFe7V/wkx08Ep85G7K+zfEJqkzatROzg0ea6iKhynr0PCDaRWDZ+c oHoxvdehjGpO65olFKBKAXZG+su/hD868eKIT6QY=
+From: KoaLens <info@koalens.live>
+To: erik.edvardson@gmail.com
+Subject: Reset Your Password
+Message-ID: <010001962e36bc39-0e5e1eb8-6a5e-4678-ae99-247a1c2136b7-000000@email.amazonses.com>
+Date: Sun, 13 Apr 2025 08:14:21 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="--_NmP-28197187fcc52204-Part_1"
+Feedback-ID: ::1.us-east-1.epbACCJLarUaEI78XZoGREJ9LamRjxMH5pM2kZb64rA=:AmazonSES
+X-SES-Outgoing: 2025.04.13-54.240.9.107
+
+----_NmP-28197187fcc52204-Part_1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+RESET PASSWORD
+
+Follow this link to reset the password for your user:
+
+Reset Password
+[https://liziujohdkdmaogfogje.supabase.co/auth/v1/verify?token=3Df9e9c2d3bd=
+11e1a5b8a57b7d95eff06733f9004f5d2acab5d5bd01a0&type=3Drecovery&redirect_to=
+=3Dkoalens://]
+----_NmP-28197187fcc52204-Part_1
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<h2>Reset Password</h2>
+
+<p>Follow this link to reset the password for your user:</p>
+<p><a href=3D"https://liziujohdkdmaogfogje.supabase.co/auth/v1/verify?token=
+=3Df9e9c2d3bd11e1a5b8a57b7d95eff06733f9004f5d2acab5d5bd01a0&amp;type=3Dreco=
+very&amp;redirect_to=3Dkoalens://">Reset Password</a></p>
+
+----_NmP-28197187fcc52204-Part_1--

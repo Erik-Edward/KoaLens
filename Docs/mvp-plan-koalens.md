@@ -28,9 +28,10 @@ Att hjälpa konsumenter enkelt avgöra om produkter är veganska genom att analy
 - ✅ Fixat dubbletter i E-nummerdatabas (E1517, E1518)
 - ✅ Fixat onboarding-flödet (visas ej för befintliga användare)
 - ✅ Fixat navigeringsproblem efter profiluppdatering
+- ✅ Lösenordsåterställning för användare
 - ⚠️ UI/layout-tester på olika skärmstorlekar behövs (via Android Studio)
 - ⚠️ Feedback-systemets backend-integration behöver verifieras
-- 🔄 Lösenordsåterställning för användare (planerad)
+- 🔄  (planerad)
 - 🔄 Testardokumentation och användarguide (behöver uppdateras)
 - 🔍 Förbättrad hantering av svårskannade förpackningar (långsiktig förbättring)
 
@@ -112,9 +113,9 @@ Att hjälpa konsumenter enkelt avgöra om produkter är veganska genom att analy
 - **Åtgärd:** Skicka test-feedback från appen och verifiera att den dyker upp i Supabase-tabellen. Debugga vid behov (RLS, anslutning).
 
 ### 4.4. Implementera Lösenordsåterställning
-**Status: Prioriterad**
+**Status: ✅ Slutförd**
 - **Mål:** Ge användare möjlighet att återställa glömt lösenord.
-- **Åtgärd:** Implementera flöde med Supabase Auth och UI-formulär i appen.
+- **Åtgärd:** Implementerat flöde med Supabase Auth (PKCE) och dedikerad skärm i appen.
 
 ### 4.5. Uppdatera Testardokumentation
 **Status: Prioriterad**

@@ -159,143 +159,108 @@ export const useProducts = (userId?: string) => {
   }, [repository]);
   
   // Spara produkt till historik
-  const saveToHistory = useCallback(async (product: string | NewProduct) => {
+  const saveToHistory = useCallback(async (productInput: Product | NewProduct) => {
     try {
       let productToSave: Product;
-      console.log(`Sparar produkt till historik med ID/objekt: ${typeof product === 'string' ? product : 'newProduct'}`);
-      
-      if (typeof product === 'string') {
-        // Om produkten är ett ID, hämta den först
-        console.log(`Hämtar befintlig produkt med ID ${product} för att spara till historik`);
-        const existingProduct = await repository.getProductById(product);
-        if (!existingProduct) {
-          const errorMsg = `Produkt med ID ${product} kunde inte hittas`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
-        }
-        
-        // Uppdatera metadata för att markera som sparad
-        productToSave = {
-          ...existingProduct,
-          metadata: {
-            ...existingProduct.metadata,
-            isSavedToHistory: true,
-            // Behåll befintligt userId om det finns, annars använd effectiveUserId
-            userId: existingProduct.metadata.userId || effectiveUserId || undefined
-          }
-        };
-        console.log(`Markerar befintlig produkt ${productToSave.id} som sparad i historik med användare ${productToSave.metadata.userId || 'ingen'}`);
+      console.log(`Sparar produkt till historik med ID/objekt: ${typeof productInput === 'string' ? productInput : (productInput as any).id || 'newProduct'}`);
+
+      if ('id' in productInput && 'timestamp' in productInput) {
+          const existingProduct = productInput as Product;
+          console.log(`Använder befintligt Product-objekt ${existingProduct.id}`);
+          productToSave = {
+            ...existingProduct,
+            metadata: {
+              ...existingProduct.metadata,
+              isSavedToHistory: true,
+              userId: existingProduct.metadata.userId || effectiveUserId || undefined
+            }
+          };
+          console.log(`Uppdaterar befintlig produkt ${productToSave.id} metadata för historik, användare ${productToSave.metadata.userId || 'ingen'}`);
       } else {
-        // Om produkten är ett objekt, konvertera det till en full produkt
-        const id = (product as any).id || uuidv4();
+        const newProductData = productInput as NewProduct;
+        const id = uuidv4();
         const timestamp = new Date().toISOString();
-        
-        console.log(`Skapar ny produkt med ID ${id} för historik`);
-        
-        // Säkerställ att vi har userId
-        let userId = effectiveUserId || product.metadata.userId;
-        
-        // Om inget användar-ID finns, hämta det från getUserId() funktionen
-        if (!userId) {
-          try {
-            userId = await getUserId();
-            console.log(`Användar-ID hämtades: ${userId}`);
-          } catch (error) {
-            console.warn('Kunde inte hämta användar-ID, genererar nytt:', error);
-            userId = uuidv4();
-          }
+        console.log(`Skapar ny produkt med ID ${id} från NewProduct för historik`);
+        let finalUserId = effectiveUserId || newProductData.metadata.userId;
+        if (!finalUserId) {
+            console.warn('Kunde inte fastställa användar-ID, sparar utan.');
+            finalUserId = undefined;
         }
-        
         productToSave = {
           id,
-          timestamp, 
-          ingredients: product.ingredients || [],
-          analysis: product.analysis,
+          timestamp,
+          ingredients: newProductData.ingredients,
+          analysis: newProductData.analysis,
           metadata: {
-            ...product.metadata,
-            userId, // Typerna matchar nu ProductMetadata.userId?: string
+            ...newProductData.metadata,
+            userId: finalUserId,
             isSavedToHistory: true,
-            scanDate: product.metadata.scanDate || timestamp
+            scanDate: newProductData.metadata.scanDate || timestamp
           }
         };
-        console.log(`Förberedd produkt för historik: ID=${productToSave.id}, användar-ID=${productToSave.metadata.userId || 'ingen'}, isSavedToHistory=${productToSave.metadata.isSavedToHistory}`);
+        console.log(`Förberedd ny produkt för historik: ID=${productToSave.id}, användar-ID=${productToSave.metadata.userId || 'ingen'}`);
       }
-      
-      // Spara produkten
+
       console.log(`Sparar produkt ${productToSave.id} till repository`);
       await repository.updateProduct(productToSave);
-      
-      // Uppdatera lokal lista
+
       setProducts(prevProducts => {
-        // Kolla om produkten redan finns i listan
         const exists = prevProducts.some(p => p.id === productToSave.id);
         if (exists) {
           console.log(`Produkt ${productToSave.id} fanns redan i listan, uppdaterar`);
-          // Uppdatera existerande produkt
-          return prevProducts.map(p => 
+          return prevProducts.map(p =>
             p.id === productToSave.id ? productToSave : p
           );
         } else {
           console.log(`Produkt ${productToSave.id} var ny, lägger till överst i listan`);
-          // Lägg till ny produkt
           return [productToSave, ...prevProducts];
         }
       });
-      
-      // Ladda om alla produkter för att säkerställa att vi ser den senaste listan
+
       await loadProducts();
-      
+
       return productToSave;
     } catch (error) {
       console.error('Fel vid sparande till historik:', error);
-      setError('Kunde inte spara produkten till historik');
+      setError(`Kunde inte spara produkten: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
-  }, [repository, effectiveUserId, loadProducts]);
+  }, [repository, effectiveUserId, loadProducts, setProducts, setError]);
   
-  // Funktion för att växla favorit-status
+  // Växla favoritstatus
   const toggleFavorite = useCallback(async (productId: string) => {
     try {
-      const success = await repository.toggleFavorite(productId);
-      if (success) {
-        // Uppdatera lokal produktlista utan att behöva hämta allt på nytt
-        setProducts(prevProducts => 
-          prevProducts.map(product => 
-            product.id === productId
-              ? {
-                  ...product,
-                  metadata: {
-                    ...product.metadata,
-                    isFavorite: !product.metadata.isFavorite
-                  }
-                }
-              : product
-          )
-        );
+      const product = await repository.getProductById(productId);
+      if (!product) {
+        throw new Error(`Produkt med ID ${productId} hittades inte`);
       }
-      return success;
+      const updatedProduct = {
+        ...product,
+        metadata: {
+          ...product.metadata,
+          isFavorite: !product.metadata.isFavorite
+        }
+      };
+      await repository.updateProduct(updatedProduct);
+      setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
     } catch (error) {
-      console.error('Fel vid ändring av favorit-status:', error);
-      return false;
+      console.error(`Fel vid växling av favoritstatus för produkt ${productId}:`, error);
+      throw error;
     }
-  }, [repository]);
+  }, [repository, setProducts]);
   
-  // Funktion för att ta bort en produkt
+  // Ta bort produkt
   const removeProduct = useCallback(async (productId: string) => {
     try {
-      const success = await repository.deleteProduct(productId);
-      if (success) {
-        // Uppdatera lokal produktlista
-        setProducts(prevProducts => 
-          prevProducts.filter(product => product.id !== productId)
-        );
-      }
-      return success;
+      await repository.deleteProduct(productId);
+      // Uppdatera lokala listan
+      setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (error) {
-      console.error('Fel vid borttagning av produkt:', error);
-      return false;
+      console.error(`Fel vid borttagning av produkt ${productId}:`, error);
+      // Kasta om felet
+      throw error;
     }
-  }, [repository]);
+  }, [repository, setProducts]);
   
   // Funktion för att få senaste produkten
   const getLatestProduct = useCallback(async () => {
@@ -310,93 +275,71 @@ export const useProducts = (userId?: string) => {
     }
   }, []);
   
-  // Funktion för att skapa en ny produkt direkt från analysdata
+  // Funktion för att skapa produkt från analys (används inte här längre?)
   const createProductFromAnalysis = useCallback(async (analysisData: any, imageUri: string) => {
+    if (!effectiveUserId) {
+        throw new Error("User ID not available to create product.");
+    }
+    
+    const timestamp = new Date().toISOString();
+    const product: Product = {
+      id: uuidv4(),
+      timestamp: timestamp,
+      // This part needs attention: analysisData.allIngredients is string[] but Product expects IngredientListItem[]
+      // For now, leave as is, but this will cause a type error if used.
+      // A proper conversion would be needed similar to what's done in result.tsx
+      ingredients: (analysisData.allIngredients || []).map((name: string) => ({ name, status: 'unknown', statusColor: '#607D8B' })), // Temporary conversion attempt
+      analysis: {
+        isVegan: analysisData.isVegan ?? null, // Handle null
+        isUncertain: analysisData.isUncertain ?? (analysisData.isVegan === null), // Infer if null
+        confidence: analysisData.confidence ?? 0.5,
+        watchedIngredients: analysisData.watchedIngredients || [],
+        reasoning: analysisData.reasoning,
+        detectedLanguage: analysisData.detectedLanguage,
+        uncertainReasons: analysisData.uncertainReasons,
+      },
+      metadata: {
+        userId: effectiveUserId,
+        scanDate: timestamp,
+        isFavorite: false,
+        isSavedToHistory: false, // Sparas inte automatiskt här
+        source: 'analysis',
+        imageUri: imageUri,
+        name: analysisData.productName || 'Analyserad Produkt'
+      }
+    };
+    
+    return product;
+  }, [effectiveUserId]);
+  
+  // Funktion för att kontrollera produktantal
+  const checkProductCount = async () => {
     try {
       if (!effectiveUserId) {
-        throw new Error('Användar-ID saknas, kan inte skapa produkt');
+        console.warn('checkProductCount: Användar-ID saknas.');
+        return 0;
       }
-      
-      const newProduct: NewProduct = {
-        ingredients: [], // Tom ingredienslista om ingen tillgänglig
-        analysis: analysisData,
-        metadata: {
-          userId: effectiveUserId,
-          isFavorite: false,
-          isSavedToHistory: true,
-          scanDate: new Date().toISOString(),
-          imageUri, // Lägg till imageUri i metadata istället 
-          source: 'New Analysis'
-        }
-      };
-      
-      const createdProduct = await repository.createProduct(newProduct);
-      
-      // Uppdatera lokal lista utan full refresh
-      setProducts(prevProducts => [createdProduct, ...prevProducts]);
-      
-      // Försök synkronisera med Supabase
-      try {
-        console.log('Synkroniserar ny produkt med Supabase...');
-        await repository.syncProductsToSupabase();
-      } catch (syncError) {
-        console.warn('Kunde inte synkronisera ny produkt med Supabase:', syncError);
-        // Fortsätt ändå, produkten är sparad lokalt
-      }
-      
-      return createdProduct;
+      const count = await repository.getProductCountForUser(effectiveUserId);
+      console.log(`Antal produkter för användare ${effectiveUserId}: ${count}`);
+      return count;
     } catch (error) {
-      console.error('Fel vid skapande av produkt från analys:', error);
-      setError('Kunde inte spara analysresultat');
-      throw error;
+      console.error('Fel vid kontroll av produktantal:', error);
+      return 0;
     }
-  }, [repository, effectiveUserId]);
-  
-  // Lyssna på AsyncStorage-ändringar för realtidsuppdateringar
-  useEffect(() => {
-    // Vi kan inte lyssna direkt på AsyncStorage, så vi använder ett intervall
-    const checkInterval = setInterval(() => {
-      if (effectiveUserId) {
-        // Kolla antalet produkter i AsyncStorage för denna användare
-        const checkProductCount = async () => {
-          try {
-            const userProductsKey = `koalens_user_products_${effectiveUserId}`;
-            const productsJson = await AsyncStorage.getItem(userProductsKey);
-            
-            if (productsJson) {
-              const storedProducts = JSON.parse(productsJson);
-              if (Array.isArray(storedProducts) && storedProducts.length !== products.length) {
-                // Antalet produkter har ändrats, uppdatera listan
-                console.log(`useProducts: Produktantal har ändrats (${products.length} -> ${storedProducts.length}), uppdaterar`);
-                await loadProducts();
-              }
-            }
-          } catch (error) {
-            console.error('useProducts: Fel vid kontroll av produktantal:', error);
-          }
-        };
-        
-        checkProductCount();
-      }
-    }, 2000); // Kontrollera var 2:a sekund
-    
-    return () => {
-      clearInterval(checkInterval);
-    };
-  }, [effectiveUserId, loadProducts, products.length]);
-  
+  };
+
   return {
     products,
     loading,
     error,
     refreshing,
     refreshProducts,
+    importLegacyProducts,
     getProductById,
     saveToHistory,
     toggleFavorite,
     removeProduct,
-    importLegacyProducts,
-    getLatestProduct,
-    createProductFromAnalysis
+    createProductFromAnalysis,
+    checkProductCount
   };
 }; 

@@ -13,7 +13,7 @@ import { styled } from 'nativewind';
 import { Product } from '@/models/productModel';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable } from 'react-native';
-import { router, useNavigation } from 'expo-router';
+import { router, useNavigation, useFocusEffect } from 'expo-router';
 import { useStore } from '@/stores/useStore';
 import { ProductRepository } from '@/services/productRepository';
 
@@ -87,6 +87,24 @@ export default function HistoryScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshAttempts, setRefreshAttempts] = useState(0);
+
+  // Use useFocusEffect to refresh data when the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('HistoryScreen focused, refreshing products...');
+      // Don't set refreshing indicator here, let the hook handle loading state
+      refreshProducts().catch(err => {
+         console.error('Error refreshing products on focus:', err);
+         // Optionally show an alert if refresh on focus fails
+         // Alert.alert('Fel', 'Kunde inte uppdatera historiken automatiskt.');
+      });
+
+      return () => {
+        // Optional cleanup if needed when screen loses focus
+        console.log('HistoryScreen blurred');
+      };
+    }, [refreshProducts]) // Dependency: refreshProducts function
+  );
 
   // Logga produkter när de ändras för debugging
   useEffect(() => {

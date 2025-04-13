@@ -6,20 +6,18 @@
 export interface WatchedIngredient {
   name: string;
   description?: string;
-  reason?: string; // Vegansk/icke-vegansk/gråzon
-  status?: string; // Nytt fält för tydligare status (uncertain, non-vegan, vegan)
+  reason?: string; // Behålls för eventuell bakåtkompatibilitet eller extra info
+  status: 'vegan' | 'non-vegan' | 'uncertain';
 }
 
 export interface ProductAnalysis {
-  isVegan: boolean;
-  isUncertain?: boolean; // Ny status för osäker vegan-status
+  isVegan: boolean | null;
+  isUncertain: boolean;
   confidence: number;
-  watchedIngredients: WatchedIngredient[]; // Ingredienser med anmärkningar
-  reasoning?: string; // Förklaring av analysen
-  detectedLanguage?: string; // Detected language of the ingredients (sv, en, unknown)
-  detectedNonVeganIngredients?: string[]; // Array of specifically detected non-vegan ingredients
-  uncertainReasons?: string[]; // Orsaker till osäker status
-  uncertainIngredients?: string[]; // Nytt fält: Lista med osäkra ingrediensnamn
+  watchedIngredients: WatchedIngredient[];
+  reasoning?: string;
+  detectedLanguage?: string;
+  uncertainReasons?: string[];
 }
 
 export interface ProductMetadata {
@@ -37,7 +35,7 @@ export interface ProductMetadata {
 export interface Product {
   id: string;
   timestamp: string; // ISO date string för bakåtkompatibilitet
-  ingredients: string[]; // Lista med alla ingredienser
+  ingredients: IngredientListItem[];
   analysis: ProductAnalysis;
   metadata: ProductMetadata;
 }
@@ -47,7 +45,7 @@ export interface Product {
  * utan de automatiskt genererade fälten (id, timestamp, etc.)
  */
 export interface NewProduct {
-  ingredients: string[];
+  ingredients: IngredientListItem[];
   analysis: ProductAnalysis;
   metadata: ProductMetadata;
 }
@@ -65,41 +63,52 @@ export function convertFromLegacyProduct(legacy: any): Product {
       watchedIngredients.push({
         name: ingredient,
         description: "Icke-vegansk ingrediens",
-        reason: "non-vegan"
+        reason: "non-vegan",
+        status: 'non-vegan'
       });
     });
   }
   
-  // Lägg till potentiellt icke-veganska ingredienser
+  // Lägg till potentiellt icke-veganska ingredienser (mappa till uncertain)
   if (Array.isArray(legacy.maybeNonVeganIngredients)) {
     legacy.maybeNonVeganIngredients.forEach((ingredient: string) => {
       watchedIngredients.push({
         name: ingredient,
         description: "Potentiellt icke-vegansk ingrediens",
-        reason: "maybe-non-vegan"
+        reason: "maybe-non-vegan",
+        status: 'uncertain'
       });
     });
   }
   
   const scanDate = legacy.timestamp || new Date().toISOString();
   
+  // Beräkna isUncertain baserat på legacy-data
+  const isUncertain = legacy.isUncertain ?? (legacy.maybeNonVeganIngredients?.length > 0);
+  
   return {
     id: legacy.id || generateId(),
-    timestamp: scanDate, // Använd samma värde för timestamp och scanDate
-    ingredients: Array.isArray(legacy.allIngredients) ? legacy.allIngredients : [],
+    timestamp: scanDate,
+    ingredients: Array.isArray(legacy.allIngredients) ? legacy.allIngredients.map((ingredient: string): IngredientListItem => ({
+      name: ingredient,
+      status: 'unknown',
+      statusColor: '#333333',
+      description: undefined
+    })) : [],
     analysis: {
-      isVegan: legacy.isVegan ?? false,
+      isVegan: legacy.isVegan === undefined || legacy.isVegan === null ? null : legacy.isVegan,
+      isUncertain: isUncertain,
       confidence: legacy.confidence ?? 0.5,
       watchedIngredients,
       reasoning: legacy.reasoning || undefined,
       detectedLanguage: legacy.detectedLanguage,
-      detectedNonVeganIngredients: legacy.detectedNonVeganIngredients,
+      uncertainReasons: legacy.uncertainReasons ?? (isUncertain ? ["Äldre produkt, status osäker"] : undefined)
     },
     metadata: {
       userId: legacy.userId,
       scanDate: scanDate,
       isFavorite: legacy.isFavorite ?? false,
-      isSavedToHistory: true, // Antag att alla legacy-produkter är i historiken
+      isSavedToHistory: true,
       source: legacy.source || "Legacy import",
       imageUri: legacy.imageUri,
       videoUri: legacy.videoUri,
@@ -125,7 +134,7 @@ export function convertToLegacyProduct(product: Product): any {
   
   return {
     id: product.id,
-    allIngredients: product.ingredients,
+    allIngredients: product.ingredients.map(i => i.name),
     nonVeganIngredients,
     maybeNonVeganIngredients,
     isVegan: product.analysis.isVegan,
@@ -139,7 +148,6 @@ export function convertToLegacyProduct(product: Product): any {
     videoUri: product.metadata.videoUri,
     productName: product.metadata.name,
     detectedLanguage: product.analysis.detectedLanguage,
-    detectedNonVeganIngredients: product.analysis.detectedNonVeganIngredients,
   };
 }
 
@@ -148,4 +156,11 @@ export function convertToLegacyProduct(product: Product): any {
  */
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
+}
+
+export interface IngredientListItem {
+  name: string;
+  status: 'vegan' | 'non-vegan' | 'uncertain' | 'unknown';
+  statusColor: string;
+  description?: string;
 } 

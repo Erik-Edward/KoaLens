@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { v4 as uuidv4 } from 'uuid';
-import { Product, NewProduct, convertFromLegacyProduct, WatchedIngredient } from '../models/productModel';
+import { Product, NewProduct, convertFromLegacyProduct, WatchedIngredient, IngredientListItem } from '../models/productModel';
 import { ProductSyncService } from './productSyncService';
 import { getUserId } from '@/stores/adapter';
 
@@ -49,6 +49,7 @@ export class ProductRepository {
       console.log(`Genererat nytt användar-ID: ${userId}`);
     }
     
+    // Product is now created with IngredientListItem[] from NewProduct
     const product: Product = {
       ...newProduct,
       id: productId,
@@ -114,12 +115,17 @@ export class ProductRepository {
       
       console.log(`Hittade ${products.length} produkter i AsyncStorage`);
       
+      // Fix: Ensure legacy products are converted and type is consistent
+      const convertedProducts = products.map(p => 
+          ('analysis' in p && 'metadata' in p) ? p as Product : convertFromLegacyProduct(p)
+      );
+      
       // Gå igenom de första 5 produkterna för debugging
-      products.slice(0, 5).forEach((product: Product, i: number) => {
-        console.log(`Produkt ${i+1}/${products.length}: ID=${product.id}, UserId=${product.metadata?.userId || 'saknas'}, Sparad=${product.metadata?.isSavedToHistory === true ? 'Ja' : 'Nej'}`);
+      convertedProducts.slice(0, 5).forEach((product: Product, i: number) => {
+        console.log(`Produkt ${i+1}/${convertedProducts.length}: ID=${product.id}, UserId=${product.metadata?.userId || 'saknas'}, Sparad=${product.metadata?.isSavedToHistory === true ? 'Ja' : 'Nej'}`);
       });
       
-      return products;
+      return convertedProducts;
     } catch (error) {
       console.error('Fel vid hämtning av alla produkter:', error);
       return [];
@@ -132,7 +138,11 @@ export class ProductRepository {
       // Först kolla om det är den senaste produkten för snabbare åtkomst
       const latestProductJson = await AsyncStorage.getItem(STORAGE_KEYS.LATEST_PRODUCT);
       if (latestProductJson) {
-        const latestProduct = JSON.parse(latestProductJson);
+        const latestProductData = JSON.parse(latestProductJson);
+        // Convert if necessary
+        const latestProduct = ('analysis' in latestProductData && 'metadata' in latestProductData) 
+            ? latestProductData as Product 
+            : convertFromLegacyProduct(latestProductData);
         if (latestProduct && latestProduct.id === id) {
           return latestProduct;
         }
@@ -164,14 +174,18 @@ export class ProductRepository {
       
       if (userProductsJson) {
         try {
-          const userProducts = JSON.parse(userProductsJson);
-          if (Array.isArray(userProducts) && userProducts.length > 0) {
-            console.log(`Hittade ${userProducts.length} produkter från cache för användare ${userId}`);
+          const parsedProducts = JSON.parse(userProductsJson);
+          if (Array.isArray(parsedProducts) && parsedProducts.length > 0) {
+            console.log(`Hittade ${parsedProducts.length} produkter från cache för användare ${userId}`);
             // Logga några produktdetaljer för debugging
-            userProducts.slice(0, 3).forEach((p, i) => {
-              console.log(`Cache-produkt ${i+1}/${userProducts.length}: ID=${p.id}, Sparad=${p.metadata.isSavedToHistory === true ? 'Ja' : 'Nej'}`);
+            parsedProducts.slice(0, 3).forEach((p, i) => {
+              console.log(`Cache-produkt ${i+1}/${parsedProducts.length}: ID=${p.id}, Sparad=${p.metadata.isSavedToHistory === true ? 'Ja' : 'Nej'}`);
             });
-            return userProducts;
+            // Convert legacy products if found in user cache
+            const convertedProducts = parsedProducts.map(p => 
+                ('analysis' in p && 'metadata' in p) ? p as Product : convertFromLegacyProduct(p)
+            );
+            return convertedProducts;
           }
           console.log(`Användarspecifik cache fanns men var tom för ${userId}`);
         } catch (parseError) {
@@ -338,63 +352,53 @@ export class ProductRepository {
   
   // Importera gamla produkter från legacy-format
   async importLegacyProducts(): Promise<number> {
+    let importedCount = 0;
     try {
-      // Försök hämta gamla produkter från tidigare implementation
-      const oldProductsJson = await AsyncStorage.getItem('koalens-latest-products');
-      if (!oldProductsJson) return 0;
+      const keys = await AsyncStorage.getAllKeys();
+      const legacyProductKeys = keys.filter(key => key.startsWith('product_') && !key.startsWith(STORAGE_KEYS.USER_PRODUCTS_PREFIX));
       
-      const oldProducts = JSON.parse(oldProductsJson);
-      if (!Array.isArray(oldProducts) || oldProducts.length === 0) return 0;
-      
-      console.log(`Importerar ${oldProducts.length} gamla produkter`);
-      
-      // Konvertera och importera alla gamla produkter
-      const existingProducts = await this.getAllProducts();
-      const existingIds = new Set(existingProducts.map(p => p.id));
-      
-      const newProducts: Product[] = [];
-      
-      for (const oldProduct of oldProducts) {
-        // Skippa om produkten redan finns
-        if (existingIds.has(oldProduct.id)) continue;
-        
-        try {
-          const newProduct = convertFromLegacyProduct(oldProduct);
-          newProducts.push(newProduct);
-        } catch (conversionError) {
-          console.error('Fel vid konvertering av gammal produkt:', conversionError);
+      if (legacyProductKeys.length === 0) {
+        console.log('Inga legacy produktnycklar hittades för import.');
+        return 0;
+      }
+
+      const legacyData = await AsyncStorage.multiGet(legacyProductKeys);
+      const currentProducts = await this.getAllProducts(); // Get current Product[]
+      const currentProductIds = new Set(currentProducts.map(p => p.id));
+      const productsToSave: Product[] = [...currentProducts];
+
+      legacyData.forEach(([key, value]) => {
+        if (value) {
+          try {
+            const legacyProductData = JSON.parse(value);
+            // Ensure it looks like a legacy product and not already imported
+            if (legacyProductData && legacyProductData.id && !currentProductIds.has(legacyProductData.id) && !legacyProductData.analysis) {
+              console.log(`Konverterar legacy produkt ${legacyProductData.id}`);
+              const convertedProduct = convertFromLegacyProduct(legacyProductData);
+              if (convertedProduct) {
+                 productsToSave.push(convertedProduct);
+                 currentProductIds.add(convertedProduct.id); // Add to set to avoid duplicates in this run
+                 importedCount++;
+              }
+            }
+          } catch (e) {
+            console.warn(`Kunde inte parsea eller konvertera legacy produkt från ${key}:`, e);
+          }
         }
+      });
+
+      if (importedCount > 0) {
+        console.log(`Sparar ${importedCount} nya konverterade produkter...`);
+        // Save the combined list (overwrite existing products with the updated list)
+        await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(productsToSave));
+        // Update user-specific caches if necessary (complex, might need re-filtering)
+        console.warn('User-specific caches may need updating after legacy import.');
       }
-      
-      if (newProducts.length === 0) return 0;
-      
-      // Spara alla nya produkter
-      const updatedProducts = [...newProducts, ...existingProducts];
-      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
-      
-      // Uppdatera användarspecifika listor
-      const userGroups = new Map<string, Product[]>();
-      
-      for (const product of newProducts) {
-        const userId = product.metadata.userId;
-        if (!userId) continue;
-        
-        if (!userGroups.has(userId)) {
-          userGroups.set(userId, []);
-        }
-        userGroups.get(userId)?.push(product);
-      }
-      
-      // Spara användarspecifika listor
-      for (const [userId, products] of userGroups.entries()) {
-        await this.addMultipleToUserProducts(userId, products);
-      }
-      
-      return newProducts.length;
+
     } catch (error) {
-      console.error('Fel vid import av gamla produkter:', error);
-      return 0;
+      console.error('Fel vid import av legacy produkter:', error);
     }
+    return importedCount;
   }
   
   // Spara en produkt i historik (markera som sparad)
@@ -690,6 +694,7 @@ export class ProductRepository {
         if (!product.analysis) {
           product.analysis = {
             isVegan: true, // Standard-antagande
+            isUncertain: false, // Default to false when analysis is missing
             confidence: 1.0,
             watchedIngredients: [],
             reasoning: "Importerad från Supabase utan analys"
@@ -698,6 +703,8 @@ export class ProductRepository {
           // Uppdatera analysis om det redan finns
           product.analysis = {
             ...product.analysis,
+            // Ensure isUncertain is present if updating existing analysis
+            isUncertain: product.analysis.isUncertain !== undefined ? product.analysis.isUncertain : false,
             isVegan: product.analysis.isVegan !== undefined ? product.analysis.isVegan : true,
             confidence: product.analysis.confidence || 1.0,
             watchedIngredients: product.analysis.watchedIngredients || [],
@@ -822,6 +829,8 @@ export class ProductRepository {
       // Generera ett antal testprodukter
       for (let i = 0; i < count; i++) {
         const isVegan = Math.random() > 0.3; // 70% chans att vara vegansk
+        const isUncertain = !isVegan && Math.random() > 0.5;
+        const actualIsVegan = isUncertain ? null : isVegan;
         const id = `demo-${now.getTime()}-${i}`;
         
         // Gemensamma ingredienser
@@ -858,9 +867,18 @@ export class ProductRepository {
             watchedIngredients.push({
               name: ingredient,
               description: 'Icke-vegansk ingrediens',
-              reason: 'non-vegan'
+              reason: 'non-vegan',
+              status: 'non-vegan' as const
             });
           }
+        } else if (isUncertain) {
+          const uncertain = { 
+            name: 'Arom', 
+            description: 'Osäkert ursprung', 
+            reason: 'uncertain-source', 
+            status: 'uncertain' as const
+          };
+          watchedIngredients.push(uncertain);
         }
         
         // Skapa timestamp för denna produkt
@@ -870,14 +888,26 @@ export class ProductRepository {
         const product: Product = {
           id,
           timestamp,
-          ingredients: productIngredients,
+          ingredients: productIngredients.map(name => {
+            const watchedItem = watchedIngredients.find(w => w.name === name);
+            let status: IngredientListItem['status'] = 'vegan';
+            if (watchedItem) {
+              status = watchedItem.status;
+            }
+            return {
+              name,
+              status,
+              statusColor: STATUS_COLORS[status] || STATUS_COLORS.unknown,
+            };
+          }),
           analysis: {
-            isVegan,
+            isVegan: actualIsVegan,
+            isUncertain: isUncertain,
             confidence: 0.7 + Math.random() * 0.3, // 70-100% konfidensgrad
             watchedIngredients,
-            reasoning: isVegan 
+            reasoning: actualIsVegan 
               ? 'Produkten innehåller inga icke-veganska ingredienser.'
-              : 'Produkten innehåller ingredienser som inte är veganska.'
+              : isUncertain ? 'Osäker status' : 'Innehåller icke-veganska ämnen.'
           },
           metadata: {
             userId,
@@ -931,4 +961,25 @@ export class ProductRepository {
       return false;
     }
   }
-} 
+
+  /**
+   * Räknar antalet produkter för en specifik användare
+   */
+  async getProductCountForUser(userId: string): Promise<number> {
+    try {
+      const products = await this.getProductsByUserId(userId);
+      return products.length;
+    } catch (error) {
+      console.error(`Fel vid räkning av produkter för användare ${userId}:`, error);
+      return 0; // Return 0 in case of error
+    }
+  }
+}
+
+// Add STATUS_COLORS constant if needed by demo product generation
+const STATUS_COLORS: Record<IngredientListItem['status'], string> = {
+  vegan: '#4CAF50',
+  'non-vegan': '#F44336',
+  uncertain: '#FF9800',
+  unknown: '#607D8B',
+}; 

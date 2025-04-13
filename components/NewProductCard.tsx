@@ -32,10 +32,11 @@ export const NewProductCard: React.FC<NewProductCardProps> = ({
     if (onPress) {
       onPress();
     } else {
-      // Navigera till detaljsidan - använd alltid den vanliga [id] routen
+      // Reverted: Navigate to the dedicated history detail page
+      console.log(`NewProductCard: Navigating to history detail screen for ID: ${product.id}`);
       router.push({
-        pathname: '/(tabs)/(history)/[id]',
-        params: { id: product.id }
+        pathname: '/(tabs)/(history)/[id]', // Reverted pathname
+        params: { id: product.id } // Reverted params
       });
     }
   };

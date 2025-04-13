@@ -51,9 +51,9 @@ function getUserId(product: ScannedProduct | Product): string | undefined {
 }
 
 // Helper function to get isVegan status from either product type
-function getIsVegan(product: ScannedProduct | Product): boolean {
+function getIsVegan(product: ScannedProduct | Product): boolean | null {
   if (isScannedProduct(product)) {
-    return product.isVegan;
+    return product.isVegan ?? false;
   } else if (isProduct(product)) {
     return product.analysis.isVegan;
   }
@@ -73,9 +73,9 @@ function getIsFavorite(product: ScannedProduct | Product): boolean {
 // Helper function to get ingredients from either product type
 function getIngredients(product: ScannedProduct | Product): string[] {
   if (isScannedProduct(product)) {
-    return product.allIngredients;
+    return product.allIngredients || [];
   } else if (isProduct(product)) {
-    return product.ingredients;
+    return product.ingredients.map(item => item.name);
   }
   return [];
 }
@@ -89,20 +89,32 @@ function toScannedProduct(product: ScannedProduct | Product): ScannedProduct {
       id: product.id,
       timestamp: product.timestamp,
       imageUri: product.metadata.imageUri || '',
-      isVegan: product.analysis.isVegan,
+      isVegan: product.analysis.isVegan ?? false,
       confidence: product.analysis.confidence,
       nonVeganIngredients: product.analysis.watchedIngredients
-        .filter(i => i.reason === 'non-vegan')
+        .filter(i => i.status === 'non-vegan')
         .map(i => i.name),
-      allIngredients: product.ingredients,
+      allIngredients: product.ingredients.map(item => item.name),
       reasoning: product.analysis.reasoning || '',
       isFavorite: product.metadata.isFavorite,
-      watchedIngredientsFound: [], // Default empty array
+      watchedIngredientsFound: [],
       userId: product.metadata.userId
     };
   }
-  // This case should never happen if the type guards are working correctly
-  throw new Error('Invalid product type');
+  console.error('Invalid product type encountered in toScannedProduct:', product);
+  return {
+      id: 'error-product',
+      timestamp: new Date().toISOString(),
+      imageUri: '',
+      isVegan: false,
+      confidence: 0,
+      nonVeganIngredients: [],
+      allIngredients: [],
+      reasoning: 'Invalid product type',
+      isFavorite: false,
+      watchedIngredientsFound: [],
+      userId: undefined
+  };
 }
 
 /**
@@ -217,7 +229,7 @@ export function HistoryScreen() {
     
     // Statistik om produkterna
     const totalProducts = userProducts.length;
-    const veganProducts = userProducts.filter(p => getIsVegan(p)).length;
+    const veganProducts = userProducts.filter(p => getIsVegan(p) === true).length;
     const favorites = userProducts.filter(p => getIsFavorite(p)).length;
     
     console.log(`Historievy: ${totalProducts} produkter totalt, ${veganProducts} veganska, ${favorites} favoriter`);

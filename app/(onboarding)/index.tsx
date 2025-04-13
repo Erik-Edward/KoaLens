@@ -15,6 +15,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { useAuth } from '@/providers/AuthProvider';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -34,6 +35,7 @@ export default function OnboardingWelcomeScreen() {
   const { width } = useWindowDimensions();
   const setOnboardingCompleted = useStore((state) => state.setOnboardingCompleted);
   const setCurrentStep = useStore((state) => state.setCurrentStep);
+  const { signOut } = useAuth();
 
   // State för textväxling
   const [currentMessage, setCurrentMessage] = useState(MESSAGES[0]);
@@ -103,23 +105,31 @@ export default function OnboardingWelcomeScreen() {
   }));
 
   const handleStart = async () => {
+    console.log("handleStart called");
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCurrentStep(0);
     router.push('/(onboarding)/vegan-status');
   };
 
   const handleSkip = async () => {
+    console.log("handleSkip called");
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await signOut();
+      console.log("handleSkip: Successfully signed out before navigating");
+    } catch (error) {
+      console.error("handleSkip: Error signing out:", error);
+    }
     await setOnboardingCompleted(true);
     router.replace('/(auth)/login');
   };
 
   return (
     <StyledView className="flex-1 bg-background-main">
-      {/* Animerad bakgrund */}
+      {/* Animerad bakgrund - Restore */}
       <AnimatedBackground />
 
-      {/* Gradient overlay */}
+      {/* Gradient overlay - Restore */}
       <StyledView className="absolute inset-0 bg-gradient-to-b from-background-dark/30 via-transparent to-background-main" />
 
       {/* Huvudinnehåll */}

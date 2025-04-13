@@ -1,3 +1,5 @@
+console.log('[TEST LOG] app/_layout.tsx loaded');
+import 'react-native-gesture-handler';
 // app/_layout.tsx
 import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';

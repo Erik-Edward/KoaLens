@@ -1085,9 +1085,8 @@ export class AnalysisService {
     this.logEvent('Rapporterar ingredienssuggestion...', reportData);
     
     try {
-      // Korrigera API-endpointen här
-      const apiUrl = `${API_ENDPOINT}/api/report/ingredient`; 
-      // Gammal felaktig URL: const apiUrl = `${API_ENDPOINT}/api/feedback/suggest`; 
+      // Corrected the API endpoint path to match backend
+      const apiUrl = `${API_ENDPOINT}/api/reports/ingredient`; // Changed to plural 'reports'
       
       console.log('AnalysisService: Skickar ingrediensrapport till:', apiUrl);
       
@@ -1109,15 +1108,7 @@ export class AnalysisService {
       console.error('AnalysisService: Kunde inte rapportera ingrediens', error);
       this.logEvent('Fel vid rapportering av ingrediens', { error: error.message });
       
-      // Temporär fallback för att simulera framgång - Ta bort när backend fungerar?
-      // Om felet är 404 (Not Found), simulera framgång för att inte blockera användaren
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        console.warn('AnalysisService: Backend endpoint (404) ej hittad, simulerar framgångsrik rapportering...');
-        this.logEvent('Simulerad framgångsrik rapportering (404)');
-        return true; // Behåll denna för demo?
-      }
-      
-      return false; // Returnera false vid andra typer av fel
+      return false; // Returnera false vid alla typer av fel
     }
   }
 }

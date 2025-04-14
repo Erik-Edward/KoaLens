@@ -299,12 +299,12 @@ function safeJsonParse(jsonString: string | undefined, fallback: any = null) {
   }
 }
 
-// Konstant för färger
+// Konstant för färger - Justerad osäker färg för bättre distinktion
 const STATUS_COLORS: Record<IngredientListItem['status'], string> = {
-  vegan: '#4CAF50', // Grön
-  'non-vegan': '#F44336', // Röd
-  uncertain: '#FF9800', // Orange
-  unknown: '#607D8B', // Gråblå (för ingredienser som inte explicit flaggats)
+  vegan: '#1B5E20', // Mörkare grön
+  'non-vegan': '#C62828', // Mörkare röd
+  uncertain: '#B57E00', // Mörk senap/guld för bättre distinktion från röd
+  unknown: '#455A64', // Mörkare gråblå
 };
 
 /**
@@ -359,36 +359,39 @@ function IngredientsList({
 
   return (
     <StyledView>
-      {uniqueIngredients.map((item, index) => (
-        // Använd item.name och index för en mer stabil nyckel
-        <StyledView key={`${item.name}-${index}`} style={styles.ingredientRow}>
-          {/* Statusindikator (färgad prick) */}
-          <StyledView
-            style={[
-              styles.ingredientStatusIndicator,
-              // Använd statusColor från item, fallback till unknown färg
-              { backgroundColor: item.statusColor || STATUS_COLORS.unknown },
-            ]}
-          />
-          {/* Ingrediensnamn - nu färgat efter status */ }
-          <StyledText
-            style={[styles.ingredientName, { color: item.statusColor || STATUS_COLORS.unknown }]}
-            selectable={true} // Gör texten markerbar
-          >
-            {item.name}
-          </StyledText>
-          {/* Rapporteringsknapp */}
-          {onReportIngredient && (
-            <StyledPressable
-              style={styles.ingredientReportButton}
-              onPress={() => onReportIngredient(item.name)}
-              hitSlop={10} // Gör knappen lättare att trycka på
+      {uniqueIngredients.map((item, index) => {
+        // Hämta färg baserat på status från vår uppdaterade STATUS_COLORS
+        const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.unknown;
+        return (
+          <StyledView key={`${item.name}-${index}`} style={styles.ingredientRow}>
+            {/* Statusindikator (färgad prick) - Använder nu statusColor variabeln */}
+            <StyledView
+              style={[
+                styles.ingredientStatusIndicator,
+                { backgroundColor: statusColor }, // Använd den bestämda statusColor
+              ]}
+            />
+            {/* Ingrediensnamn - Använder nu statusColor variabeln */}
+            <StyledText
+              style={[styles.ingredientName, { color: statusColor }]} // Använd den bestämda statusColor
+              selectable={true}
             >
-              <Ionicons name="warning-outline" size={20} color="#FF9800" />
-            </StyledPressable>
-          )}
-        </StyledView>
-      ))}
+              {item.name}
+            </StyledText>
+            {/* Rapporteringsknapp - Changed icon and color */}
+            {onReportIngredient && (
+              <StyledPressable
+                style={styles.ingredientReportButton}
+                onPress={() => onReportIngredient(item.name)}
+                hitSlop={10}
+              >
+                {/* Changed to flag icon and neutral grey color */}
+                <Ionicons name="flag-outline" size={20} color="#666666" /> 
+              </StyledPressable>
+            )}
+          </StyledView>
+        );
+      })}
     </StyledView>
   );
 }
@@ -431,7 +434,7 @@ function WatchedIngredientsDisplay({ watchedIngredients }: { watchedIngredients:
 
   return (
     <StyledView style={styles.ingredientsCard}>
-      <SafeText value={"Observerade Ingredienser"} style={styles.watchedIngredientsTitle} />
+      <SafeText value={"Statusförklaring"} style={styles.watchedIngredientsTitle} />
       {nonVegan.length > 0 && (
         <StyledView style={{ marginBottom: uncertain.length > 0 ? 12 : 0 }}>
           <SafeText value={"Icke-veganska:"} style={[styles.watchedIngredientSectionTitle, { color: STATUS_COLORS['non-vegan'] }]} />

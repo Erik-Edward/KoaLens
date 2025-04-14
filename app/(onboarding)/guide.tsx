@@ -26,12 +26,14 @@ export default function GuideScreen() {
 
   return (
     <StyledView className="flex-1 bg-background-main">
-      {/* Content */}
-      <ScanGuideStep />
+      {/* Content - Wrap ScanGuideStep in ScrollView */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <ScanGuideStep />
+      </ScrollView>
 
-      {/* Navigation buttons */}
-      <StyledView className="px-6 pb-12">
-        <StyledView className="flex-row justify-between">
+      {/* Navigation buttons - Keep outside ScrollView */}
+      <StyledView className="px-6 pb-12 pt-4">
+        <StyledView className="flex-row justify-between items-center">
           <StyledPressable
             onPress={handleBack}
             className="py-4 px-6"
@@ -44,6 +46,9 @@ export default function GuideScreen() {
           <StyledPressable
             onPress={handleNext}
             className="bg-primary py-4 px-8 rounded-lg active:opacity-80"
+            style={({ pressed }) => ({
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            })}
           >
             <StyledText className="text-text-inverse font-sans-bold">
               Fortsätt

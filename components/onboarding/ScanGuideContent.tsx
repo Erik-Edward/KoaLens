@@ -15,8 +15,8 @@ interface GuideStepProps {
 export const ScanGuideContent: React.FC<GuideStepProps> = ({ title, description }) => {
   return (
     <StyledView className="flex-1 px-6">
-      {/* Använd padding-top för att flytta ner innehållet från toppen */}
-      <StyledView className="pt-16 flex-1">
+      {/* Reduced top padding from pt-16 to pt-8 */}
+      <StyledView className="pt-8 flex-1">
         {/* Title & Description */}
         <StyledView className="mb-8">
           <StyledText
@@ -32,8 +32,8 @@ export const ScanGuideContent: React.FC<GuideStepProps> = ({ title, description 
           </StyledText>
         </StyledView>
 
-        {/* Illustration med flex-1 för att ta upp resterande utrymme */}
-        <StyledView className="flex-1 justify-center">
+        {/* Illustration container */}
+        <StyledView className="justify-center items-center">
           <ScanGuideIllustration />
         </StyledView>
       </StyledView>

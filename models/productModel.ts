@@ -7,17 +7,18 @@ export interface WatchedIngredient {
   name: string;
   description?: string;
   reason?: string; // Behålls för eventuell bakåtkompatibilitet eller extra info
-  status: 'vegan' | 'non-vegan' | 'uncertain';
+  status: 'vegan' | 'non-vegan' | 'uncertain' | 'unknown';
 }
 
 export interface ProductAnalysis {
-  isVegan: boolean | null;
-  isUncertain: boolean;
-  confidence: number;
-  watchedIngredients: WatchedIngredient[];
-  reasoning?: string;
-  detectedLanguage?: string;
-  uncertainReasons?: string[];
+  isVegan: boolean | null; // True for vegan, False for non-vegan, Null for uncertain
+  isUncertain: boolean; // Explicit flag for uncertainty
+  confidence: number; // Confidence score (0-1)
+  watchedIngredients: WatchedIngredient[]; // List of ingredients flagged by backend rules (non-vegan/uncertain/vegan-but-watched)
+  traceIngredients: string[]; // *** ADDED: Names of ingredients found ONLY in trace warnings ***
+  reasoning?: string; // Explanation from the analysis
+  detectedLanguage?: string; // Detected language of the ingredients list
+  uncertainReasons?: string[]; // Specific reasons for uncertainty (now potentially an array of strings)
 }
 
 export interface ProductMetadata {
@@ -100,6 +101,7 @@ export function convertFromLegacyProduct(legacy: any): Product {
       isUncertain: isUncertain,
       confidence: legacy.confidence ?? 0.5,
       watchedIngredients,
+      traceIngredients: [],
       reasoning: legacy.reasoning || undefined,
       detectedLanguage: legacy.detectedLanguage,
       uncertainReasons: legacy.uncertainReasons ?? (isUncertain ? ["Äldre produkt, status osäker"] : undefined)

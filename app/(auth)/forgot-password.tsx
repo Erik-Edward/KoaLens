@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Alert as RNAlert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { Alert as CustomAlert } from '../../utils/alertUtils';
+
+// Logging the import
+console.log('ForgotPasswordScreen: CustomAlert import loaded');
 
 export default function ForgotPasswordScreen() {
   // Lägg till loggning för att bekräfta att komponenten laddas
@@ -20,39 +24,83 @@ export default function ForgotPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  // Validera email-format
+  const validateEmail = (email: string): boolean => {
+    // Snabb grundläggande validering
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      return false;
+    }
+    
+    // Mer omfattande validering med regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Funktion för att visa validerings-fel med React Native's inbyggda Alert
+  const showValidationError = () => {
+    console.log('ForgotPasswordScreen: Visar valideringsfel för e-post');
+    RNAlert.alert(
+      'Ogiltigt format',
+      'Ange en giltig e-postadress med korrekt format.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  // Funktion för att hantera lösenordsåterställning
   const handlePasswordResetRequest = async () => {
-    if (!email) {
-      Alert.alert('E-post saknas', 'Var god ange din e-postadress.');
+    console.log('ForgotPasswordScreen: handlePasswordResetRequest anropad med email:', email);
+    
+    // Validera e-post på klientsidan
+    if (!validateEmail(email)) {
+      showValidationError();
       return;
     }
-
+    
     setIsLoading(true);
     try {
+      console.log('ForgotPasswordScreen: Anropar supabase.auth.resetPasswordForEmail');
       const { error } = await supabase.auth.resetPasswordForEmail(email);
-
+      
       if (error) {
-        console.error('Error requesting password reset:', error);
-        // Visa ett generiskt meddelande för att inte avslöja om e-posten finns
-        Alert.alert(
-          'Begäran skickad',
-          'Om ett konto med den angivna e-postadressen finns, har ett återställningsmail skickats.',
-          [{ text: 'OK', onPress: () => router.back() }] // Gå tillbaka efter bekräftelse
-        );
+        console.error('ForgotPasswordScreen: Fel vid återställning:', error);
+        
+        // Kontrollera om felet handlar om validering av e-postadressen
+        if (String(error).toLowerCase().includes('invalid') || 
+            String(error).toLowerCase().includes('validate') ||
+            String(error).toLowerCase().includes('format')) {
+          console.log('ForgotPasswordScreen: Serverfel för e-postvalidering, visar felmeddelande');
+          RNAlert.alert(
+            'Ogiltigt format',
+            'E-postadressen har ett ogiltigt format. Kontrollera att du angett en giltig e-postadress.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          // För andra typer av fel visar vi ändå bekräftelsemeddelandetför att inte avslöja om kontot existerar
+          console.log('ForgotPasswordScreen: Annat fel, visar generiskt meddelande');
+          CustomAlert.alert(
+            'Begäran skickad',
+            'Om ett konto med den angivna e-postadressen finns, har ett återställningsmail skickats.',
+            [{ text: 'OK', onPress: () => router.back() }],
+            'info'
+          );
+        }
       } else {
-        Alert.alert(
+        // Vid framgång
+        console.log('ForgotPasswordScreen: Återställningsförfrågan lyckades, visar bekräftelse');
+        CustomAlert.alert(
           'Begäran skickad',
           'Om ett konto med den angivna e-postadressen finns, har ett återställningsmail skickats. Kolla din inkorg (och skräppost).',
-           [{ text: 'OK', onPress: () => router.back() }] // Gå tillbaka efter bekräftelse
+          [{ text: 'OK', onPress: () => router.back() }],
+          'success'
         );
       }
     } catch (err) {
-      // Catch any unexpected errors during the API call itself
-       console.error('Unexpected error during password reset request:', err);
-       Alert.alert(
+      console.error('ForgotPasswordScreen: Oväntat fel:', err);
+      RNAlert.alert(
         'Ett fel inträffade',
         'Kunde inte skicka begäran om lösenordsåterställning. Försök igen senare.',
         [{ text: 'OK' }]
-       );
+      );
     } finally {
       setIsLoading(false);
     }

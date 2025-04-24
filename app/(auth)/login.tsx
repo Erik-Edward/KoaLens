@@ -1,10 +1,11 @@
 // app/(auth)/login.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import { Alert } from '../../utils/alertUtils';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -40,22 +41,50 @@ export default function LoginScreen() {
       Alert.alert(
         'E-post verifierad',
         message,
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
+        'success'
       );
     }
   }, [verified, emailFromParams]);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Fel', 'Var god fyll i både e-post och lösenord.');
+      Alert.alert('Fel', 'Var god fyll i både e-post och lösenord.', undefined, 'error');
       return;
     }
     
     setIsLoading(true);
     try {
-      await signIn(email, password);
-    } catch (error) {
+      // Direkta anropet till Supabase istället för att använda signIn från AuthProvider
+      // Detta ger oss tillgång till det direkta felmeddelandet
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error('Login error from Supabase:', error);
+        
+        // Hantera olika felmeddelanden från Supabase
+        let errorMessage = 'Kunde inte logga in. Försök igen.';
+        
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'E-postadressen eller lösenordet är felaktigt. Kontrollera dina uppgifter och försök igen.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Din e-post har inte bekräftats. Kontrollera din inkorg för ett verifieringsmail.';
+        }
+        
+        Alert.alert('Inloggningsfel', errorMessage, undefined, 'error');
+        return;
+      }
+      
+      // Om ingen error, fortsätt med signIn för att uppdatera appens tillstånd
+      if (data.session) {
+        await signIn(email, password);
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
+      Alert.alert('Inloggningsfel', 'Ett oväntat fel inträffade. Försök igen senare.', undefined, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +95,7 @@ export default function LoginScreen() {
     const emailToUse = email || emailFromParams;
     
     if (!emailToUse) {
-      Alert.alert('E-post saknas', 'Ange din e-postadress för att skicka ett nytt verifieringsmail.');
+      Alert.alert('E-post saknas', 'Ange din e-postadress för att skicka ett nytt verifieringsmail.', undefined, 'warning');
       return;
     }
 
@@ -82,13 +111,13 @@ export default function LoginScreen() {
       });
 
       if (error) {
-        Alert.alert('Fel', error.message);
+        Alert.alert('Fel', error.message, undefined, 'error');
       } else {
-        Alert.alert('Verifieringsmail skickat', 'Kolla din inkorg och klicka på länken i mailet.');
+        Alert.alert('Verifieringsmail skickat', 'Kolla din inkorg och klicka på länken i mailet.', undefined, 'success');
       }
     } catch (error) {
       console.error('Error resending verification email:', error);
-      Alert.alert('Fel', 'Kunde inte skicka verifieringsmail');
+      Alert.alert('Fel', 'Kunde inte skicka verifieringsmail', undefined, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +126,7 @@ export default function LoginScreen() {
   // Funktion för att hantera begäran om glömt lösenord (visar formuläret)
   const handlePasswordResetRequest = async () => {
     if (!email) {
-      Alert.alert('E-post saknas', 'Var god ange din e-postadress.');
+      Alert.alert('E-post saknas', 'Var god ange din e-postadress.', undefined, 'warning');
       return;
     }
 
@@ -114,14 +143,16 @@ export default function LoginScreen() {
       Alert.alert(
         'Begäran skickad',
         'Om ett konto med den angivna e-postadressen finns, har ett återställningsmail skickats. Kolla din inkorg (och skräppost).',
-        [{ text: 'OK', onPress: () => setShowForgotPasswordForm(false) }]
+        [{ text: 'OK', onPress: () => setShowForgotPasswordForm(false) }],
+        'info'
       );
     } catch (err) {
       console.error('Unexpected error during password reset request:', err);
       Alert.alert(
         'Ett fel inträffade',
         'Kunde inte skicka begäran om lösenordsåterställning. Försök igen senare.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
+        'error'
       );
     } finally {
       setIsLoading(false);

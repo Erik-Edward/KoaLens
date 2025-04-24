@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { UserProfileSync } from '@/components/UserProfileSync';
 import { AppInitializer } from '@/components/AppInitializer';
 import { UpdateHandler } from '@/components/UpdateHandler';
+import { AlertInitializer } from '@/components/AlertInitializer';
 import theme from '@/constants/theme';
 import { styled } from 'nativewind';
 import { supabase } from '@/lib/supabase';
@@ -102,6 +103,7 @@ const RootLayout = () => {
           <AuthProvider>
             <UpdateHandler onUpdateComplete={handleUpdateComplete} />
             <AppInitializer onInitialized={handleInitialized} />
+            <AlertInitializer />
             <StatusBar 
               style="light"
               backgroundColor={theme.colors.background.main}

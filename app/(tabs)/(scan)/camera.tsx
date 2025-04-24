@@ -12,8 +12,10 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraGuide } from '@/components/CameraGuide';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
-import { logEvent, Events, logScreenView } from '@/lib/analytics';
+import { logScreenView, logEvent } from '@/lib/analyticsWrapper';
 import Animated, { useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { useIsFocused } from '@react-navigation/native';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -164,7 +166,7 @@ export default function CameraScreen() {
         recordingProgress.value = 0;
         
         addBreadcrumb('Starting video recording', 'camera');
-        logEvent(Events.VIDEO_RECORDING_STARTED);
+        logEvent('video_recording_started');
         
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
@@ -254,7 +256,7 @@ export default function CameraScreen() {
     recordingProgress.value = 0;
 
     addBreadcrumb('Video recording finished', 'camera', { path: video?.path });
-    logEvent(Events.VIDEO_RECORDING_COMPLETED, { duration: videoElapsedTime });
+    logEvent('video_recording_completed', { duration: videoElapsedTime });
 
     // 2. Validera videoobjekt och sökväg
     if (!video || !video.path) {
@@ -327,7 +329,7 @@ export default function CameraScreen() {
     setRecordingStartTime(null);
     
     // Logga fel
-    logEvent(Events.VIDEO_RECORDING_ERROR, { 
+    logEvent('video_recording_error', { 
       error_type: "camera_error",
       error_message: error instanceof Error ? error.message : "Unknown error"
     });
@@ -339,15 +341,27 @@ export default function CameraScreen() {
     );
   };
 
-  // Handle photo capture
+  // Handle photo capture - Modified to show alert and prevent usage
   const capturePhoto = async () => {
+    console.warn('capturePhoto called, but image analysis is disabled.');
+    logEvent('photo_capture_attempt_disabled');
+    // Reset capturing state immediately
+    setIsCapturing(false);
+    // Inform the user that photo capture is not supported
+    Alert.alert(
+      "Bildanalys inaktiverad",
+      "Att ta bilder för analys stöds inte längre. Använd videoinspelning istället.",
+      [{ text: "OK" }]
+    );
+    // Do not proceed with capturing or navigation
+    return;
+
+    /* Original photo capture logic (commented out):
     try {
       if (camera.current && !isCapturing) {
         setIsCapturing(true);
         addBreadcrumb('Capturing photo', 'camera');
-        
-        // Log that scanning has started
-        logEvent(Events.SCAN_STARTED);
+        logEvent('photo_capture_started');
         
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
@@ -376,7 +390,7 @@ export default function CameraScreen() {
       captureException(error instanceof Error ? error : new Error('Failed to take photo'));
       
       // Log scanning error
-      logEvent(Events.SCAN_ERROR, { 
+      logEvent('photo_capture_error', { 
         error_type: "camera_error",
         error_message: error instanceof Error ? error.message : "Unknown error"
       });
@@ -389,6 +403,7 @@ export default function CameraScreen() {
       
       setIsCapturing(false);
     }
+    */
   };
 
   // Hantera knapptryckning för foto/video

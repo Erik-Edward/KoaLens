@@ -28,6 +28,7 @@ try {
 }
 import { VeganStatus } from '@/stores/slices/createVeganStatusSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert as CustomAlert } from '@/utils/alertUtils';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -102,7 +103,7 @@ const ProfileScreen = () => {
   }, [avatarId, avatarStyle]);
 
   const handleSignOut = async () => {
-    Alert.alert(
+    CustomAlert.alert(
       'Logga ut',
       'Är du säker på att du vill logga ut?',
       [
@@ -237,7 +238,7 @@ const ProfileScreen = () => {
     } catch (error) {
       console.error('ProfileScreen: Error updating vegan status:', error);
       setIsUpdatingStatus(false);
-      Alert.alert('Fel', 'Kunde inte uppdatera vegansk status. Försök igen senare.');
+      CustomAlert.alert('Fel', 'Kunde inte uppdatera vegansk status. Försök igen senare.');
     }
   };
 
@@ -266,7 +267,7 @@ const ProfileScreen = () => {
         }
       } catch (error) {
         console.error('ProfileScreen: Error copying to clipboard:', error);
-        Alert.alert('Fel', 'Kunde inte kopiera e-postadressen. Försök igen senare.');
+        CustomAlert.alert('Fel', 'Kunde inte kopiera e-postadressen. Försök igen senare.');
       }
     }
   };

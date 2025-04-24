@@ -1,0 +1,326 @@
+ LOG  Opening camera for video
+ LOG  Checking camera permissions
+ LOG  Camera permission already granted
+ LOG  Analytics: Logging event video_recording_started {"app_version": 31, "platform": "android"}
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ LOG  Analytics: Logging screen view Camera
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead. [Component Stack]
+ LOG  Camera screen mounted
+ LOG  Starting recording via button press
+ LOG  Analytics: Logging event video_recording_started {"app_version": 31, "platform": "android"}
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ LOG  Starting video recording...
+ LOG  Maximal inspelningstid uppnådd, stoppar automatiskt...
+ LOG  Stopping video recording...
+ LOG  Video recording finished callback received: {"duration": 4.932, "height": 1080, "path": "/data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov", "width": 1920}
+ LOG  Analytics: Logging event video_recording_completed {"app_version": 31, "duration": 0, "platform": "android"}
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ LOG  Processing recorded video path: /data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov
+ LOG  Waiting 500ms before checking file existence...
+ LOG  Checking if file exists at multiple possible locations...
+ LOG  Kontrollerar om videofilen existerar på sökväg: /data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov
+ LOG  Ursprunglig sökväg info: {"exists": false, "isDirectory": false}
+ LOG  file:// sökväg info: {"exists": true, "isDirectory": false, "modificationTime": 1744795602, "size": 10491103, "uri": "file:///data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov"}
+ LOG  Video file confirmed to exist at path: file:///data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov
+ LOG  Attempting navigation to video screen with validated path: file:///data/user/0/com.erikedward.KoaLens/cache/mrousavy3217913456820518307.mov
+ LOG  AnalysisService: API_ENDPOINT är konfigurerad till: https://koalens-backend.fly.dev
+ LOG  AnalysisService: API_BASE_URL värde är: https://koalens-backend.fly.dev
+ LOG  AnalysisService: process.env.EXPO_PUBLIC_API_URL är: undefined
+ LOG  AnalysisService: Tillgängliga API-slutpunkter:
+ LOG  - TEXT_ANALYSIS_ENDPOINT: https://koalens-backend.fly.dev/api/ingredients/analyze
+ LOG  - IMAGE_ANALYSIS_ENDPOINT: https://koalens-backend.fly.dev/api/image/analyze
+ LOG  - VIDEO_ANALYSIS_ENDPOINT: https://koalens-backend.fly.dev/api/video/analyze-video
+ ERROR  Warning: Error: Text strings must be rendered within a <Text> component.
+
+This error is located at:
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RNCSafeAreaView
+    in Unknown (created by VideoScreen)
+    in VideoScreen
+    in Unknown (created by Route(video))
+    in Suspense (created by Route(video))
+    in Route (created by Route(video))
+    in Route(video) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by ScanLayout)
+    in ScanLayout
+    in Unknown (created by Route((scan)))
+    in Suspense (created by Route((scan)))
+    in Route (created by Route((scan)))
+    in Route((scan)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthProvider (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in ApiStatusProvider (created by Providers)
+    in Providers (created by RootLayout)
+    in RNGestureHandlerRootView (created by GestureHandlerRootView)
+    in GestureHandlerRootView (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent), js engine: hermes
+ ERROR  Uncaught error in component: [Error: Text strings must be rendered within a <Text> component.] {"componentStack": "
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RCTView (created by View)
+    in View
+    in NativeWind.View (created by VideoScreen)
+    in RNCSafeAreaView
+    in Unknown (created by VideoScreen)
+    in VideoScreen
+    in Unknown (created by Route(video))
+    in Suspense (created by Route(video))
+    in Route (created by Route(video))
+    in Route(video) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by ScanLayout)
+    in ScanLayout
+    in Unknown (created by Route((scan)))
+    in Suspense (created by Route((scan)))
+    in Route (created by Route((scan)))
+    in Route((scan)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by BottomTabNavigator)
+    in RCTView (created by View)
+    in View (created by Screen)
+    in RCTView (created by View)
+    in View (created by Animated(View))
+    in Animated(View) (created by Background)
+    in Background (created by Screen)
+    in Screen (created by BottomTabView)
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen (created by MaybeScreen)
+    in MaybeScreen (created by BottomTabView)
+    in RNSScreenContainer (created by ScreenContainer)
+    in ScreenContainer (created by MaybeScreenContainer)
+    in MaybeScreenContainer (created by BottomTabView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by BottomTabView)
+    in BottomTabView (created by BottomTabNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by BottomTabNavigator)
+    in BottomTabNavigator
+    in Unknown (created by TabLayout)
+    in TabLayout
+    in Unknown (created by Route((tabs)))
+    in Suspense (created by Route((tabs)))
+    in Route (created by Route((tabs)))
+    in Route((tabs)) (created by SceneView)
+    in StaticContainer
+    in EnsureSingleNavigator (created by SceneView)
+    in SceneView (created by NativeStackNavigator)
+    in RNSScreenContentWrapper (created by ScreenContentWrapper)
+    in ScreenContentWrapper (created by DebugContainer)
+    in DebugContainer
+    in RNSScreen (created by Animated(Anonymous))
+    in Animated(Anonymous)
+    in Suspender (created by Freeze)
+    in Suspense (created by Freeze)
+    in Freeze (created by DelayedFreeze)
+    in DelayedFreeze
+    in InnerScreen (created by Screen)
+    in Screen
+    in ScreenStackItem (created by SceneView)
+    in SceneView (created by NativeStackView)
+    in RNSScreenStack (created by ScreenStack)
+    in Unknown (created by ScreenStack)
+    in ScreenStack (created by NativeStackView)
+    in RCTView (created by View)
+    in View (created by SafeAreaProviderCompat)
+    in SafeAreaProviderCompat (created by NativeStackView)
+    in NativeStackView (created by NativeStackNavigator)
+    in PreventRemoveProvider (created by NavigationContent)
+    in NavigationContent
+    in Unknown (created by NativeStackNavigator)
+    in NativeStackNavigator
+    in Unknown (created by RootLayout)
+    in AuthProvider (created by RootLayout)
+    in ErrorBoundary (created by RootLayout)
+    in ApiStatusProvider (created by Providers)
+    in Providers (created by RootLayout)
+    in RNGestureHandlerRootView (created by GestureHandlerRootView)
+    in GestureHandlerRootView (created by RootLayout)
+    in RootLayout
+    in Unknown (created by Route())
+    in Suspense (created by Route())
+    in Route (created by Route())
+    in Route() (created by ContextNavigator)
+    in RNCSafeAreaProvider (created by SafeAreaProvider)
+    in SafeAreaProvider (created by wrapper)
+    in wrapper (created by ContextNavigator)
+    in ThemeProvider
+    in EnsureSingleNavigator
+    in BaseNavigationContainer
+    in NavigationContainerInner (created by ContextNavigator)
+    in ContextNavigator (created by ExpoRoot)
+    in ExpoRoot (created by App)
+    in App (created by ErrorOverlay)
+    in ErrorToastContainer (created by ErrorOverlay)
+    in ErrorOverlay (created by withDevTools(ErrorOverlay))
+    in withDevTools(ErrorOverlay)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in RCTView (created by View)
+    in View (created by AppContainer)
+    in AppContainer
+    in main(RootComponent)"} [Component Stack]
+ LOG  Navigation to video screen initiated successfully.
+ LOG  AuthProvider: Städar upp deep link lyssnare
+ LOG  AuthProvider: Städar upp auth state change lyssnare
+ LOG  HomeScreen unmounted

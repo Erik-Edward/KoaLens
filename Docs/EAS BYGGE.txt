@@ -2,22 +2,34 @@
 
 2. $env:EAS_NO_VCS=1
 
-3. eas build --platform android --profile preview
+# --- ANTECKNINGAR OCH GAMLA KOMMANDON --- 
 
+# Kör ett preview-bygge (används sällan nu)
+# eas build --platform android --profile preview
 
+# --- NYA REKOMMENDERADE SCRIPTS (från package.json) --- 
 
-
-# Skapa en ny development build
+# Skapa en ny development build (för lokal utveckling med dev client)
 npm run build:dev
 
+# Skapa ett produktionsbygge (för Google Play Testing Tracks & Release)
+# Detta är kommandot du oftast använder för att bygga inför release/testning via Play Store
+npm run build:production
+
+# --- OTA-UPPDATERINGAR (endast kodändringar, inte native) --- 
 
 # Uppdatera JavaScript/TypeScript-kod på en existerande build
 npm run update:dev
-
+# npm run update:preview # (om preview-kanal används)
+# eas update --branch production # (för produktionskanalen)
 
 # Starta en utvecklingsserver för dev-client
 npm run dev:client
 
+# Enklaste sättet att uppdatera
+# Manuell OTA-uppdatering (använd npm run update:* istället)
+# $env:EAS_NO_VCS=1
+# eas update
 
-Dessa script kommer att automatiskt använda EAS_NO_VCS=1 flaggan för att undvika Git-relaterade problem.
-När du kör update-scripten, ska ändringar du gjort i JavaScript/TypeScript-koden skickas till ditt befintliga dev-bygge utan att behöva bygga en ny APK.
+# Viktigt: Scripten i package.json använder `cross-env EAS_NO_VCS=1` för att undvika Git-problem.
+# För att bygga för Google Play Testing (Internal, Closed, Open) eller för publik release, använd `npm run build:production`.

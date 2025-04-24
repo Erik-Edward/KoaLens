@@ -294,6 +294,7 @@ export const useProducts = (userId?: string) => {
         isUncertain: analysisData.isUncertain ?? (analysisData.isVegan === null), // Infer if null
         confidence: analysisData.confidence ?? 0.5,
         watchedIngredients: analysisData.watchedIngredients || [],
+        traceIngredients: [],
         reasoning: analysisData.reasoning,
         detectedLanguage: analysisData.detectedLanguage,
         uncertainReasons: analysisData.uncertainReasons,

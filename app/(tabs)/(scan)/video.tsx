@@ -1,24 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, Alert, ActivityIndicator, Platform, Image, AppState, AppStateStatus } from 'react-native';
-import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { StyleSheet, Alert, ActivityIndicator, Platform, AppState, AppStateStatus } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { styled } from 'nativewind';
 import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import * as KeepAwake from 'expo-keep-awake';
 
 import VideoRecorder from '@/components/VideoRecorder';
 import { AnalysisService } from '@/services/analysisService';
-// Bortkommenterar lottie-import eftersom det verkar saknas
-// import LottieView from 'lottie-react-native';
 import { useApiStatus } from '@/contexts/ApiStatusContext';
-import { API_BASE_URL } from '@/constants/config';
 import { useCounter } from '@/hooks/useCounter';
 import { UsageLimitModal } from '@/components/UsageLimitModal';
 
@@ -26,784 +21,630 @@ const StyledView = styled(View);
 const StyledText = styled(Text);
 const StyledPressable = styled(Pressable);
 
-// Definiera typer för analysstatus
+// Define analysis states and steps
 type AnalysisState = 'idle' | 'analyzing' | 'preparing_results' | 'error';
 type AnalysisStep = 'uploading' | 'optimizing' | 'analyzing' | 'processing' | 'complete';
 
-const VIDEO_DEBUG_VERSION = "2025-04-07-12:00"; // Tillagt för att visa uppdateringsversion
+// --- Helper Function: Generate Mock Data ---
+// Included here as it was missing according to linter
+const generateMockVideoAnalysisResult = () => {
+  return {
+    isVegan: false,
+    isUncertain: false,
+    confidence: 0.85,
+    ingredientList: [
+      { name: "Socker", status: "vegan" },
+      { name: "Vetemjöl", status: "vegan" },
+      { name: "Mjölk", status: "non-vegan" },
+      { name: "Vegetabiliska oljor (palm, raps)", status: "vegan" },
+      { name: "Salt", status: "vegan" },
+      { name: "Emulgeringsmedel (sojalecitin)", status: "vegan" },
+      { name: "Arom", status: "uncertain" }
+    ],
+    watchedIngredients: [
+      {
+        name: "Mjölk",
+        status: "non-vegan",
+        reason: "Mjölk är en animalisk produkt som kommer från kor"
+      }
+    ],
+    traceIngredients: ["Nötter"],
+    reasoning: "OBS! DETTA ÄR DEMO-DATA. Produkten innehåller mjölk vilket är en animalisk produkt och därför inte vegansk.",
+    detectedLanguage: "sv",
+    isMock: true // Flag as mock data
+  };
+};
+
 
 /**
- * Skärm för videoanalys där användaren kan spela in en video 
- * och få ingredienserna analyserade
+ * Screen for video analysis. Allows recording a video and analyzing its ingredients.
  */
 function VideoScreen() {
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ videoPath?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { videoApiStatus, checkApiAvailability } = useApiStatus();
+  const { checkApiAvailability } = useApiStatus(); // Assuming videoApiStatus is not directly used here anymore
+
+  // Core State
   const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [videoPlayerError, setVideoPlayerError] = useState(false);
-  const [usingMockData, setUsingMockData] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const analysisService = new AnalysisService();
-  const processingRef = useRef(false);
-  const maxRetries = 2;
-  const [videoApiAvailable, setVideoApiAvailable] = useState(true);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [mockData, setMockData] = useState(false);
-  const requestIdRef = useRef<string | null>(null);
-  const [requestCancelled, setRequestCancelled] = useState(false);
-  const lastRequestTimeRef = useRef<number>(0);
-  const MIN_REQUEST_INTERVAL = 3000;
-  const processedVideoPathRef = useRef<string | null>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
-  const [isLimitModalVisible, setLimitModalVisible] = useState(false);
-  
-  // Ny state för progress-tracking
+  const [error, setError] = useState<string | null>(null);
+
+  // Progress Tracking State
   const [progressValue, setProgressValue] = useState(0);
   const [currentStep, setCurrentStep] = useState<AnalysisStep>('uploading');
   const [stepMessage, setStepMessage] = useState('Förbereder...');
-  
-  const {
-    checkLimit,
-    recordAnalysis,
-    loading: counterLoading
-  } = useCounter('analysis_count');
 
-  // Uppdatera progress och meddelande baserat på analysläge
+  // Refs for controlling analysis flow
+  const processingRef = useRef(false); // Is an analysis currently running?
+  const processedVideoPathRef = useRef<string | null>(null); // Which path was last processed?
+  const requestIdRef = useRef<string | null>(null); // Unique ID for the current analysis request
+  const isCancelledRef = useRef(false); // Flag if user cancelled
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For storing navigation timeout
+  const isMountedRef = useRef(true); // Track if component is mounted
+
+  // State for Retry Limit
+  const [retryAttempted, setRetryAttempted] = useState(false);
+
+  // Hooks and Services
+  const analysisService = useRef(new AnalysisService()).current; // Use ref for stability
+  const { checkLimit, recordAnalysis, loading: counterLoading } = useCounter('analysis_count');
+  const [isLimitModalVisible, setLimitModalVisible] = useState(false);
+
+  // --- Effect: Initialize from Parameters ---
   useEffect(() => {
-    let animationInterval: NodeJS.Timeout;
-    let stepChangeTimeout: NodeJS.Timeout;
+    const initialize = async () => {
+      const newVideoPath = params.videoPath;
+      console.log('VideoScreen: useEffect[params] - Initializing with path:', newVideoPath);
+
+      // Skip initialization if already processing to prevent loops
+      if (processingRef.current && analysisState === 'analyzing') {
+        console.log('VideoScreen: Already processing. Skipping re-initialization to prevent loops.');
+        return;
+      }
+
+      if (!newVideoPath) {
+        console.log('VideoScreen: No videoPath in params. Resetting.');
+        setVideoUri(null);
+        setError(null);
+        setAnalysisState('idle');
+        processingRef.current = false;
+        processedVideoPathRef.current = null;
+        isCancelledRef.current = false;
+        // Reset UI state explicitly
+        setProgressValue(0);
+        setCurrentStep('uploading');
+        setStepMessage('Förbereder...');
+        return;
+      }
+
+      // Only proceed if it's a genuinely new path and we're not already processing
+      if (newVideoPath !== processedVideoPathRef.current && !processingRef.current) {
+        console.log('VideoScreen: New video path detected. Resetting state.');
+        // Reset all relevant states
+        setAnalysisState('idle');
+        setProgressValue(0);
+        setCurrentStep('uploading');
+        setStepMessage('Förbereder...');
+        setError(null);
+        setVideoUri(null); // Clear previous video display if any
+        isCancelledRef.current = false; // Reset cancellation flag
+        setRetryAttempted(false); // Reset retry flag for new video
+        processedVideoPathRef.current = newVideoPath; // Mark this path as the one we are starting to process
+
+        try {
+          const fileCheck = await checkFileExists(newVideoPath);
+          if (fileCheck.exists) {
+            const validPath = fileCheck.validPath || newVideoPath;
+            console.log('VideoScreen: Validated path:', validPath);
+            setVideoUri(validPath); // Set URI for potential display or later use
+
+            // Schedule the analysis to start
+            // Use requestAnimationFrame for smoother UI transition before heavy task
+            console.log('VideoScreen: Scheduling analysis for:', validPath);
+            processingRef.current = true; // Mark as processing *before* calling analyzeVideo
+            requestAnimationFrame(() => analyzeVideo(validPath));
+          } else {
+            console.warn('VideoScreen: Video file not found:', newVideoPath);
+            setError('Videofilen kunde inte hittas. Försök spela in igen.');
+            setAnalysisState('error');
+            processingRef.current = false; // Ensure reset on error
+          }
+        } catch (err) {
+          console.error('VideoScreen: Error during file validation:', err);
+          setError('Kunde inte validera videofilen. Försök spela in igen.');
+          setAnalysisState('error');
+          processingRef.current = false; // Ensure reset on error
+        }
+      } else {
+        console.log('VideoScreen: Either videoPath is the same as already processed or processing is in progress. Ignoring initialization.');
+      }
+    };
+
+    initialize();
+  }, [params.videoPath]); // Depend only on path change
+
+  // --- Effect: Progress Bar Animation ---
+  useEffect(() => {
+    let animationInterval: NodeJS.Timeout | null = null;
     
     if (analysisState === 'analyzing') {
-      // Starta från 0
-      setProgressValue(0);
-      setCurrentStep('uploading');
-      setStepMessage('Laddar upp och förbereder video...');
-      
-      // Animera progress och uppdatera steg automatiskt - snabbare för att matcha 10-12 sekunders analys
+      setProgressValue(0); // Start animation from 0
       animationInterval = setInterval(() => {
-        setProgressValue(prev => {
-          // Högre ökningshastighet för att matcha 10-12 sekunders analys
-          const increment = prev < 30 ? 6 : prev < 60 ? 4 : 3;
-          const nextValue = Math.min(prev + increment, 95);
-          return nextValue;
-        });
-      }, 200); // Snabbare uppdateringar
-      
-      // Kortare tidsintervall mellan faser
-      stepChangeTimeout = setTimeout(() => {
-        setCurrentStep('optimizing');
-        setStepMessage('Optimerar video för analys...');
-        
-        setTimeout(() => {
-          setCurrentStep('analyzing');
-          setStepMessage('Analyserar ingredienser med AI...');
-          
-          setTimeout(() => {
-            setCurrentStep('processing');
-            setStepMessage('Bearbetar analysresultat...');
-          }, 3000); // 3 sekunder istället för 8
-        }, 2000); // 2 sekunder istället för 5
-      }, 1500); // 1.5 sekunder istället för 3
+        if (isMountedRef.current && !isCancelledRef.current) {
+          setProgressValue(prev => Math.min(prev + 5, 95)); // Simple increment up to 95%
+        } else {
+          // Clear interval if component is no longer mounted
+          if (animationInterval) {
+            clearInterval(animationInterval);
+            animationInterval = null;
+          }
+        }
+      }, 250);
     } else if (analysisState === 'preparing_results') {
-      setProgressValue(95);
-      setCurrentStep('complete');
-      setStepMessage('Slutför analys...');
-      
-      // Avsluta animationen vid 100%
+      setProgressValue(95); // Jump to 95%
       animationInterval = setInterval(() => {
-        setProgressValue(prev => {
-          const nextValue = Math.min(prev + 2, 100); // Snabbare slutförande
-          return nextValue;
-        });
-      }, 50); // Snabbare slutanimation
+        if (isMountedRef.current && !isCancelledRef.current) {
+          setProgressValue(prev => {
+            const nextValue = Math.min(prev + 5, 100);
+            if (nextValue === 100 && animationInterval) {
+              clearInterval(animationInterval); // Stop at 100%
+              animationInterval = null;
+            }
+            return nextValue;
+          });
+        } else {
+          // Clear interval if component is no longer mounted
+          if (animationInterval) {
+            clearInterval(animationInterval);
+            animationInterval = null;
+          }
+        }
+      }, 100); // Faster animation to 100%
     } else {
-      // Återställ progress när vi inte analyserar
-      setProgressValue(0);
+      setProgressValue(0); // Reset progress if not analyzing/preparing
     }
-    
-    return () => {
-      if (animationInterval) clearInterval(animationInterval);
-      if (stepChangeTimeout) clearTimeout(stepChangeTimeout);
+
+    return () => { // Cleanup interval on state change or unmount
+      if (animationInterval) {
+        clearInterval(animationInterval);
+      }
     };
   }, [analysisState]);
 
-  // Hantera app-state för att hålla analysen igång även i bakgrunden
+  // --- Effect: Keep Awake & App State ---
   useEffect(() => {
-    // Aktivera "håll skärmen på" när vi analyserar för att förhindra att telefonen går i viloläge
     if (analysisState === 'analyzing' || analysisState === 'preparing_results') {
       KeepAwake.activateKeepAwake();
     } else {
       KeepAwake.deactivateKeepAwake();
     }
-    
-    // Lyssna på app-state förändringar
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
       console.log('App state changed to:', nextAppState);
-      
-      // Fortsätt analysprocessen även om appen är i bakgrunden
-      if (analysisState === 'analyzing' && nextAppState === 'active') {
-        // Appen kom tillbaka från bakgrunden, kolla om analysen fortfarande pågår
-        console.log('App came back to foreground, checking analysis status...');
-        
-        // Visa ett meddelande om att vi fortfarande processar
-        if (currentStep === 'uploading' || currentStep === 'optimizing') {
-          setStepMessage('Fortsätter analys...');
-        }
-      }
-    });
-    
+      // Optional: Add logic here if needed when app returns to foreground during analysis
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
-      // Rensa prenumerationen när komponenten avmonteras
       subscription.remove();
-      
-      // Inaktivera håll skärmen på
-      KeepAwake.deactivateKeepAwake();
+      KeepAwake.deactivateKeepAwake(); // Ensure deactivation on unmount
     };
-  }, [analysisState, currentStep]);
+  }, [analysisState]);
 
-  useEffect(() => {
-    const initializeFromParams = async () => {
-      try {
-        console.log('VideoScreen: Initializing from params:', params);
-        
-        if (params.videoPath) {
-          const videoPath = params.videoPath as string;
-          console.log('VideoScreen: Received videoPath from params:', videoPath);
-          
-          if (videoPath === processedVideoPathRef.current) {
-            console.log('VideoScreen: videoPath from params already processed, skipping analyzeVideo call.');
-            return;
-          }
-          
-          try {
-            const fileCheck = await checkFileExists(videoPath);
-            
-            if (fileCheck.exists) {
-              const validPath = fileCheck.validPath || videoPath;
-              console.log('VideoScreen: Setting validated videoPath:', validPath);
-              setVideoUri(validPath);
-              
-              if (!processingRef.current) {
-                processedVideoPathRef.current = videoPath;
-                setAnalysisState('analyzing');
-                processingRef.current = true;
-                setTimeout(() => analyzeVideo(validPath), 500);
-              }
-            } else {
-              console.warn('VideoScreen: Received video path does not exist, setting error:', videoPath);
-              setVideoUri(videoPath);
-              setError('Videofilen kunde inte hittas. Försök spela in igen.');
-              setAnalysisState('error');
-            }
-          } catch (error) {
-            console.error('VideoScreen: Error validating video path, setting error:', error);
-            setVideoUri(videoPath);
-            setError('Kunde inte validera videofilen. Försök spela in igen.');
-            setAnalysisState('error');
-          }
-        } else {
-          console.log('VideoScreen: No videoPath in params, starting fresh recording flow');
-          setAnalysisState('idle');
-        }
-      } catch (error) {
-        console.error('VideoScreen: Error during initialization:', error);
-        setError('Ett oväntat fel uppstod vid initiering.');
-        setAnalysisState('error');
-      }
-    };
+   // --- Effect: Check API Availability ---
+   useEffect(() => {
+       checkApiAvailability();
+   }, [checkApiAvailability]); // Include dependency
 
-    initializeFromParams();
-  }, [params]);
-
-  useEffect(() => {
-    checkApiAvailability();
-  }, []);
-
+  // --- File Handling ---
   const checkFileExists = async (path: string): Promise<{ exists: boolean, validPath?: string }> => {
-    console.log('Kontrollerar om videofilen existerar på sökväg:', path);
-    
+    console.log('Checking file existence for:', path);
     try {
-      const originalPathInfo = await FileSystem.getInfoAsync(path);
-      console.log('Ursprunglig sökväg info:', originalPathInfo);
-      if (originalPathInfo.exists) {
-        return { exists: true, validPath: path };
-      }
-    } catch (error) {
-      console.log('Fel vid kontroll av ursprunglig sökväg:', error);
-    }
-    
-    if (!path.startsWith('file://')) {
-      const filePath = `file://${path}`;
-      try {
-        const filePathInfo = await FileSystem.getInfoAsync(filePath);
-        console.log('file:// sökväg info:', filePathInfo);
-        if (filePathInfo.exists) {
-          return { exists: true, validPath: filePath };
+        // Try original path first
+        let info = await FileSystem.getInfoAsync(path);
+        if (info.exists) return { exists: true, validPath: path };
+
+        // If not found, try adding file:// prefix (common on Android)
+        if (!path.startsWith('file://')) {
+            const filePathUri = `file://${path}`;
+            info = await FileSystem.getInfoAsync(filePathUri);
+            if (info.exists) return { exists: true, validPath: filePathUri };
         }
-      } catch (error) {
-        console.log('Fel vid kontroll av file:// sökväg:', error);
-      }
-    }
-    
-    try {
-      const cacheDir = FileSystem.cacheDirectory;
-      const fileName = path.split('/').pop();
-      if (cacheDir && fileName) {
-        const cachePath = `${cacheDir}${fileName}`;
-        const cachePathInfo = await FileSystem.getInfoAsync(cachePath);
-        console.log('Cache sökväg info:', cachePathInfo);
-        if (cachePathInfo.exists) {
-          return { exists: true, validPath: cachePath };
+
+        // As a last resort, check cache directory (common on iOS simulator/exports)
+        const cacheDir = FileSystem.cacheDirectory;
+        const fileName = path.split('/').pop();
+        if (cacheDir && fileName) {
+             const cachePath = `${cacheDir}${fileName}`;
+             info = await FileSystem.getInfoAsync(cachePath);
+             if (info.exists) return { exists: true, validPath: cachePath };
         }
-      }
+
     } catch (error) {
-      console.log('Fel vid kontroll av cache sökväg:', error);
+        console.warn('Error checking file existence:', error);
+        // Fallthrough to return false
     }
-    
+    console.log('File check failed for all paths derived from:', path);
     return { exists: false };
   };
 
-  const handleVideoRecorded = async (uri: string) => {
-    console.log('Video inspelad till:', uri);
-    
-    if (processingRef.current) {
-      console.log('Redan bearbetar en video, ignorerar ny inspelning');
-      return;
-    }
-    
-    const now = Date.now();
-    if (now - lastRequestTimeRef.current < MIN_REQUEST_INTERVAL) {
-      console.log('För tidigt att starta ny analys, ignorerar begäran');
-      Alert.alert(
-        'Vänta lite',
-        'Du kan inte starta en ny analys så snabbt efter den förra. Vänta några sekunder och försök igen.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    lastRequestTimeRef.current = now;
-    
-    requestIdRef.current = uuidv4();
-    console.log('Nytt requestId genererat:', requestIdRef.current);
-    
-    setVideoUri(uri);
+  // --- Core Analysis Logic ---
+  const analyzeVideo = async (uriToAnalyze: string) => {
+    console.log(`analyzeVideo: Starting for ${uriToAnalyze}`);
+    isCancelledRef.current = false; // Ensure cancellation flag is reset
+    requestIdRef.current = uuidv4(); // Generate unique ID for this request
+
+    // 1. Set UI state to analyzing
     setAnalysisState('analyzing');
-    processingRef.current = true;
-    setRequestCancelled(false);
-    
-    setTimeout(async () => {
-      try {
-        const fileCheck = await checkFileExists(uri);
-        if (!fileCheck.exists) {
-          console.warn('Video fil hittades inte efter inspelning:', uri);
-          setError('Videofilen verkar ha försvunnit direkt efter inspelning. Försök igen.');
-          setAnalysisState('error');
-          processingRef.current = false;
-          return;
-        }
-        
-        const validVideoUri = fileCheck.validPath || uri;
-        console.log('Använder validerad video sökväg:', validVideoUri);
-        setVideoUri(validVideoUri); 
-        
-        analyzeVideo(validVideoUri);
-      } catch (error) {
-        console.error('Fel vid validering av videofil efter inspelning:', error);
-        setError('Kunde inte validera videofilen. Försök igen.');
-        setAnalysisState('error');
-        processingRef.current = false;
+    setCurrentStep('analyzing'); // Use a generic step during analysis
+    setStepMessage('Analyserar video...');
+    setError(null); // Clear previous errors
+
+    // 2. Check Usage Limits
+    try {
+      if (counterLoading) {
+         console.log("analyzeVideo: Waiting for counter loading to finish...");
+         // Optionally wait or show a message, here we just proceed cautiously
       }
-    }, 100);
-  };
-
-  const handleCancel = () => {
-    if (analysisState === 'analyzing') { 
-      Alert.alert(
-        'Avbryta analys?',
-        'Vill du avbryta den pågående analysen?',
-        [
-          { text: 'Fortsätt analys', style: 'cancel' },
-          { 
-            text: 'Avbryt', 
-            style: 'destructive', 
-            onPress: () => {
-              console.log('Avbryter analys, requestId:', requestIdRef.current);
-              setRequestCancelled(true);
-              processingRef.current = false;
-              setAnalysisState('idle');
-              setVideoUri(null);
-              router.back();
-            } 
-          }
-        ]
-      );
-    } else {
-      setAnalysisState('idle');
-      setVideoUri(null);
-      router.back();
+      const limitCheck = await checkLimit();
+      if (!limitCheck.allowed) {
+        console.log('analyzeVideo: Usage limit reached.');
+        setLimitModalVisible(true);
+        setAnalysisState('idle'); // Go back to idle
+        processingRef.current = false; // Allow new attempt later
+        return;
+      }
+      console.log('analyzeVideo: Usage limit OK.');
+    } catch (limitError) {
+      console.error('analyzeVideo: Failed to check usage limit:', limitError);
+      // Proceed despite error in limit checking
     }
-  };
 
-  const analyzeVideo = async (uriToAnalyze?: string) => {
-    const currentVideoUri = uriToAnalyze || videoUri; 
-    
-    if (!currentVideoUri) {
-      console.error('analyzeVideo anropad utan videoUri.');
-      setError('Ingen video vald för analys.');
-      setAnalysisState('error');
+    if (isCancelledRef.current || !isMountedRef.current) {
+      console.log("analyzeVideo: Cancelled before API call or component unmounted.");
+      setAnalysisState('idle');
       processingRef.current = false;
       return;
     }
 
-    // ---- NY KOD: Kontrollera användningsgräns ----
+    // 3. Call Backend Service
     try {
-      console.log('Kontrollerar användningsgräns...');
-      const limitCheck = await checkLimit();
-      
-      if (!limitCheck.allowed) {
-        console.log('Användningsgräns nådd.');
-        setLimitModalVisible(true); // Visa modal
+      console.log(`analyzeVideo: Calling analysisService.analyzeVideo with requestId: ${requestIdRef.current}`);
+      // --- MOCK DATA SWITCH ---
+      const MOCK_ENABLED = false; // Set to true to force mock data for testing
+      let backendResult;
+      if (MOCK_ENABLED) {
+          console.warn("analyzeVideo: MOCK DATA ENABLED!");
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+          backendResult = generateMockVideoAnalysisResult();
+      } else {
+         // --- Actual API Call ---
+         try {
+             backendResult = await analysisService.analyzeVideo(uriToAnalyze, requestIdRef.current);
+             console.log('analyzeVideo: API call successful.');
+         } catch (apiError: any) {
+             console.error('analyzeVideo: API call failed:', apiError);
+             // Always re-throw the error to be caught by the outer catch block
+             throw apiError;
+         }
+      }
+      // --- End API Call / Mock Data ---
+
+      if (isCancelledRef.current || !isMountedRef.current) {
+        console.log("analyzeVideo: Cancelled after API call returned or component unmounted.");
         setAnalysisState('idle');
         processingRef.current = false;
-        return; // Avbryt analysen
-      }
-      console.log('Användningsgräns OK, återstående:', limitCheck.remaining);
-    } catch (limitError) {
-      console.error('Fel vid kontroll av användningsgräns:', limitError);
-      // Fortsätt ändå, men logga felet
-      // Alternativt, visa ett felmeddelande
-      // setError('Kunde inte kontrollera användningsgränsen.');
-      // setAnalysisState('error');
-      // processingRef.current = false;
-      // return;
-    }
-    // ---- SLUT PÅ NY KOD ----
-
-    console.log('Validerad video sökväg för analys:', currentVideoUri);
-    setAnalysisState('analyzing');
-    setRetryCount(0); 
-    
-    try {
-      console.log('Skickar begäran med requestId:', requestIdRef.current);
-      
-      if (requestCancelled) {
-        console.log('Analys avbruten innan API-anrop skickades.');
-        processingRef.current = false;
-        setAnalysisState('idle');
-        return; 
-      }
-      
-      console.log('Före anrop till analysisService.analyzeVideo - videoApiStatus:', videoApiStatus);
-      console.log('Anropar analysisService.analyzeVideo med URI:', currentVideoUri.substring(0, 30) + '...');
-      
-      let result;
-      try {
-        result = await analysisService.analyzeVideo(currentVideoUri, requestIdRef.current);
-        
-        console.log('Resultat från analysisService.analyzeVideo mottaget:', result ? 'data finns' : 'null');
-      } catch (apiError: any) {
-        console.error('Fel vid analysisService.analyzeVideo:', apiError);
-        console.error('Fel meddelande:', apiError.message);
-        console.error('Stack:', apiError.stack);
-        
-        // TILLFÄLLIG FIX: Om felet har att göra med API tillgänglighet, ignorera det
-        if (apiError.message === 'Video analysis API is not available') {
-          console.log('OVERRIDE: Ignorerar "API not available" fel och genererar mock-data');
-          // Generera mock-data istället för att kasta felet vidare
-          const mockResult = generateMockVideoAnalysisResult();
-          console.log('Mock-data genererad');
-          setAnalysisState('preparing_results');
-          navigateToResults(mockResult, currentVideoUri);
-          return;
-        }
-        
-        throw apiError; // Kasta vidare andra fel
-      }
-      
-      if (requestCancelled) {
-         console.log('Analys avbruten efter API-anrop slutfördes men innan navigering.');
-         processingRef.current = false;
-         setAnalysisState('idle');
-         return; 
-      }
-      
-      if (!result || !result.ingredientList || result.ingredientList.length === 0) {
-         throw new Error('Kunde inte identifiera några ingredienser i videon. Kontrollera att hela ingredienslistan var synlig och välbelyst i videon. Försök igen.');
-      }
-      
-      console.log('Analysresultat:', JSON.stringify(result).substring(0, 100) + '...');
-      setAnalysisState('preparing_results');
-
-      // ---- NY KOD: Registrera analys ----
-      try {
-        console.log('Registrerar analys...');
-        await recordAnalysis(); 
-        console.log('Analys registrerad!');
-      } catch (recordError) {
-        console.error('Fel vid registrering av analys:', recordError);
-        // Fortsätt ändå, men logga felet
-      }
-      // ---- SLUT PÅ NY KOD ----
-
-      navigateToResults(result, currentVideoUri);
-      
-    } catch (err: any) {
-      console.error('Fel under analysprocessen:', err);
-      
-      if (requestCancelled) {
-        console.log('Fel inträffade, men analysen var redan avbruten.');
-        processingRef.current = false;
-        setAnalysisState('idle');
         return;
       }
 
-      let errorMessage = err.message || 'Ett okänt fel uppstod under analysen.';
-
-      // Lägg till specifik felhantering för duplicerad begäran
-      if (errorMessage.includes('Duplicate request') || errorMessage.includes('Analysen pågår redan')) {
-        errorMessage = 'Analysen pågår redan för denna video. Vänta ett ögonblick.';
-        // Behåll analysläget som 'analyzing'?
-        setAnalysisState('analyzing'); 
-      } else {
-        setError(errorMessage);
-        setAnalysisState('error');
+      // Basic validation of result structure
+      if (!backendResult || !backendResult.ingredientList) {
+         console.error("analyzeVideo: Invalid result structure from backend:", backendResult);
+         throw new Error('Ogiltigt svar från analysservern.');
       }
       
-      // Reset processingRef only if it's not a duplicate request error
-      if (!errorMessage.includes('Analysen pågår redan')) {
-        processingRef.current = false;
+      // Only throw error for empty list if it's NOT mock data 
+      if (backendResult.ingredientList.length === 0 && !MOCK_ENABLED) { 
+         throw new Error('Kunde inte identifiera några ingredienser. Kontrollera att listan var tydlig i videon.');
       }
+
+      console.log('analyzeVideo: Analysis successful. Preparing results.');
+      setAnalysisState('preparing_results');
+
+      // 4. Record Analysis (Fire-and-forget)
+      recordAnalysis().catch(err => console.error("analyzeVideo: Failed to record analysis:", err));
+
+      // 5. Navigate to Results
+      // Add a slight delay before navigating to allow the "preparing_results" UI state to render briefly
+      // Clear any previous timeout
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      navigationTimeoutRef.current = setTimeout(() => {
+          if (!isCancelledRef.current && isMountedRef.current) {
+             navigateToResults(backendResult, uriToAnalyze);
+          } else {
+              console.log("analyzeVideo: Cancelled before navigation timeout or component unmounted.");
+              setAnalysisState('idle');
+              processingRef.current = false;
+          }
+          // Clear the ref after timeout completes
+          navigationTimeoutRef.current = null;
+      }, 300);
+
+    } catch (err: any) {
+      console.error('analyzeVideo: Error during analysis process:', err);
+      if (isCancelledRef.current || !isMountedRef.current) {
+         console.log("analyzeVideo: Error occurred, but was already cancelled or component unmounted.");
+         setAnalysisState('idle');
+         processingRef.current = false;
+         return;
+      }
+
+      // Set specific error message if retry failed
+      let errorMessage = err.message || 'Ett okänt fel uppstod under analysen.';
+      // Handle specific errors if needed, e.g., duplicate request
+      if (err.message?.includes('Duplicate request')) {
+          errorMessage = 'Analysen pågår redan för denna video.';
+          // Keep state as analyzing? Or revert to idle? Reverting seems safer.
+          setAnalysisState('idle');
+      } else if (retryAttempted) {
+          // If this error occurred after a retry attempt
+          errorMessage = 'Analysen misslyckades igen. Försök skanna om videon.';
+      } else {
+          setAnalysisState('error');
+      }
+      setError(errorMessage); // Set the final error message
+      processingRef.current = false; // Ensure reset on error
     }
   };
-  
-  const navigateToResults = (result: any, videoPath: string) => {
-    try {
-      console.log('Navigerar till resultatskärm');
-      
-      setTimeout(() => {
-        try {
-          setAnalysisState('idle');
-          setVideoUri(null);
-          processingRef.current = false;
 
-          console.log('Försöker navigera till resultatskärm med params:', {
-            productAnalysis: JSON.stringify(result),
-            mediaUri: videoPath,
-            analysisType: 'video'
-          });
+  // --- Navigation ---
+  const navigateToResults = (result: any, sourceVideoUri: string) => {
+      console.log('navigateToResults: Navigating with result and URI:', sourceVideoUri);
+      try {
+          // Ensure result is stringified for navigation parameters
+          const resultString = JSON.stringify(result);
           
-          router.push({
+          // Block ALL future state updates by marking as cancelled
+          isCancelledRef.current = true;
+          
+          // Clear any lingering timers or state that might cause loops
+          requestIdRef.current = null;
+          
+          // Use router.replace instead of push to completely replace current screen in history
+          // This helps prevent memory leaks and loops when going back
+          router.replace({
             pathname: '/(tabs)/(scan)/result',
             params: { 
-              productAnalysis: JSON.stringify(result),
-              mediaUri: videoPath,
-            }
-          });
-        } catch (routeError) {
-          console.error('Navigationsfel:', routeError);
-          
-          Alert.alert(
-            'Navigationsfel',
-            'Kunde inte visa resultatskärmen. Vill du försöka igen?',
-            [
-              { 
-                text: 'Avbryt', 
-                style: 'cancel',
-                onPress: () => router.replace('/(tabs)/(scan)')
-              },
-              { 
-                text: 'Försök igen', 
-                onPress: () => {
-                  router.push({
-                    pathname: '/(tabs)/(scan)/result',
-                    params: {
-                      productAnalysis: JSON.stringify(result),
-                      mediaUri: videoPath,
-                    }
-                  });
-                }
+                  productAnalysis: resultString,
+                  mediaUri: sourceVideoUri,
               }
-            ]
-          );
-        }
-      }, 300);
-    } catch (error) {
-      console.error('Allvarligt navigationsfel:', error);
+          });
+      } catch (navError) {
+          console.error('navigateToResults: Navigation failed:', navError);
+          Alert.alert('Navigationsfel', 'Kunde inte visa resultatskärmen.');
+          // Reset state if navigation fails
+          setError('Navigationsfel.');
+          setAnalysisState('error');
+          processingRef.current = false;
+      }
+  };
+
+  // --- Event Handlers ---
+  const handleCancel = () => {
+    console.log('handleCancel: User initiated cancel.');
+    if (analysisState === 'analyzing' || analysisState === 'preparing_results') {
       Alert.alert(
-        'Fel',
-        'Ett fel uppstod när analysresultatet skulle visas. Försök igen.',
-        [{ text: 'OK', onPress: () => router.replace('/(tabs)/(scan)') }]
+        'Avbryta analys?',
+        'Vill du verkligen avbryta den pågående analysen?',
+        [
+          { text: 'Fortsätt', style: 'cancel' },
+          {
+            text: 'Avbryt Analys',
+            style: 'destructive',
+            onPress: () => {
+              console.log('handleCancel: Confirmed cancellation.');
+              isCancelledRef.current = true;
+              processingRef.current = false;
+              setRetryAttempted(false); // Reset retry flag on cancel
+              setAnalysisState('idle');
+              setVideoUri(null); // Clear displayed video
+              processedVideoPathRef.current = null; // Allow reprocessing if needed later
+              // Navigate back or to a default state
+              if (router.canGoBack()) {
+                  router.back();
+              } else {
+                  router.replace('/(tabs)/(scan)/'); // Go to scan home
+              }
+            }
+          }
+        ]
       );
-    }
-  };
-
-  const handleVideoError = (error: any) => {
-    console.error('Video player error:', error);
-    setVideoPlayerError(true);
-  };
-
-  const convertVideoToBase64 = async (uri: string): Promise<string> => {
-    try {
-      console.log('Converting video to base64:', uri);
-      
-      let normalizedUri = uri;
-      if (!uri.startsWith('file://') && !uri.startsWith('content://')) {
-        normalizedUri = `file://${uri}`;
-      }
-      
-      const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
-      
-      if (!fileInfo.exists) {
-        throw new Error('Video file not found');
-      }
-      
-      // Säkerställ att size är tillgänglig genom att använda type assertion
-      const fileSize = (fileInfo as FileSystem.FileInfo & { size?: number })?.size || 0;
-      
-      if (fileSize > 50 * 1024 * 1024) {
-        throw new Error('Video file is too large (max 50MB)');
-      }
-      
-      // Komprimera videon innan den konverteras till base64 om den är större än 5MB
-      if (fileSize > 5 * 1024 * 1024) {
-        console.log(`Video är ${(fileSize / (1024 * 1024)).toFixed(2)}MB, komprimerar innan uppladdning...`);
-        
-        try {
-          const compressedUri = await compressVideo(normalizedUri);
-          console.log('Video komprimerad, använder komprimerad version');
-          
-          const compressedFileInfo = await FileSystem.getInfoAsync(compressedUri);
-          const compressedFileSize = (compressedFileInfo as FileSystem.FileInfo & { size?: number })?.size || 0;
-          console.log(`Originalstorlek: ${(fileSize / (1024 * 1024)).toFixed(2)}MB, Komprimerad: ${(compressedFileSize / (1024 * 1024)).toFixed(2)}MB`);
-          
-          normalizedUri = compressedUri;
-        } catch (compressError) {
-          console.warn('Kunde inte komprimera video, fortsätter med original:', compressError);
+    } else {
+        // If not analyzing, just navigate back/home
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(tabs)/(scan)/');
         }
-      }
-      
-      const base64 = await FileSystem.readAsStringAsync(normalizedUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      console.log(`Successfully converted video to base64 (${base64.length} chars)`);
-      return base64;
-    } catch (error) {
-      console.error('Failed to convert video to base64:', error);
-      throw error;
-    }
-  };
-  
-  // Hjälpfunktion för att komprimera video
-  const compressVideo = async (videoUri: string): Promise<string> => {
-    try {
-      // Implementera komprimering med react-native-video-processing eller annan lämplig modul
-      // För tillfället, returnera bara originalfilmen eftersom faktisk komprimering kräver en separat modul
-      console.log('Video komprimering skulle ske här med en dedikerad modul');
-      
-      // Simulera komprimering genom att returnera originalfilen
-      // I en riktig implementation skulle du använda:
-      // 1. react-native-compressor
-      // 2. react-native-video-processing
-      // 3. ffmpeg i react-native
-      return videoUri;
-    } catch (error) {
-      console.error('Fel vid komprimering av video:', error);
-      throw error;
     }
   };
 
-  const generateMockVideoAnalysisResult = () => {
-    return {
-      isVegan: false,
-      confidence: 0.85,
-      ingredientList: [
-        "Socker", 
-        "Vetemjöl", 
-        "Mjölk", 
-        "Vegetabiliska oljor (palm, raps)", 
-        "Salt", 
-        "Emulgeringsmedel (sojalecitin)", 
-        "Arom"
-      ],
-      watchedIngredients: [
-        {
-          name: "Mjölk",
-          isVegan: false,
-          reason: "Mjölk är en animalisk produkt som kommer från kor"
-        },
-        {
-          name: "Vegetabiliska oljor (palm, raps)",
-          isVegan: true,
-          reason: "Vegetabiliska oljor är veganska, men palmolja kan ha etiska problem relaterade till miljöpåverkan"
-        }
-      ],
-      reasoning: "OBS! DETTA ÄR DEMO-DATA. Produkten innehåller mjölk vilket är en animalisk produkt och därför inte vegansk.",
-      detectedLanguage: "sv"
+  const handleRetry = () => {
+      if (retryAttempted) {
+          // If retry already attempted, force rescan by navigating back/cancelling
+          console.log('handleRetry: Retry already attempted. Forcing rescan by navigating home.');
+          // Explicitly reset processing state before navigating
+          processingRef.current = false;
+          processedVideoPathRef.current = null; // Clear the path we tried
+          // Directly navigate to the scan home screen to ensure a fresh start
+          router.replace('/(tabs)/(scan)/');
+      } else if (processedVideoPathRef.current) {
+           // First retry attempt
+           console.log('handleRetry: First retry attempt for:', processedVideoPathRef.current);
+           setRetryAttempted(true); // Mark retry as attempted
+           setError(null); // Clear previous error
+           processingRef.current = true; // Mark as processing again
+           analyzeVideo(processedVideoPathRef.current); // Start analysis with the last path
+      } else {
+           console.error('handleRetry: No video path available to retry.');
+           handleCancel(); // Go back if no path
+      }
+  };
+
+  const handleVideoRecorded = (uri: string) => {
+    console.log('handleVideoRecorded: Received new video URI:', uri);
+    // Navigate to self with the new video path as a parameter
+    // This triggers the useEffect[params] logic for initialization
+    router.push({
+        pathname: '/(tabs)/(scan)/video', // Navigate to this screen
+        params: { videoPath: uri }
+    });
+  };
+
+  // --- UI Rendering ---
+  const renderContent = () => {
+    switch (analysisState) {
+      case 'analyzing':
+      case 'preparing_results':
+        return (
+          <StyledView className="items-center w-full">
+            <ActivityIndicator size="large" color="#ffffff" />
+            <StyledText className="text-white text-center mt-4 px-6 font-sans-bold text-lg">
+              {stepMessage}
+            </StyledText>
+            {/* Progress Bar */}
+            <StyledView className="w-full mt-6 px-8">
+              <StyledView className="h-2 bg-gray-800 rounded-full w-full overflow-hidden">
+                <StyledView
+                  className="h-full bg-white"
+                  style={{ width: `${progressValue}%`, opacity: 0.9 }}
+                />
+              </StyledView>
+            </StyledView>
+            {/* Percentage */}
+            <StyledView className="mt-2 bg-gray-800/50 px-4 py-2 rounded-lg">
+              <StyledText className="text-neutral-300 text-center font-sans-medium text-sm">
+                {Math.floor(progressValue)}% slutfört
+              </StyledText>
+            </StyledView>
+            {/* Cancel Button */}
+            <StyledPressable
+              onPress={handleCancel} // Use the main cancel handler
+              className="mt-8 bg-gray-700 px-6 py-3 rounded-lg" // Slightly different color
+            >
+              <StyledText className="text-white font-sans-medium">
+                Avbryt analys
+              </StyledText>
+            </StyledPressable>
+          </StyledView>
+        );
+      case 'error':
+        return (
+          <StyledView className="items-center w-full px-6">
+            <Ionicons name="alert-circle-outline" size={64} color="#FF4545" />
+            <StyledText className="text-white text-center mt-4 font-sans-bold text-lg">
+              Analys misslyckades
+            </StyledText>
+            {error && (
+              <StyledText className="text-red-400 text-center mt-2 font-sans text-sm">
+                {String(error)}
+              </StyledText>
+            )}
+            <StyledPressable
+              onPress={handleRetry} // Use retry handler
+              className="bg-white/20 rounded-lg py-3 px-6 mt-8"
+            >
+              <StyledText className="text-white text-center font-sans-medium">
+                  {retryAttempted ? 'Skanna igen' : 'Försök igen'}
+              </StyledText>
+            </StyledPressable>
+          </StyledView>
+        );
+      case 'idle':
+      default:
+         // If idle and no videoUri, show recorder.
+         // If idle WITH videoUri (e.g., after cancellation before analysis), show placeholder? Or recorder?
+         // Showing recorder seems most logical if idle.
+        return (
+          <VideoRecorder onVideoRecorded={handleVideoRecorded} onCancel={handleCancel} />
+        );
+    }
+  };
+
+  // --- Effect: Component Cleanup ---
+  useEffect(() => {
+    // Mark as mounted on initial render
+    isMountedRef.current = true;
+    
+    // This effect handles cleanup when component unmounts
+    return () => {
+      console.log('VideoScreen: Unmounting - performing final cleanup');
+      // Mark as unmounted first to prevent any new state updates
+      isMountedRef.current = false;
+      
+      // Clear all processing flags and state to prevent memory leaks and loops
+      processingRef.current = false;
+      isCancelledRef.current = true;
+      requestIdRef.current = null;
+      processedVideoPathRef.current = null;
+      
+      // Clear any pending navigation timeout
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+      
+      // Ensure device doesn't stay awake
+      KeepAwake.deactivateKeepAwake();
     };
-  };
+  }, []);
 
+  // Render main screen structure
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]} className="bg-black flex-1">
+    <SafeAreaView style={styles.container} className="flex-1 bg-black">
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
-      
-      {analysisState === 'idle' && !videoUri ? (
-        <VideoRecorder onVideoRecorded={handleVideoRecorded} onCancel={handleCancel} />
+
+      {/* Conditionally render VideoRecorder or the analysis/error view */}
+      {analysisState === 'idle' && !params.videoPath ? (
+         <VideoRecorder onVideoRecorded={handleVideoRecorded} onCancel={handleCancel} />
       ) : (
-        <StyledView className="flex-1 justify-center items-center p-4">
+         <StyledView className="flex-1 justify-center items-center p-4">
+           {/* Back Button - always show if not in recorder mode */}
            <StyledView className="absolute inset-x-0 top-0 z-10" style={{ marginTop: insets.top }}>
              <StyledView className="flex-row justify-between items-center p-4">
-                <StyledPressable
-                  onPress={handleCancel}
-                  className="bg-black/50 rounded-full p-2"
-                >
-                  <Ionicons name="arrow-back" size={24} color="white" />
-                </StyledPressable>
-               <StyledView className="w-10" /> 
+               <StyledPressable
+                 onPress={handleCancel}
+                 className="bg-black/50 rounded-full p-2"
+               >
+                 <Ionicons name="arrow-back" size={24} color="white" />
+               </StyledPressable>
+               <StyledView className="w-10" />
              </StyledView>
            </StyledView>
 
-          {analysisState === 'analyzing' && (
-            <StyledView className="items-center w-full">
-              <ActivityIndicator size="large" color="#ffffff" />
-              <StyledText className="text-white text-center mt-4 px-6 font-sans font-bold text-lg">
-                {stepMessage}
-              </StyledText>
-              
-              {/* Animerad progress-indikator */}
-              <StyledView className="w-full mt-6 px-8">
-                <StyledView className="h-2 bg-gray-800 rounded-full w-full overflow-hidden">
-                  <StyledView 
-                    className="h-full bg-white" 
-                    style={{ width: `${progressValue}%`, opacity: 0.9 }}
-                  />
-                </StyledView>
-                
-                <StyledView className="flex-row justify-between mt-2">
-                  <StyledText className={`text-xs ${currentStep === 'uploading' ? 'text-white font-sans-bold' : 'text-neutral-400'}`}>
-                    Uppladdning
-                  </StyledText>
-                  <StyledText className={`text-xs ${currentStep === 'optimizing' ? 'text-white font-sans-bold' : 'text-neutral-400'}`}>
-                    Optimering
-                  </StyledText>
-                  <StyledText className={`text-xs ${currentStep === 'analyzing' ? 'text-white font-sans-bold' : 'text-neutral-400'}`}>
-                    Analys
-                  </StyledText>
-                  <StyledText className={`text-xs ${currentStep === 'processing' || currentStep === 'complete' ? 'text-white font-sans-bold' : 'text-neutral-400'}`}>
-                    Resultat
-                  </StyledText>
-                </StyledView>
-              </StyledView>
-              
-              <StyledView className="mt-2 bg-gray-800/50 px-4 py-2 rounded-lg">
-                <StyledText className="text-neutral-300 text-center font-sans-medium text-sm">
-                  {Math.floor(progressValue)}% slutfört
-                </StyledText>
-              </StyledView>
-              
-              {/* Avbryt-knapp */}
-              <StyledPressable
-                onPress={() => {
-                  Alert.alert(
-                    'Avbryta analys?',
-                    'Vill du avbryta analysen?',
-                    [
-                      { text: 'Fortsätt analys', style: 'cancel' },
-                      { 
-                        text: 'Avbryt', 
-                        style: 'destructive', 
-                        onPress: handleCancel 
-                      }
-                    ]
-                  );
-                }}
-                className="mt-8 bg-gray-800 px-6 py-3 rounded-lg"
-              >
-                <StyledText className="text-white font-sans-medium">
-                  Avbryt analys
-                </StyledText>
-              </StyledPressable>
-              
-              {/* Info-text för bakgrundskörning */}
-              <StyledText className="text-neutral-500 text-center mt-4 px-6 font-sans text-xs">
-                Du kan gå tillbaka till hemskärmen under analysen. Vi meddelar dig när analysen är klar.
-              </StyledText>
-            </StyledView>
-          )}
-
-          {analysisState === 'preparing_results' && (
-            <StyledView className="items-center">
-              <ActivityIndicator size="large" color="#ffffff" />
-              <StyledText className="text-white text-center mt-4 px-6 font-sans font-bold text-lg">
-                Förbereder resultaten...
-              </StyledText>
-            </StyledView>
-          )}
-
-          {analysisState === 'error' && (
-            <StyledView className="items-center w-full">
-               <Ionicons name="alert-circle-outline" size={64} color="#FF4545" />
-              <StyledText className="text-white text-center mt-4 px-6 font-sans font-bold text-lg">
-                Analys misslyckades
-              </StyledText>
-              {error && (
-                 <StyledText className="text-red-400 text-center mt-2 px-6 font-sans text-sm">
-                   {error}
-                 </StyledText>
-              )}
-              <StyledPressable
-                onPress={() => {
-                   if (videoUri) {
-                      setError(null);
-                      setAnalysisState('analyzing');
-                      analyzeVideo(videoUri); 
-                   } else {
-                      handleCancel(); 
-                   }
-                }}
-                className="bg-white/20 rounded-lg py-3 px-6 mt-8"
-              >
-                <StyledText className="text-white text-center font-sans font-medium">Försök igen</StyledText>
-              </StyledPressable>
-            </StyledView>
-          )}
-        </StyledView>
+           {renderContent()}
+         </StyledView>
       )}
 
-      {/* Modal för användningsgräns */}
-      <UsageLimitModal 
-        visible={isLimitModalVisible} 
-        onClose={() => setLimitModalVisible(false)} 
+      <UsageLimitModal
+        visible={isLimitModalVisible}
+        onClose={() => setLimitModalVisible(false)}
       />
-      
     </SafeAreaView>
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  video: {
-    flex: 1,
-    alignSelf: 'stretch',
-    backgroundColor: '#000',
-  },
-  versionText: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    fontSize: 10,
-    color: 'rgba(100, 100, 100, 0.5)',
-    zIndex: 1000,
+    backgroundColor: '#000', // Ensure container uses black background
   },
 });
 
-export default VideoScreen; 
+export default VideoScreen;

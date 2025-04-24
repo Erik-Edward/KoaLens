@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../../constants/Colors';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { Alert as CustomAlert } from '../../utils/alertUtils';
+import { useAuth } from '../../providers/AuthProvider';
 
 export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
@@ -25,15 +27,16 @@ export default function ResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
+  const { signOut } = useAuth();
 
   const updatePassword = async () => {
     Keyboard.dismiss();
     if (password !== confirmPassword) {
-      Alert.alert('Fel', 'Lösenorden matchar inte.');
+      CustomAlert.alert('Fel', 'Lösenorden matchar inte.', undefined, 'error');
       return;
     }
     if (password.length < 8) {
-      Alert.alert('Fel', 'Lösenordet måste vara minst 8 tecken långt.');
+      CustomAlert.alert('Fel', 'Lösenordet måste vara minst 8 tecken långt.', undefined, 'error');
       return;
     }
 
@@ -46,10 +49,10 @@ export default function ResetPasswordScreen() {
 
       if (error) {
         console.error('ResetPasswordScreen: Fel vid lösenordsuppdatering:', error);
-        Alert.alert('Fel', `Kunde inte uppdatera lösenord: ${error.message}`);
+        CustomAlert.alert('Fel', `Kunde inte uppdatera lösenord: ${error.message}`, undefined, 'error');
       } else {
         console.log('ResetPasswordScreen: Lösenordet uppdaterades framgångsrikt!');
-        Alert.alert(
+        CustomAlert.alert(
           'Lösenord uppdaterat',
           'Ditt lösenord har ändrats. Du kan nu logga in med ditt nya lösenord.',
           [
@@ -57,12 +60,30 @@ export default function ResetPasswordScreen() {
               text: 'OK', 
               onPress: () => router.replace('/(tabs)') 
             }
-          ]
+          ],
+          'success'
         );
       }
     } catch (err) {
       console.error('ResetPasswordScreen: Oväntat fel vid lösenordsuppdatering:', err);
-      Alert.alert('Fel', 'Ett oväntat fel inträffade. Försök igen senare.');
+      CustomAlert.alert('Fel', 'Ett oväntat fel inträffade. Försök igen senare.', undefined, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    console.log('ResetPasswordScreen: Användaren avbröt lösenordsåterställning');
+    setLoading(true);
+    try {
+      // Logga ut användaren först för att säkerställa att de inte förblir inloggade med temporära token
+      await signOut();
+      console.log('ResetPasswordScreen: Utloggning genomförd, navigerar till login');
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('ResetPasswordScreen: Fel vid utloggning:', error);
+      // Även vid fel försöker vi navigera tillbaka till login
+      router.replace('/(auth)/login');
     } finally {
       setLoading(false);
     }
@@ -162,7 +183,7 @@ export default function ResetPasswordScreen() {
            {/* Cancel Button */}
           <TouchableOpacity
             style={styles.cancelButton}
-            onPress={() => router.replace('/(auth)/login')}
+            onPress={handleCancel}
             disabled={loading}
           >
             <Text style={styles.cancelButtonText}>Avbryt</Text>

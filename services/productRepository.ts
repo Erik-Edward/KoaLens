@@ -697,6 +697,7 @@ export class ProductRepository {
             isUncertain: false, // Default to false when analysis is missing
             confidence: 1.0,
             watchedIngredients: [],
+            traceIngredients: [],
             reasoning: "Importerad från Supabase utan analys"
           };
         } else {
@@ -708,6 +709,7 @@ export class ProductRepository {
             isVegan: product.analysis.isVegan !== undefined ? product.analysis.isVegan : true,
             confidence: product.analysis.confidence || 1.0,
             watchedIngredients: product.analysis.watchedIngredients || [],
+            traceIngredients: product.analysis.traceIngredients || [],
             reasoning: product.analysis.reasoning || "Importerad från Supabase"
           };
         }
@@ -905,6 +907,7 @@ export class ProductRepository {
             isUncertain: isUncertain,
             confidence: 0.7 + Math.random() * 0.3, // 70-100% konfidensgrad
             watchedIngredients,
+            traceIngredients: [],
             reasoning: actualIsVegan 
               ? 'Produkten innehåller inga icke-veganska ingredienser.'
               : isUncertain ? 'Osäker status' : 'Innehåller icke-veganska ämnen.'

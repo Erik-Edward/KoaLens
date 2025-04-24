@@ -1,7 +1,7 @@
 {
   "name": "koalens",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -12,6 +12,7 @@
     "lint": "expo lint",
     "build:dev": "cross-env EAS_NO_VCS=1 eas build --profile development --platform android",
     "build:preview": "cross-env EAS_NO_VCS=1 eas build --profile preview --platform android",
+    "build:production": "cross-env EAS_NO_VCS=1 eas build --profile production --platform android",
     "update:dev": "cross-env EAS_NO_VCS=1 eas update --branch development",
     "update:preview": "cross-env EAS_NO_VCS=1 eas update --branch preview",
     "dev:client": "expo start --dev-client"

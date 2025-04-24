@@ -1,10 +1,11 @@
 // app/(auth)/register.tsx
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { useAuth } from '../../providers/AuthProvider';
 import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '@/stores/useStore';
+import { Alert } from '@/utils/alertUtils';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -17,17 +18,17 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Fel', 'Vänligen fyll i alla fält');
+      Alert.alert('Fel', 'Vänligen fyll i alla fält', undefined, 'error');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Fel', 'Lösenorden matchar inte');
+      Alert.alert('Fel', 'Lösenorden matchar inte', undefined, 'error');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Fel', 'Lösenordet måste vara minst 6 tecken långt');
+      Alert.alert('Fel', 'Lösenordet måste vara minst 6 tecken långt', undefined, 'error');
       return;
     }
 
@@ -49,7 +50,8 @@ export default function RegisterScreen() {
             text: 'Avbryt', 
             style: 'cancel' 
           }
-        ]
+        ],
+        'warning'
       );
       return;
     }
@@ -60,7 +62,7 @@ export default function RegisterScreen() {
       const { data, error } = await signUp(email, password);
       
       if (error) {
-        Alert.alert('Registreringsfel', error.message);
+        Alert.alert('Registreringsfel', error.message, undefined, 'error');
         return;
       }
       
@@ -83,19 +85,21 @@ export default function RegisterScreen() {
                 });
               }
             }
-          ]
+          ],
+          'info'
         );
       } else {
         // Om vi får en session betyder det att användaren är inloggad direkt
         Alert.alert(
           'Konto skapat',
           'Ditt konto har skapats och du är nu inloggad.',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
+          'success'
         );
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      Alert.alert('Registreringsfel', error?.message || 'Ett fel uppstod vid registrering. Försök igen senare.');
+      Alert.alert('Registreringsfel', error?.message || 'Ett fel uppstod vid registrering. Försök igen senare.', undefined, 'error');
     } finally {
       setIsSubmitting(false);
     }

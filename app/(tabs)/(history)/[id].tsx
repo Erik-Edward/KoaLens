@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { useStore } from '@/stores/useStore';
 import { useShallow } from 'zustand/react/shallow';
+import { STRINGS } from '@/constants/strings';
+import { WatchedIngredient } from '@/types/settingsTypes';
 
 // Styled components
 const StyledView = styled(View);
@@ -25,40 +27,6 @@ const StyledScrollView = styled(ScrollView);
 const StyledPressable = styled(Pressable);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledImage = styled(Image);
-
-// Hårdkodade strings för skärmen
-const STRINGS = {
-  HEADER_BACK: 'Tillbaka',
-  HEADER_TITLE: 'Historik',
-  ERROR_TITLE: 'Fel',
-  ERROR_MESSAGE: 'Kunde inte hitta produkten',
-  ERROR_BUTTON: 'Gå tillbaka',
-  SHARE_BUTTON: 'Dela',
-  FAVORITE_BUTTON: 'Favorit',
-  UNFAVORITE_BUTTON: 'Ta bort favorit',
-  DELETE_BUTTON: 'Ta bort',
-  DELETE_TITLE: 'Ta bort produkt',
-  DELETE_MESSAGE: 'Är du säker på att du vill ta bort denna produkt från historiken?',
-  DELETE_CANCEL: 'Avbryt',
-  DELETE_CONFIRM: 'Ta bort',
-  SHARE_TITLE: 'Se vad jag hittade med KoaLens!',
-  SHARE_ERROR: 'Kunde inte dela produkten',
-  SECTION_ANALYSIS: 'Analys',
-  SECTION_INGREDIENTS: 'Ingredienser',
-  VEGAN_INGREDIENTS: 'Veganska ingredienser',
-  NON_VEGAN_INGREDIENTS: 'Icke-veganska ingredienser',
-  WATCH_INGREDIENTS: 'Bevakade ingredienser',
-  UNKNOWN_INGREDIENTS: 'Okända ingredienser',
-  UNCERTAIN_INGREDIENTS: 'Osäkra ingredienser',
-  VEGAN_RESULT: 'Vegansk',
-  NON_VEGAN_RESULT: 'Inte vegansk',
-  CONFIDENCE: 'Säkerhet',
-  ANALYSIS_DATE: 'Analyserad',
-  NO_INGREDIENTS: 'Inga ingredienser av denna typ hittades',
-  EMPTY_REASONING: 'Ingen analysgrund tillgänglig',
-  UNKNOWN_RESULT: 'Okänd status',
-  UNCERTAIN_RESULT: 'Osäker'
-};
 
 // Sektion-rubrik komponent
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
@@ -121,28 +89,26 @@ const IngredientList: React.FC<{
 
 // Huvudkomponent för produktdetalj
 export default function ProductDetailScreen() {
-  // Hämta ID från URL-parametrar
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { getProductById, removeProduct, toggleFavorite } = useProducts();
+  const { id: originalId } = useLocalSearchParams<{ id: string }>();
+  
+  // --- Get current watched ingredient settings ---
+  const watchedIngredientsSettings = useStore(useShallow(state => state.preferences.watchedIngredients));
+  // ---
+
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Hämta produktrelaterade funktioner från vår custom hook
-  const { 
-    getProductById, toggleFavorite, removeProduct
-  } = useProducts();
-  
-  // --- Get user's watched ingredients ---
-  const userWatchedIngredientNames = useStore(useShallow(state =>
-    Object.values(state.preferences?.watchedIngredients || {})
-      .filter(ing => ing.enabled)
-      .map(ing => ing.name.toLowerCase())
-  ));
-  // --------------------------------------
-  
+
+  // Memoize the active watched configurations (including keywords)
+  const activeWatchedConfigs = useMemo(() => {
+    return Object.values(watchedIngredientsSettings)
+      .filter((config): config is WatchedIngredient => config?.enabled && Array.isArray(config.keywords));
+  }, [watchedIngredientsSettings]);
+
   // Ladda produktdata
   const loadProduct = useCallback(async () => {
-    if (!id) {
+    if (!originalId) {
       console.error('ProductDetailScreen: Inget produkt-ID angivet');
       setError('Inget produkt-ID angivet');
       setLoading(false);
@@ -150,8 +116,8 @@ export default function ProductDetailScreen() {
     }
     
     // Rensa bort eventuellt -new suffix från ID
-    const cleanId = id.toString().replace('-new', '');
-    console.log(`ProductDetailScreen: Försöker hämta produkt med ID: ${cleanId} (original ID: ${id})`);
+    const cleanId = originalId.toString().replace('-new', '');
+    console.log(`ProductDetailScreen: Försöker hämta produkt med ID: ${cleanId} (original ID: ${originalId})`);
     
     try {
       setLoading(true);
@@ -170,23 +136,42 @@ export default function ProductDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, getProductById]);
+  }, [originalId, getProductById]);
   
   // Ladda produkten när skärmen visas
   useEffect(() => {
     loadProduct();
   }, [loadProduct]);
   
-  // --- Filter product ingredients based on user's watch list ---
+  // --- Filter product ingredients based on user's watch list (USING KEYWORDS) ---
   const watchedProductIngredients = useMemo(() => {
-    if (!product || !Array.isArray(product.ingredients)) return [];
-    // Filter IngredientListItem by comparing item.name
-    return product.ingredients.filter(item =>
-      userWatchedIngredientNames.includes(item.name.toLowerCase().trim())
-    );
-    // Returnerar nu IngredientListItem[]
-  }, [product, userWatchedIngredientNames]);
-  // -----------------------------------------------------------
+    if (!product || !Array.isArray(product.ingredients) || !activeWatchedConfigs) {
+      return [];
+    }
+
+    const watched: IngredientListItem[] = [];
+    const productIngredients = product.ingredients; // IngredientListItem[]
+
+    productIngredients.forEach(ingredient => {
+      const ingredientNameLower = ingredient.name.toLowerCase();
+      let isWatched = false;
+
+      for (const config of activeWatchedConfigs) {
+        if (config.keywords.some(keyword => ingredientNameLower.includes(keyword.toLowerCase()))) {
+          isWatched = true;
+          break; // Found a match for this ingredient, no need to check other configs
+        }
+      }
+
+      if (isWatched) {
+        watched.push(ingredient);
+      }
+    });
+
+    console.log("[HistoryDetail] Filtered watched ingredients:", JSON.stringify(watched.map(i => i.name)));
+    return watched;
+  }, [product, activeWatchedConfigs]);
+  // --------------------------------------------------------------------
   
   // --- Separate ingredients by status for rendering --- 
   const { veganIngredients, nonVeganIngredients, uncertainIngredients } = useMemo(() => {

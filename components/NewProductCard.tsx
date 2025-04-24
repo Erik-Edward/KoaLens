@@ -6,7 +6,7 @@ import { sv } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { Product } from '@/models/productModel';
-import { HISTORY_HEADER_COLOR } from '@/app/(tabs)/(history)/history';
+import { HISTORY_HEADER_COLOR } from '@/app/(tabs)/(history)/index';
 
 const StyledView = styled(View);
 const StyledText = styled(Text);

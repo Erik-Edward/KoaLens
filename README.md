@@ -58,11 +58,11 @@ För att säkerställa att den nya arkitekturen fungerar korrekt bör följande 
 1. **Dev-fliken test**:
    - Kontrollera att Dev-fliken syns i appen
    - Använd funktionerna i Dev-vyn för att skapa testprodukter
-   - Kontrollera att testprodukterna visas korrekt i historiken
+   - Kontrollera att testprodukterna visas korrekt i historikvyn
 
 2. **Produkthantering**:
    - Skanna en produkt och se till att den sparas korrekt
-   - Kontrollera att produkten visas i både den gamla och den nya historiken
+   - Kontrollera att produkten visas i både den gamla och den nya historikvyn
    - Markera en produkt som favorit och verifiera att statusen uppdateras
    - Ta bort en produkt och verifiera att den försvinner från listan
 
@@ -81,7 +81,7 @@ För framtida implementation bör följande automatiserade tester skapas:
    - Testa hooks som `useProducts` och `useAnalytics`
 
 2. **Integrationstester**:
-   - Testa flödet från skanning till visning i historiken
+   - Testa flödet från skanning till visning i historikvyn
    - Testa att gamla och nya system kan samexistera
 
 3. **UI-tester**:
@@ -121,44 +121,28 @@ KoaLens är byggd med React Native och Expo, och använder AI för att analysera
 
 **Lärdom:** Om oväntade renderfel uppstår med `<Modal>`, överväg att implementera en egen overlay-vy som alternativ.
 
-## AnalysisService dubbla implementationer
+## AnalysisService Historik
 
-KoaLens har för närvarande två separata implementationer av `analysisService.ts`:
+Tidigare hade KoaLens två separata implementationer av `analysisService.ts`:
 
-1. **services/analysisService.ts** (i rootmappen)
-   - Fokuserar på videoanalys
-   - Integrerar med Gemini AI
-   - Innehåller komplex logik för videohantering och API-anrop
+- En i rotens `services/`-mapp (fokuserad på videoanalys med Gemini AI).
+- En i `src/services/`-mappen (fokuserad på bild-/textanalys med Claude AI och lokal validering).
 
-2. **src/services/analysisService.ts**
-   - Tidigare implementation fokuserad på bild- och textanalys
-   - Använder Claude AI
-   - Innehåller lokal ingrediensvalidering via `veganIngredientDatabase`
+### Nuvarande status (Efter Rensning)
 
-### Nuvarande status
-
-Bildanalysfunktionen har inaktiverats till förmån för videoanalys, som ger bättre resultat. Detta beror på:
+Bildanalysfunktionen har inaktiverats och den gamla implementationen i `src/services/analysisService.ts` har **tagits bort**.
+Appen använder nu endast videoanalys via `services/analysisService.ts` (i rotmappen), vilket ger bättre resultat eftersom:
 
 1. Videoanalys fångar hela ingredienslistan bättre
 2. Det är enklare för användaren att hantera en kort video
-3. Vi kan standardisera på en AI-modell (Gemini) istället för att ha två olika (Claude för bilder, Gemini för video)
+3. Vi kan standardisera på en AI-modell (Gemini).
 
 ### Framtida plan
 
-Planen är att slå ihop de två versionerna av analysisService till en enda, enhetlig service:
+Nu när den gamla implementationen är borttagen, är framtida planer:
 
-1. **Kortsiktig lösning**:
-   - Bildanalys har inaktiverats i `src/services/analysisService.ts`
-   - Alla UI-komponenter har uppdaterats för att bara erbjuda videoanalys
-   - Felmeddelanden informerar användaren om förändringen
+- **Konsolidera Logik**: Konsolidera eventuell kvarvarande värdefull logik (som felhantering och cachning) inom den nuvarande `services/analysisService.ts`.
+- **Bildanalys (Valfritt)**: Implementera eventuellt Gemini-baserad bildanalys i framtiden om behov uppstår, inom den befintliga servicen.
+- **Modularitet**: Överväg en mer modulär arkitektur om fler analysmetoder läggs till.
 
-2. **Medellång sikt**:
-   - Slå ihop de båda servicen till en enda implementation
-   - Behåll värdefulla delar av båda, särskilt veganIngredientDatabase från src-implementationen
-   - Konsolidera felhantering och cachningslogik
-
-3. **Lång sikt**:
-   - Implementera Gemini-baserad bildanalys om behov finns
-   - Strukturera om till en mer modulär arkitektur med separata tjänster för olika analysmetoder
-
-För utvecklare: Använd `services/analysisService.ts` för alla videoanalys-behov och undvik att lägga till funktionalitet i `src/services/analysisService.ts` eftersom den kommer att fasas ut.
+För utvecklare: Använd `services/analysisService.ts` (i rotmappen) för all analys-relaterad funktionalitet.

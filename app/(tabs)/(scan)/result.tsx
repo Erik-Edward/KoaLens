@@ -12,7 +12,7 @@ import {
   Image,
   Pressable,
   SafeAreaView,
-  Alert,
+  Alert as RNAlert,
   StyleSheet,
   Platform,
   Modal,
@@ -38,6 +38,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Video, ResizeMode } from 'expo-av';
 import { useStore } from '@/stores/useStore';
 import { useShallow } from 'zustand/react/shallow';
+import { Alert } from '@/utils/alertUtils';
 
 // Styled components
 const StyledView = styled(View);
@@ -398,35 +399,46 @@ function IngredientsList({
 
 /**
  * WatchedIngredientsDisplay komponent
- * Visar enbart de ingredienser som flaggats av backend (icke-veganska/osäkra)
- * i en tydlig sektion.
+ * Visar ingredienser flaggade av backend (non-vegan/uncertain/watched)
+ * Indikerar nu om de är spårämnen baserat på reason-fältet.
  */
 function WatchedIngredientsDisplay({ watchedIngredients }: { watchedIngredients: WatchedIngredient[] }) {
-  const relevantWatched = (watchedIngredients || []).filter(i => i.status === 'non-vegan' || i.status === 'uncertain');
+  // Ta bort intern filtrering - komponenten visar nu allt som skickas in.
+  // const nonVegan = (watchedIngredients || []).filter(i => i.status === 'non-vegan');
+  // const uncertain = (watchedIngredients || []).filter(i => i.status === 'uncertain');
 
-  if (!relevantWatched || relevantWatched.length === 0) {
+  // Ta bort logik baserad på overallStatus och intern filtrering
+  // const shouldRenderNonVegan = overallStatus === false && nonVegan.length > 0;
+  // const shouldRenderUncertain = overallStatus === null && uncertain.length > 0;
+
+  // Rendera bara om det faktiskt finns ingredienser att visa
+  if (!watchedIngredients || watchedIngredients.length === 0) {
     return null;
   }
 
-  const nonVegan = relevantWatched.filter(i => i.status === 'non-vegan');
-  const uncertain = relevantWatched.filter(i => i.status === 'uncertain');
-
+  // Uppdaterad renderIngredient för att hantera spårämnen och använda neutral färg
   const renderIngredient = (ingredient: WatchedIngredient) => {
+    // Ikon baseras på status
     const isNonVegan = ingredient.status === 'non-vegan';
-    const iconName = isNonVegan ? 'close-circle' : 'help-circle';
-    const iconColor = isNonVegan ? STATUS_COLORS['non-vegan'] : STATUS_COLORS['uncertain'];
+    const isUncertain = ingredient.status === 'uncertain';
+    // Använd informationsikon för 'unknown' (troligen spårämne matchat av user config)
+    const iconName = isNonVegan ? 'close-circle' : (isUncertain ? 'help-circle' : 'information-circle-outline'); 
+    
+    const notedColor = '#007AFF'; // Konsekvent blå färg
+
+    // Kontrollera om reason indikerar spårämne
+    const isTrace = ingredient.reason?.includes("(spårämne)") ?? false;
+    const displayName = isTrace ? `${ingredient.name} (spårämne)` : ingredient.name;
+    const nameStyle = isTrace ? { fontStyle: 'italic' } : {};
 
     return (
-      <StyledView key={ingredient.name} style={styles.watchedIngredientItem}>
-        <Ionicons name={iconName} size={20} color={iconColor} style={styles.watchedIngredientIcon} />
+      <StyledView key={`${ingredient.name}-${ingredient.status}-${isTrace}`} style={[styles.watchedIngredientItem, { paddingLeft: 5 }]}>
+        <Ionicons name={iconName} size={20} color={notedColor} style={styles.watchedIngredientIcon} />
         <StyledView style={styles.watchedIngredientTextContainer}>
-          <SafeText value={ingredient.name} style={[styles.watchedIngredientName, { color: iconColor }]} />
-          {(ingredient.description || ingredient.reason) && (
-            <SafeText
-               value={ingredient.description || ingredient.reason}
-               style={styles.watchedIngredientDescription}
-            />
-          )}
+          <SafeText 
+            value={displayName} 
+            style={[styles.watchedIngredientName, { color: notedColor }, nameStyle]} 
+          />
         </StyledView>
       </StyledView>
     );
@@ -434,19 +446,42 @@ function WatchedIngredientsDisplay({ watchedIngredients }: { watchedIngredients:
 
   return (
     <StyledView style={styles.ingredientsCard}>
-      <SafeText value={"Statusförklaring"} style={styles.watchedIngredientsTitle} />
-      {nonVegan.length > 0 && (
-        <StyledView style={{ marginBottom: uncertain.length > 0 ? 12 : 0 }}>
-          <SafeText value={"Icke-veganska:"} style={[styles.watchedIngredientSectionTitle, { color: STATUS_COLORS['non-vegan'] }]} />
-          {nonVegan.map(renderIngredient)}
+      <SafeText value={"Noterade ingredienser"} style={styles.watchedIngredientsTitle} />
+      {/* Förklarande text - Kortare och enklare */}
+       <StyledText style={[styles.watchedIngredientDescription, {marginBottom: 8}]}>
+         Här visas ingredienser som matchar din bevakningslista, inklusive de från "kan innehålla"-varningar (märkta med "spårämne").
+       </StyledText>
+      
+      {watchedIngredients.map(renderIngredient)}
+    </StyledView>
+  );
+}
+
+/**
+ * TraceIngredientsList komponent
+ * Visar en enkel lista över ingredienser som identifierats 
+ * från "kan innehålla spår av"-varningar.
+ */
+function TraceIngredientsList({ traceIngredients }: { traceIngredients: string[] }) {
+  if (!traceIngredients || traceIngredients.length === 0) {
+    return null; // Rendera inget om listan är tom
+  }
+
+  return (
+    <StyledView style={styles.ingredientsCard} className="mt-1 mb-2"> {/* Lite mindre marginal */}
+      <SafeText value={"Kan innehålla spår av"} style={styles.ingredientsTitle} />
+      <StyledText style={[styles.watchedIngredientDescription, {marginBottom: 8}]}>
+        Följande ämnen nämndes i "kan innehålla"-varningar på produkten:
+      </StyledText>
+      {traceIngredients.map((name, index) => (
+        <StyledView key={`${name}-${index}`} style={[styles.watchedIngredientItem, { borderBottomWidth: index === traceIngredients.length - 1 ? 0 : 1 }]}>
+           {/* Använd en neutral ikon eller ingen alls */}
+          <Ionicons name="information-circle-outline" size={20} color="#888" style={styles.watchedIngredientIcon} />
+          <StyledView style={styles.watchedIngredientTextContainer}>
+            <SafeText value={name} style={[styles.watchedIngredientName, { color: '#555', fontWeight: 'normal' }]} />
+          </StyledView>
         </StyledView>
-      )}
-      {uncertain.length > 0 && (
-        <StyledView>
-          <SafeText value={"Osäkra:"} style={[styles.watchedIngredientSectionTitle, { color: STATUS_COLORS.uncertain }]} />
-          {uncertain.map(renderIngredient)}
-        </StyledView>
-      )}
+      ))}
     </StyledView>
   );
 }
@@ -464,6 +499,7 @@ export default function ResultScreen() {
   const { incrementCounter } = useCounter();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const videoRef = useRef<Video>(null);
@@ -478,6 +514,94 @@ export default function ResultScreen() {
   // State for Save Modal
   const [isSaveModalVisible, setSaveModalVisible] = useState(false);
   const [saveName, setSaveName] = useState('');
+
+  // State for Color Legend Expansion
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+
+  // --- Get user preferences for watched ingredients --- 
+  const userPreferences = useStore(useShallow(state => state.preferences));
+  
+  const activeWatchedConfigs = useMemo(() => {
+    if (!userPreferences?.watchedIngredients) return [];
+    return Object.values(userPreferences.watchedIngredients)
+                 .filter(details => details.enabled && details.keywords && details.keywords.length > 0);
+  }, [userPreferences]);
+
+  // *** NY useMemo hook för att filtrera baserat på ANVÄNDARENS inställningar ***
+  const userWatchedDisplayItems = useMemo((): WatchedIngredient[] => {
+    if (!product || !activeWatchedConfigs || activeWatchedConfigs.length === 0) {
+      return [];
+    }
+
+    const filteredItems: WatchedIngredient[] = [];
+    const addedNames = new Set<string>(); // För deduplicering
+
+    // 1. Kolla backend-flaggade ingredienser (watchedIngredients)
+    if (Array.isArray(product.analysis.watchedIngredients)) {
+      product.analysis.watchedIngredients.forEach(item => {
+        if (!item || !item.name) return;
+        const lowerCaseItemName = item.name.toLowerCase().trim();
+        
+        const isUserWatching = activeWatchedConfigs.some(config => 
+          config.keywords.some(keyword => lowerCaseItemName.includes(keyword.toLowerCase()))
+        );
+
+        if (isUserWatching && !addedNames.has(item.name)) {
+          filteredItems.push(item); // Inkludera hela objektet från backend
+          addedNames.add(item.name);
+        }
+      });
+    }
+
+    // 2. Kolla rena spårämnen (traceIngredients) som inte redan lagts till
+    if (Array.isArray(product.analysis.traceIngredients)) {
+      product.analysis.traceIngredients.forEach(traceName => {
+        if (typeof traceName !== 'string' || traceName.trim() === '' || addedNames.has(traceName)) return; 
+        const lowerCaseTraceName = traceName.toLowerCase().trim();
+
+        const isUserWatching = activeWatchedConfigs.some(config => 
+          config.keywords.some(keyword => lowerCaseTraceName.includes(keyword.toLowerCase()))
+        );
+
+        if (isUserWatching) {
+          // Skapa ett nytt objekt för detta spårämne
+          filteredItems.push({
+            name: traceName,
+            status: 'unknown', // Vi har ingen backend-status här, märk som unknown
+            reason: '(spårämne)', // Markera som spårämne
+            // description: 'Matchar din bevakningslista (från "kan innehålla")' // Valfri beskrivning
+          });
+          addedNames.add(traceName);
+        }
+      });
+    }
+    
+     // 3. Kolla deklarerade ingredienser (product.ingredients) som inte redan lagts till
+     // Detta behövs om användaren bevakar en normalt 'vegan' ingrediens som inte flaggades av backend.
+     if (Array.isArray(product.ingredients)) {
+        product.ingredients.forEach(item => {
+          if (!item || !item.name || addedNames.has(item.name)) return;
+          const lowerCaseItemName = item.name.toLowerCase().trim();
+
+          const isUserWatching = activeWatchedConfigs.some(config => 
+             config.keywords.some(keyword => lowerCaseItemName.includes(keyword.toLowerCase()))
+          );
+
+          if (isUserWatching) {
+             filteredItems.push({
+                 name: item.name,
+                 status: item.status, // Använd status från huvudlistan
+                 reason: 'Matchar din bevakningslista',
+                 // description: item.description // Valfritt
+             });
+             addedNames.add(item.name);
+          }
+        });
+     }
+
+    console.log("[DEBUG] User Watched Display Items (Filtered):", JSON.stringify(filteredItems));
+    return filteredItems;
+  }, [product, activeWatchedConfigs]);
 
   const analysisService = useMemo(() => new AnalysisService(), []);
   const productRepository = useMemo(() => new ProductRepository(), []);
@@ -564,15 +688,15 @@ export default function ResultScreen() {
    */
   const createProductFromAnalysis = (
       analysisResult: any,
-      ingredientList: IngredientListItem[],
+      ingredientList: IngredientListItem[], // This is now ONLY declared ingredients
       userId: string | null,
       mediaUri?: string,
       productName?: string,
       isMock: boolean = false,
       existingId?: string
   ): Product => {
-    console.log('[createProduct] Startar. Analysdata (från backend result):', JSON.stringify(analysisResult, null, 2));
-    console.log('[createProduct] IngredientList (från backend result):', ingredientList);
+    console.log('[createProduct] Startar. Rått analysresultat från backend:', JSON.stringify(analysisResult, null, 2));
+    console.log('[createProduct] Deklarerad IngredientList (från backend result.ingredientList):', ingredientList);
 
     if (!analysisResult) {
       console.error('[createProduct] Saknar analysisResult-objekt.');
@@ -586,18 +710,42 @@ export default function ResultScreen() {
     const now = new Date().toISOString();
     const productId = existingId || uuidv4();
 
+    // Validera och extrahera watchedIngredients - se till att det är en array
+    const validatedWatchedIngredients = Array.isArray(analysisResult.watchedIngredients) 
+        ? analysisResult.watchedIngredients 
+        : [];
+    // Logga om det inte var en array
+    if (!Array.isArray(analysisResult.watchedIngredients)) {
+        console.warn('[createProduct] analysisResult.watchedIngredients var inte en array, använder tom lista. Mottaget värde:', analysisResult.watchedIngredients);
+    }
+
+    // Validera och extrahera traceIngredients - se till att det är en array av strängar
+    const validatedTraceIngredients = Array.isArray(analysisResult.traceIngredients) 
+        ? analysisResult.traceIngredients.filter((item: any) => typeof item === 'string')
+        : [];
+    // Logga om det inte var en array
+    if (!Array.isArray(analysisResult.traceIngredients)) {
+        console.warn('[createProduct] analysisResult.traceIngredients var inte en array, använder tom lista. Mottaget värde:', analysisResult.traceIngredients);
+    }
+    
+    // Logga om filtering skedde (dvs om arrayen innehöll annat än strängar)
+    if (Array.isArray(analysisResult.traceIngredients) && validatedTraceIngredients.length !== analysisResult.traceIngredients.length) {
+        console.warn('[createProduct] Filtrerade bort icke-sträng värden från analysisResult.traceIngredients.');
+    }
+
     const productData: Product = {
       id: productId,
       timestamp: now,
-      ingredients: ingredientList,
+      ingredients: ingredientList, // Endast deklarerade här
       analysis: {
         isVegan: analysisResult.isVegan,
         isUncertain: analysisResult.isUncertain ?? (analysisResult.isVegan === null),
         confidence: analysisResult.confidence ?? 0.5,
-        watchedIngredients: analysisResult.watchedIngredients || [],
+        watchedIngredients: validatedWatchedIngredients, // Använd validerad lista
+        traceIngredients: validatedTraceIngredients, // Använd validerad lista
         reasoning: analysisResult.reasoning || '',
         detectedLanguage: analysisResult.detectedLanguage || 'unknown',
-        uncertainReasons: analysisResult.uncertainReasons || [],
+        uncertainReasons: Array.isArray(analysisResult.uncertainReasons) ? analysisResult.uncertainReasons : [], // Säkerställ array
       },
       metadata: {
         userId: userId ?? undefined,
@@ -612,7 +760,7 @@ export default function ResultScreen() {
       },
     };
 
-    console.log('[createProduct] Färdigt Product-objekt skapat.');
+    console.log('[createProduct] Färdigt Product-objekt skapat med nya strukturen.');
     return productData;
   };
 
@@ -803,7 +951,8 @@ export default function ResultScreen() {
 
     const trimmedName = saveName.trim();
     console.log(`Försöker spara produkt ${product.id} med namn: "${trimmedName}" för användare ${userId}`);
-    setLoading(true); // Show loading indicator
+    setIsSaving(true); // Show saving indicator
+    setSaveModalVisible(false); // Close modal immediately
 
     try {
       // 1. Create updated product object
@@ -823,13 +972,10 @@ export default function ResultScreen() {
       // 3. Update local state to reflect the changes
       setProduct(updatedProduct);
 
-      // 4. Close modal
-      setSaveModalVisible(false);
-
-      // 5. Show confirmation
+      // 4. Show confirmation
       Alert.alert('Sparat!', `Analysen har sparats i historiken som "${trimmedName}".`);
 
-      // 6. Log event
+      // 5. Log event
       logEvent('result_manually_saved', { productId: product.id, nameLength: trimmedName.length });
 
     } catch (err) {
@@ -837,15 +983,15 @@ export default function ResultScreen() {
       Alert.alert('Fel', `Kunde inte spara analysen: ${err instanceof Error ? err.message : String(err)}`);
       logEvent('result_manual_save_error', { productId: product.id, error_message: err instanceof Error ? err.message : String(err) });
     } finally {
-      setLoading(false); // Hide loading indicator
+      setIsSaving(false); // Hide saving indicator
     }
   };
 
-  if (loading) {
+  if (loading || isSaving) {
     return (
       <StyledSafeAreaView style={styles.container} className="justify-center items-center">
         <ActivityIndicator size="large" color="#007AFF" />
-        <SafeText value="Analyseras..." style={{ marginTop: 16, fontSize: 16, color: '#666' }} />
+        <SafeText value={isSaving ? "Sparar..." : "Analyseras..."} style={{ marginTop: 16, fontSize: 16, color: '#666' }} />
       </StyledSafeAreaView>
     );
   }
@@ -976,28 +1122,13 @@ export default function ResultScreen() {
               <SafeText value={product.analysis.reasoning} style={styles.reasoning} />
             </StyledView>
           )}
-
-          {(product.analysis.isUncertain || product.analysis.isVegan === null) && (
-            <StyledView style={styles.uncertaintyContainer}>
-              <SafeText value={"Varför Osäker?"} style={styles.uncertaintyTitle} />
-              {(product.analysis.uncertainReasons && product.analysis.uncertainReasons.length > 0) ? (
-                product.analysis.uncertainReasons.map((reason, index) => (
-                  <StyledView key={`uncertain-${index}`} style={styles.uncertaintyReason}>
-                    <Ionicons name="information-circle-outline" size={18} color="#FFA000" />
-                    <SafeText value={reason} style={styles.uncertaintyText} />
-                  </StyledView>
-                ))
-              ) : (
-                <StyledView style={styles.uncertaintyReason}>
-                    <Ionicons name="information-circle-outline" size={18} color="#FFA000" />
-                    <SafeText value={"Ingen specifik orsak angiven, men statusen kunde inte fastställas som vegansk."} style={styles.uncertaintyText} />
-                </StyledView>
-              )}
-            </StyledView>
-          )}
         </StyledView>
 
-        <WatchedIngredientsDisplay watchedIngredients={product.analysis.watchedIngredients} />
+        <WatchedIngredientsDisplay
+            watchedIngredients={userWatchedDisplayItems} 
+        />
+
+        <TraceIngredientsList traceIngredients={product.analysis.traceIngredients} />
 
         <StyledView style={styles.ingredientsCard}>
           <StyledText style={styles.ingredientsTitle}>Ingredienser</StyledText>
@@ -1007,6 +1138,38 @@ export default function ResultScreen() {
           />
         </StyledView>
 
+        <StyledView style={styles.ingredientsCard} className="mt-2 mb-4">
+          <StyledTouchableOpacity onPress={() => setIsLegendExpanded(!isLegendExpanded)} className="flex-row justify-between items-center py-2">
+            <StyledText className="text-base font-semibold text-gray-700">Vad betyder färgerna?</StyledText>
+            <Ionicons name={isLegendExpanded ? "chevron-up" : "chevron-down"} size={20} color="#666" />
+          </StyledTouchableOpacity>
+
+          {isLegendExpanded && (
+            <StyledView className="mt-3 pt-3 border-t border-gray-200">
+              <StyledView className="flex-row items-start mb-2">
+                <StyledView className="w-3 h-3 rounded-full mr-3 mt-1" style={{ backgroundColor: STATUS_COLORS.vegan }} />
+                <StyledText className="flex-1 text-sm text-gray-600"><StyledText className="font-semibold">Grön:</StyledText> Ingrediensen bedöms vara vegansk.</StyledText>
+              </StyledView>
+              <StyledView className="flex-row items-start mb-2">
+                 <StyledView className="w-3 h-3 rounded-full mr-3 mt-1" style={{ backgroundColor: STATUS_COLORS['non-vegan'] }} />
+                 <StyledText className="flex-1 text-sm text-gray-600"><StyledText className="font-semibold">Röd:</StyledText> Ingrediensen bedöms vara icke-vegansk (animaliskt ursprung).</StyledText>
+              </StyledView>
+              <StyledView className="flex-row items-start mb-3">
+                 <StyledView className="w-3 h-3 rounded-full mr-3 mt-1" style={{ backgroundColor: STATUS_COLORS.uncertain }} />
+                 <StyledText className="flex-1 text-sm text-gray-600"><StyledText className="font-semibold">Gul/Orange:</StyledText> Ingrediensens ursprung är osäkert (kan vara växt- eller djurbaserad).</StyledText>
+              </StyledView>
+              <StyledView className="flex-row items-start mb-3">
+                 <StyledView className="w-3 h-3 rounded-full mr-3 mt-1" style={{ backgroundColor: '#007AFF' }} /> 
+                 <StyledText className="flex-1 text-sm text-gray-600"><StyledText className="font-semibold">Blå:</StyledText> Används för "Noterade ingredienser" (t.ex. icke-veganska, osäkra, spårämnen, eller de som matchar din bevakningslista). Ikonen visar den underliggande statusen.</StyledText>
+              </StyledView>
+              <StyledView className="mt-2 pt-2 border-t border-gray-100">
+                 <StyledText className="text-xs text-gray-500 italic">
+                     Tips: Är du osäker på en ingrediens? För att vara helt säker rekommenderar vi att du kontaktar tillverkaren direkt.
+                 </StyledText>
+               </StyledView>
+            </StyledView>
+          )}
+        </StyledView>
       </StyledScrollView>
 
       <Modal

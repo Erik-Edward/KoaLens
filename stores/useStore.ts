@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StoreState } from './types';
 import { createAuthSlice } from './slices/createAuthSlice';
-import { createSettingsSlice } from './slices/createSettingsSlice';
+import { createSettingsSlice, defaultWatchedIngredients } from './slices/createSettingsSlice';
 import { createHistorySlice } from './slices/createHistorySlice';
 import { createOnboardingSlice } from './slices/createOnboardingSlice';
 import { createAvatarSlice } from './slices/createAvatarSlice';
@@ -14,6 +14,7 @@ import { createUserSlice } from './slices/userSlice';
 import { createProductSlice } from './slices/productSlice';
 import { Product } from '@/models/productModel';
 import { ScannedProduct } from './types';
+import { WatchedIngredient } from '@/types/settingsTypes';
 
 const STORE_VERSION = 1;
 
@@ -98,7 +99,63 @@ export const useStore = create<StoreState>()(
         }
         
         return isValidPersistedState(persistedState) ? persistedState : {};
-      }
+      },
+      merge: (persistedState, currentState) => {
+        console.log('[Merge] Merging persisted state with current state.');
+        const typedPersistedState = persistedState as PersistedState;
+
+        // --- Merge logic for watchedIngredients --- 
+        const currentDefaultIngredients = defaultWatchedIngredients; // Default list from settings slice
+        const persistedWatchedIngredients = typedPersistedState.preferences?.watchedIngredients || {};
+        const mergedWatchedIngredients: { [key: string]: WatchedIngredient } = {};
+
+        // Iterate over the definitive default list
+        Object.keys(currentDefaultIngredients).forEach(key => {
+          const defaultIngredient = currentDefaultIngredients[key];
+          const persistedIngredient = persistedWatchedIngredients[key];
+
+          if (persistedIngredient) {
+            // Ingredient exists in persisted state, use it (keeps user's enabled status)
+            // Optional: Add a check here to ensure persistedIngredient structure is valid?
+             mergedWatchedIngredients[key] = persistedIngredient;
+          } else {
+            // Ingredient is new (or was missing), use the default
+            mergedWatchedIngredients[key] = defaultIngredient;
+          }
+        });
+        console.log(`[Merge] Watched ingredients merged. Total keys: ${Object.keys(mergedWatchedIngredients).length}`);
+        // --- End merge logic for watchedIngredients ---
+
+        // Merge the rest of the state (simple shallow merge for this example)
+        // Important: This assumes other parts of the state don't need deep merging.
+        // If they do, more specific merge logic is needed for them too.
+        const mergedState = {
+            ...currentState, // Start with the current app state (slices' initial states)
+            ...(persistedState as object), // Overwrite with persisted values (shallow)
+            // ** Explicitly set the merged preferences **
+            preferences: {
+                 ...(currentState.preferences || {}),
+                 ...(typedPersistedState.preferences || {}),
+                 watchedIngredients: mergedWatchedIngredients, // Use the carefully merged watched ingredients
+            },
+            // Example: Ensure specific non-primitive substates are handled if needed
+             onboarding: { 
+                 ...(currentState.onboarding || {}), 
+                 ...(typedPersistedState.onboarding || {}), 
+             },
+             // Add similar logic for other complex slices if necessary
+        };
+
+        // Remove potential undefined keys that might come from persisted state
+        Object.keys(mergedState).forEach(key => {
+            if ((mergedState as any)[key] === undefined) {
+                delete (mergedState as any)[key];
+            }
+        });
+
+        console.log('[Merge] State merge complete.');
+        return mergedState as StoreState;
+      },
     }
   )
 );

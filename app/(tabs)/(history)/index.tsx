@@ -1,19 +1,23 @@
 // app/(tabs)/(history)/index.tsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
-import { ProductCard } from '@/components/ProductCard';
+import { NewProductCard } from '@/components/NewProductCard';
 import { useStore } from '@/stores/useStore';
 import { styled } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
-import { logEvent, Events, logScreenView } from '@/lib/analyticsWrapper';
+import { logEvent, logScreenView } from '@/lib/analyticsWrapper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScannedProduct, StoreState, MixedProductArray } from '@/stores/types';
 import { Product } from '@/models/productModel';
-import { useNavigation } from '@react-navigation/native';
-import { Redirect, usePathname, useRouter } from 'expo-router';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { useProducts } from '@/hooks/useProducts';
 import { shouldUseModernUI, getUseNewUI, getUIPreferences, UIVersion } from '../../../constants/uiPreferences';
-import * as SplashScreen from 'expo-splash-screen';
 import { router } from 'expo-router';
+
+// Färgkonstanter för historiksidan
+export const HISTORY_HEADER_COLOR = '#232A35';
+export const HISTORY_ACCENT_COLOR = '#FFD700'; // Du kan flytta denna också om den används
 
 const StyledView = styled(View);
 const StyledText = styled(Text);
@@ -21,9 +25,6 @@ const StyledTextInput = styled(TextInput);
 const StyledScrollView = styled(ScrollView);
 const StyledSafeAreaView = styled(SafeAreaView);
 const StyledPressable = styled(Pressable);
-
-// Förhindra autohide av splash screen vid appens boot
-SplashScreen.preventAutoHideAsync();
 
 // Type guard to check if a product is a ScannedProduct
 function isScannedProduct(product: ScannedProduct | Product): product is ScannedProduct {
@@ -117,111 +118,24 @@ function toScannedProduct(product: ScannedProduct | Product): ScannedProduct {
   };
 }
 
-/**
- * Historik-router
- * Denna komponent ansvarar för att dirigera till rätt historiksida
- */
-export default function HistoryIndexRouter() {
-  useEffect(() => {
-    // Denna timeout säkerställer att splash screen visas korrekt
-    // innan vi navigerar till nästa skärm
-    const navigateTimer = setTimeout(() => {
-      // Navigera till den nya historikskärmen och dölj splash screen när vi är redo
-      try {
-        router.replace('/(tabs)/(history)/history');
-        SplashScreen.hideAsync();
-      } catch (error) {
-        console.error('Navigation error:', error);
-        SplashScreen.hideAsync();
-      }
-    }, 100);
-
-    return () => clearTimeout(navigateTimer);
-  }, []);
-
-  // Visar en laddningsindikator medan vi förbereder för navigation
-  return (
-    <StyledView className="flex-1 justify-center items-center bg-background-main">
-      <ActivityIndicator size="large" color="#4FB4F2" />
-      <StyledText className="text-text-secondary mt-4">
-        Laddar historik...
-      </StyledText>
-    </StyledView>
-  );
-}
-
-export function HistoryScreen() {
+export default function HistoryScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const getUserProducts = useStore(state => state.getUserProducts);
   const addProduct = useStore(state => state.addProduct);
   const [filterFavorites, setFilterFavorites] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(Date.now());
   const navigation = useNavigation();
-  const [refreshing, setRefreshing] = useState(false);
   
-  // Funktion för att uppdatera produktlistan
-  const updateProductsList = useCallback(() => {
-    // Tvinga omrendering genom att uppdatera forceUpdate-statet
-    setForceUpdate(Date.now());
-    console.log('Uppdaterar produktlista i historik');
-  }, []);
-  
-  // Använd useMemo för att beräkna produktlistan baserat på aktuella filter
-  const userProducts = useMemo(() => {
-    // Hämta ALLA produkter först för debugging
-    const allStoredProducts = useStore.getState().products;
-    const currentUser = useStore.getState().user;
-    
-    // Logga alla produkter för debugging
-    console.log('DEBUG: Alla produkter i store:', 
-      allStoredProducts.map(p => ({ 
-        id: p.id,
-        userId: getUserId(p),
-        isFavorite: getIsFavorite(p),
-        isVegan: getIsVegan(p),
-        timestamp: p.timestamp
-      }))
-    );
-    
-    // Logga användarinfo
-    console.log('DEBUG: Nuvarande användare:', currentUser ? currentUser.id : 'ingen inloggad användare');
-    
-    // Hämta produkter som vi normalt skulle visa, för debugging
-    const products = getUserProducts();
-    console.log('History: Fick', products.length, 'produkter från getUserProducts');
-    
-    // Om inga produkter från getUserProducts, analysera varför
-    if (products.length === 0 && allStoredProducts.length > 0) {
-      console.warn('VIKTIGT: getUserProducts returnerar 0 produkter trots att det finns', 
-        allStoredProducts.length, 'produkter i store - möjlig användarfiltrering');
-        
-      // Check vilka produkter som filtreras bort pga användare
-      const productsWithoutUserId = allStoredProducts.filter(p => !getUserId(p));
-      const productsWithDifferentUserId = allStoredProducts.filter(p => 
-        getUserId(p) && currentUser && getUserId(p) !== currentUser.id);
-      
-      console.log('Produkter utan användar-ID:', productsWithoutUserId.length);
-      console.log('Produkter med annat användar-ID:', productsWithDifferentUserId.length);
-      
-      // I utvecklingsläge, visa alla produkter oavsett användar-ID
-      if (__DEV__) {
-        console.log('DEV-läge: Visar alla produkter oavsett användar-ID');
-        return allStoredProducts;
-      }
-    }
-    
-    return products;
-  }, [getUserProducts, forceUpdate]);
-  
-  // Tvinga uppdatering var 5:e sekund och när komponenten visas
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('Uppdaterar produktlistan...');
-      setForceUpdate(Date.now());
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  // --- Use the useProducts hook to get products and manage state --- 
+  const authUser = useStore(state => state.user);
+  const storeUserId = useStore(state => state.userId);
+  const effectiveUserId = authUser?.id || (storeUserId || undefined);
+  const { 
+    products: userProducts, // Get products directly from the hook
+    loading: refreshing,    // Use loading state from the hook as refreshing
+    refreshProducts,
+    toggleFavorite,        // We might need these later if ProductCard doesn't handle them
+    removeProduct          // We might need these later if ProductCard doesn't handle them
+  } = useProducts(effectiveUserId);
+  // ------------------------------------------------------------------
   
   useEffect(() => {
     // Logga skärmvisning
@@ -238,6 +152,8 @@ export function HistoryScreen() {
   // Filtrera produkterna baserat på sökning och favoriter
   const filteredProducts = useMemo(() => {
     return userProducts
+      // Ensure products is an array before filtering
+      .filter(product => !!product) // Simple check if product is truthy
       .filter((product) => {
         // Ändra sökning till att matcha antingen ingredienser eller ID om produktnamn saknas
         const ingredientsList = getIngredients(product);
@@ -258,114 +174,32 @@ export function HistoryScreen() {
   const handleFavoriteFilter = () => {
     setFilterFavorites(!filterFavorites);
     // Använd generisk logEvent istället för TOGGLE_FAVORITES_FILTER som inte existerar
-    logEvent('toggle_filter', { filterType: 'favorites', newState: !filterFavorites });
+    logEvent('history_toggle_favorite_filter', { newState: !filterFavorites });
   };
 
-  // Uppdatera produkter när fliken får fokus
-  useEffect(() => {
-    // Automatisk uppdatering när komponenten renderas
-    setRefreshing(true);
-    updateProductsList();
-    
-    // Hämta även produkter från AsyncStorage om det finns sådana
-    const syncFromAsyncStorage = async () => {
-      try {
-        const productsJson = await AsyncStorage.getItem('koalens-latest-products');
-        if (productsJson) {
-          const asyncProducts = JSON.parse(productsJson);
-          if (Array.isArray(asyncProducts) && asyncProducts.length > 0) {
-            console.log(`Hittade ${asyncProducts.length} produkter i AsyncStorage`);
-            
-            // Lägg till produkter från AsyncStorage till store om de inte redan finns där
-            const storeProducts = getUserProducts();
-            const storeProductIds = new Set(storeProducts.map(p => p.id));
-            
-            // Räkna nya produkter som inte finns i store
-            let newProductCount = 0;
-            
-            // För varje produkt i AsyncStorage
-            for (const asyncProduct of asyncProducts) {
-              if (asyncProduct && asyncProduct.id && !storeProductIds.has(asyncProduct.id)) {
-                try {
-                  // Använd addProduct från store för att lägga till produkten
-                  console.log('Lägger till produkt från AsyncStorage i store:', asyncProduct.id);
-                  
-                  addProduct({
-                    imageUri: asyncProduct.imageUri,
-                    isVegan: asyncProduct.isVegan,
-                    confidence: asyncProduct.confidence,
-                    nonVeganIngredients: asyncProduct.nonVeganIngredients || [],
-                    allIngredients: asyncProduct.allIngredients || [],
-                    reasoning: asyncProduct.reasoning || '',
-                    watchedIngredientsFound: asyncProduct.watchedIngredientsFound || [],
-                    userId: asyncProduct.userId || 'unknown'
-                  });
-                  
-                  newProductCount++;
-                } catch (error) {
-                  console.error('Fel vid tillägg av produkt från AsyncStorage:', error);
-                }
-              }
-            }
-            
-            if (newProductCount > 0) {
-              console.log(`Lade till ${newProductCount} nya produkter från AsyncStorage till store`);
-              // Uppdatera produktlistan igen efter att vi lagt till från AsyncStorage
-              updateProductsList();
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Fel vid synkronisering från AsyncStorage:', error);
-      } finally {
-        setRefreshing(false);
-      }
-    };
-    
-    syncFromAsyncStorage();
-    
-    // Registrera en fokus-lyssnare för att uppdatera när fliken visas
-    const unsubscribe = navigation?.addListener('focus', () => {
-      console.log('Historikfliken fick fokus, uppdaterar produktlistan');
-      updateProductsList();
-      syncFromAsyncStorage();
-    });
-    
-    return () => {
-      unsubscribe && unsubscribe();
-    };
-  }, [navigation]);
+  // Use useFocusEffect to refresh products when the screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('HistoryScreen focused, refreshing products...');
+      refreshProducts(); // Call refreshProducts from the hook
+      // The hook will handle loading state and update products
+      // which will cause this component to re-render.
 
-  // Överskrid getUserProducts i DEV för att visa alla produkter
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('DEV-läge: Skapar en funktion som visar alla produkter');
-      
-      // Sätt en override i store för getUserProducts
-      const originalGetUserProducts = useStore.getState().getUserProducts;
-      
-      // Spara original-funktionen i en ref för återställning senare
-      const getAllProductsOverride = () => {
-        return useStore.getState().products as unknown as ScannedProduct[];
-      };
-      
-      // Logga för att verifiera
-      console.log('DEV: Override getUserProducts för att visa alla produkter');
-      
-      // Override getUserProducts direkt i store
-      useStore.setState({
-        getUserProducts: getAllProductsOverride
-      });
-      
-      // Återställ när komponenten avmonteras
       return () => {
-        console.log('DEV: Återställer getUserProducts till original');
-        useStore.setState({
-          getUserProducts: originalGetUserProducts
-        });
+        console.log('HistoryScreen blurred');
       };
-    }
-  }, []);
+    }, [refreshProducts]) // Depend only on the refresh function reference
+  );
+
+  // Display loading indicator based on the hook's state
+  if (refreshing && userProducts.length === 0) {
+    return (
+      <StyledSafeAreaView className="flex-1 bg-background-main justify-center items-center">
+        <ActivityIndicator size="large" color={HISTORY_ACCENT_COLOR} />
+        <StyledText className="text-text-secondary mt-4">Laddar historik...</StyledText>
+      </StyledSafeAreaView>
+    );
+  }
 
   return (
     <StyledSafeAreaView className="flex-1 bg-background-main">
@@ -420,27 +254,26 @@ export function HistoryScreen() {
       ) : (
         <StyledScrollView className="flex-1">
           <StyledView className="px-4 pb-24">
-            {filteredProducts.map((product) => (
-              <ProductCard 
+            {filteredProducts.map((product: Product) => (
+              <NewProductCard 
                 key={product.id} 
-                product={toScannedProduct(product)}
+                product={product}
+                onFavoriteToggle={() => toggleFavorite(product.id)}
+                onDelete={() => removeProduct(product.id)}
+                useNewDetailPage={true}
               />
             ))}
           </StyledView>
       </StyledScrollView>
       )}
       
-      {__DEV__ && <AdminControls setForceUpdate={setForceUpdate} />}
+      {__DEV__ && <AdminControls removeProduct={removeProduct} />}
     </StyledSafeAreaView>
   );
 }
 
 // Administrativ kontroll för utvecklingsläge
-interface AdminControlsProps {
-  setForceUpdate: React.Dispatch<React.SetStateAction<number>>;
-}
-
-function AdminControls({ setForceUpdate }: AdminControlsProps) {
+function AdminControls({ removeProduct }: { removeProduct?: (id: string) => Promise<void> }) {
   const clearProductsWithoutUser = useStore((state: StoreState) => state.clearProductsWithoutUser);
   const currentUser = useStore((state: StoreState) => state.user);
   const [showAllProducts, setShowAllProducts] = useState(false);
@@ -477,9 +310,6 @@ function AdminControls({ setForceUpdate }: AdminControlsProps) {
         { text: 'OK' }
       ]
     );
-    
-    // Uppdatera listan
-    setForceUpdate(Date.now());
   };
 
   // Hämta session direkt från supabase
@@ -530,7 +360,6 @@ function AdminControls({ setForceUpdate }: AdminControlsProps) {
   
   const forceReload = () => {
     console.log("Manuell uppdatering begärd, uppdaterar...");
-    setForceUpdate(Date.now());
     
     // Visa toast eller alert för att bekräfta
     Alert.alert('Uppdatering', 'Produktlistan uppdateras...', [
@@ -550,7 +379,7 @@ function AdminControls({ setForceUpdate }: AdminControlsProps) {
       global.__DEV_SHOW_ALL_PRODUCTS = newValue;
       
       // Tvinga uppdatering
-      setForceUpdate(Date.now());
+      forceReload();
       
       // Visa ett meddelande om att inställningen är aktiverad
       Alert.alert(

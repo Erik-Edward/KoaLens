@@ -67,6 +67,7 @@ export class ProductApiService {
         isUncertain: isUncertainApi,
         confidence: data.confidence,
         watchedIngredients: data.watchedIngredients || [],
+        traceIngredients: [],
         reasoning: data.reasoning,
         detectedLanguage: data.detectedLanguage,
         uncertainReasons: data.uncertainReasons
@@ -80,7 +81,7 @@ export class ProductApiService {
           
           // Map legacy watched ingredients (missing status) to the new type
           const mappedWatchedIngredients: WatchedIngredient[] = (fallbackResult.watchedIngredients || []).map(legacyWatched => {
-            let status: 'vegan' | 'non-vegan' | 'uncertain' = 'uncertain'; // Default to uncertain
+            let status: 'vegan' | 'non-vegan' | 'uncertain' | 'unknown' = 'uncertain'; // Default to uncertain, allow unknown
             if (legacyWatched.reason === 'non-vegan') {
               status = 'non-vegan';
             } else if (legacyWatched.reason === 'maybe-non-vegan') {
@@ -103,6 +104,7 @@ export class ProductApiService {
             confidence: fallbackResult.confidence ?? 0.5,
             // Use the mapped watched ingredients
             watchedIngredients: mappedWatchedIngredients,
+            traceIngredients: [],
             reasoning: fallbackResult.reasoning,
             detectedLanguage: undefined,
             uncertainReasons: isUncertainFallback ? [fallbackResult.reasoning || 'Osäker status från lokal analys'] : undefined
@@ -115,6 +117,7 @@ export class ProductApiService {
                 isUncertain: true, 
                 confidence: 0, 
                 watchedIngredients: [], 
+                traceIngredients: [],
                 reasoning: 'Kunde inte analysera ingredienser (API och lokal fallback misslyckades).' 
            };
       }

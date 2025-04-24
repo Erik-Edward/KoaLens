@@ -190,6 +190,7 @@ export function scannedProductsToProducts(scannedProducts: ScannedProduct[] | Pr
             ? scannedProduct.confidence
             : 0,
           watchedIngredients: [],
+          traceIngredients: [],
           reasoning: scannedProduct.reasoning
         },
         metadata: {

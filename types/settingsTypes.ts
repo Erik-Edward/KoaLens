@@ -1,8 +1,12 @@
 // types/settingsTypes.ts
+export type IngredientCategory = 'Allergener & Intoleranser' | 'Hälsa & Kost' | 'Miljö & Etik';
+
 export interface WatchedIngredient {
-  name: string;          // t.ex. "Palmolja"
-  enabled: boolean;      // om ingrediensen är aktiverad för bevakning
-  description: string;   // förklaring varför ingrediensen bevakas
+  name: string;          // Visningsnamn, t.ex. "Gluten (Vete, Korn, Råg)"
+  enabled: boolean;      // Om bevakningen är påslagen
+  description: string;   // Förklaring
+  category: IngredientCategory; 
+  keywords: string[];    // Lista med sökord (lowercase) som ska matchas
 }
 
 export interface UserPreferences {

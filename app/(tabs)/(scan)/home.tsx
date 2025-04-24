@@ -4,9 +4,13 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import * as Haptics from 'expo-haptics';
-import { logEvent, Events, logScreenView } from '@/lib/analytics';
+import { logScreenView, logEvent } from '@/lib/analyticsWrapper';
 import { useCameraPermission } from '@/lib/visionCameraWrapper';
 import { useRouter } from 'expo-router';
+import { Link, Stack } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Asset } from 'expo-asset';
+import AnimatedBackground from '@/components/AnimatedBackground';
 
 // Styling med nativewind
 const StyledView = styled(View);
@@ -84,7 +88,7 @@ export default function HomeScreen() {
       if (!hasPermission) return;
       
       // Logga händelse
-      logEvent(Events.VIDEO_RECORDING_STARTED);
+      logEvent('video_recording_started');
       
       // Navigera till kameran med inställning för videoläge
       router.push({
@@ -121,7 +125,7 @@ export default function HomeScreen() {
                 <Ionicons name="scan-outline" size={24} color="#000" />
               )}
               <StyledText className="ml-2 text-black font-sans-medium text-base">
-                Starta videoskanning
+                Skanna nu
               </StyledText>
             </StyledView>
           </StyledPressable>
